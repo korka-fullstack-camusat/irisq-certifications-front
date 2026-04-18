@@ -1,5 +1,4 @@
-export const API_URL = (process.env.NEXT_PUBLIC_API_URL || "https://irisq-certifications-api.onrender.com/api").replace(/\/$/, "");
-
+export const API_URL = (process.env.NEXT_PUBLIC_API_URL || "https://irisq-certifications-api.onrender.com/api")
 // Helper: nettoie le path pour construire l'URL correctement sans slash final
 
 async function apiFetch(input: RequestInfo | URL, init?: RequestInit) {
