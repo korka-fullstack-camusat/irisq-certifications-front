@@ -98,23 +98,23 @@ export default function Home() {
             initial={{ opacity: 0, y: 24 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.65, delay: 0.32 }}
-            className="flex flex-col sm:flex-row items-center justify-center gap-4 w-full max-w-2xl mt-2"
+            className="flex flex-col sm:flex-row items-center justify-center gap-3 w-full mt-2"
           >
             <Link
               href="/demande-certification"
-              className="w-full sm:flex-1 flex items-center justify-center gap-2 rounded-xl px-6 py-3.5 text-base font-bold text-white shadow-lg hover:-translate-y-0.5 transition-all duration-200"
+              className="w-full sm:flex-1 flex items-center justify-center gap-2 rounded-xl px-5 py-3.5 text-base font-bold text-white shadow-lg hover:-translate-y-0.5 transition-all duration-200 whitespace-nowrap"
               style={{
                 backgroundColor: "#2e7d32",
                 boxShadow: "0 8px 24px rgba(46, 125, 50, 0.3)",
               }}
             >
-              <UserPlus className="h-5 w-5" />
+              <UserPlus className="h-5 w-5 flex-shrink-0" />
               Candidater
             </Link>
 
             <Link
               href="/candidat/login"
-              className="w-full sm:flex-1 flex items-center justify-center gap-2 rounded-xl px-6 py-3.5 text-base font-bold shadow-lg hover:-translate-y-0.5 transition-all duration-200"
+              className="w-full sm:flex-1 flex items-center justify-center gap-2 rounded-xl px-5 py-3.5 text-base font-bold shadow-lg hover:-translate-y-0.5 transition-all duration-200 whitespace-nowrap"
               style={{
                 backgroundColor: "#ffffff",
                 color: "#1a237e",
@@ -122,19 +122,19 @@ export default function Home() {
                 boxShadow: "0 8px 24px rgba(26, 35, 126, 0.12)",
               }}
             >
-              <GraduationCap className="h-5 w-5" />
+              <GraduationCap className="h-5 w-5 flex-shrink-0" />
               Espace Candidat
             </Link>
 
             <Link
               href="/login"
-              className="w-full sm:flex-1 flex items-center justify-center gap-2 rounded-xl px-6 py-3.5 text-base font-bold text-white shadow-lg hover:-translate-y-0.5 transition-all duration-200"
+              className="w-full sm:flex-1 flex items-center justify-center gap-2 rounded-xl px-5 py-3.5 text-base font-bold text-white shadow-lg hover:-translate-y-0.5 transition-all duration-200 whitespace-nowrap"
               style={{
                 backgroundColor: "#1a237e",
                 boxShadow: "0 8px 24px rgba(26, 35, 126, 0.3)",
               }}
             >
-              <LogIn className="h-5 w-5" />
+              <LogIn className="h-5 w-5 flex-shrink-0" />
               Espace Gestionnaire
             </Link>
           </motion.div>
