@@ -1,4 +1,4 @@
-export const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api").replace(/\/$/, "");
+export const API_URL = (process.env.NEXT_PUBLIC_API_URL || "https://irisq-certifications-api.onrender.com/api").replace(/\/$/, "");
 
 // Helper: nettoie le path pour construire l'URL correctement sans slash final
 
