@@ -9,6 +9,7 @@ import {
     Upload,
     LogOut,
     X,
+    GraduationCap,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import Image from "next/image";
@@ -16,12 +17,13 @@ import { CandidateProvider, useCandidate } from "@/lib/candidate-context";
 
 const AUTH_PATHS = new Set([
     "/candidat/login",
-    "/candidat/change-password",
+    "/candidat/register",
     "/candidat/forgot-password",
 ]);
 
 const navItems = [
     { name: "Tableau de bord", href: "/candidat", icon: LayoutDashboard },
+    { name: "Certifications", href: "/candidat/certifications", icon: GraduationCap },
     { name: "Mes dossiers", href: "/candidat/dossiers", icon: FolderOpen },
     { name: "Mes corrections", href: "/candidat/documents", icon: Upload },
 ];
@@ -29,7 +31,6 @@ const navItems = [
 export default function CandidateLayout({ children }: { children: React.ReactNode }) {
     const pathname = usePathname();
 
-    // Public auth pages don't use the shell.
     if (AUTH_PATHS.has(pathname)) {
         return <>{children}</>;
     }
@@ -43,11 +44,14 @@ export default function CandidateLayout({ children }: { children: React.ReactNod
 
 function Shell({ children }: { children: React.ReactNode }) {
     const pathname = usePathname();
-    const { dossier, logout } = useCandidate();
+    const { account, logout } = useCandidate();
     const [showLogoutModal, setShowLogoutModal] = useState(false);
 
-    const initials = (dossier?.name || dossier?.public_id || "??").substring(0, 2).toUpperCase();
-    const displayName = dossier?.name || dossier?.public_id || "Candidat";
+    const displayName = account
+        ? `${account.first_name} ${account.last_name}`.trim()
+        : "Candidat";
+    const initials = displayName.substring(0, 2).toUpperCase();
+    const accountId = account?.account_id || "";
 
     const handleLogout = () => {
         setShowLogoutModal(false);
@@ -86,10 +90,7 @@ function Shell({ children }: { children: React.ReactNode }) {
                                             Déconnexion
                                         </span>
                                     </div>
-                                    <button
-                                        onClick={() => setShowLogoutModal(false)}
-                                        className="text-white/60 hover:text-white transition-colors"
-                                    >
+                                    <button onClick={() => setShowLogoutModal(false)} className="text-white/60 hover:text-white transition-colors">
                                         <X className="h-4 w-4" />
                                     </button>
                                 </div>
@@ -120,10 +121,7 @@ function Shell({ children }: { children: React.ReactNode }) {
                                         <button
                                             onClick={handleLogout}
                                             className="flex-1 py-3 rounded-xl text-sm font-bold text-white transition-all hover:-translate-y-0.5"
-                                            style={{
-                                                backgroundColor: "#c62828",
-                                                boxShadow: "0 6px 16px rgba(198,40,40,0.25)",
-                                            }}
+                                            style={{ backgroundColor: "#c62828", boxShadow: "0 6px 16px rgba(198,40,40,0.25)" }}
                                         >
                                             Se déconnecter
                                         </button>
@@ -146,14 +144,7 @@ function Shell({ children }: { children: React.ReactNode }) {
                 >
                     <Link href="/candidat" className="flex flex-col items-center gap-2 group">
                         <div className="w-20 h-20 flex items-center justify-center drop-shadow-md group-hover:scale-105 transition-transform">
-                            <Image
-                                src="/logo.png"
-                                alt="IRISQ Logo"
-                                width={80}
-                                height={80}
-                                className="object-contain w-full h-full"
-                                priority
-                            />
+                            <Image src="/logo.png" alt="IRISQ Logo" width={80} height={80} className="object-contain w-full h-full" priority />
                         </div>
                         <span className="text-[10px] font-extrabold tracking-[0.2em] uppercase" style={{ color: "#1a237e" }}>
                             Espace candidat
@@ -162,9 +153,7 @@ function Shell({ children }: { children: React.ReactNode }) {
                 </div>
 
                 <div className="flex-1 overflow-y-auto p-4">
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 px-3 mb-3">
-                        Navigation
-                    </p>
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 px-3 mb-3">Navigation</p>
                     <nav className="space-y-1">
                         {navItems.map((item) => {
                             const isActive = item.href === "/candidat"
@@ -214,7 +203,6 @@ function Shell({ children }: { children: React.ReactNode }) {
                         className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all text-left group"
                         onMouseEnter={e => (e.currentTarget as HTMLElement).style.backgroundColor = "#f4f6f9"}
                         onMouseLeave={e => (e.currentTarget as HTMLElement).style.backgroundColor = "transparent"}
-                        title="Cliquer pour se déconnecter"
                     >
                         <div
                             className="h-9 w-9 rounded-full flex items-center justify-center text-xs font-black text-white shrink-0"
@@ -224,7 +212,7 @@ function Shell({ children }: { children: React.ReactNode }) {
                         </div>
                         <div className="flex flex-col min-w-0">
                             <span className="text-sm font-bold text-gray-800 truncate">{displayName}</span>
-                            <span className="text-xs text-gray-400 font-mono truncate">{dossier?.public_id || "—"}</span>
+                            <span className="text-xs text-gray-400 font-mono truncate">{accountId}</span>
                         </div>
                         <LogOut className="h-4 w-4 ml-auto opacity-0 group-hover:opacity-100 transition-opacity shrink-0" style={{ color: "#c62828" }} />
                     </button>
@@ -238,9 +226,7 @@ function Shell({ children }: { children: React.ReactNode }) {
                 >
                     <Link href="/candidat" className="flex items-center gap-2">
                         <Image src="/logo.png" alt="IRISQ" width={36} height={36} className="object-contain" />
-                        <span className="text-xs font-extrabold tracking-widest uppercase" style={{ color: "#1a237e" }}>
-                            IRISQ
-                        </span>
+                        <span className="text-xs font-extrabold tracking-widest uppercase" style={{ color: "#1a237e" }}>IRISQ</span>
                     </Link>
                     <button
                         onClick={() => setShowLogoutModal(true)}
@@ -259,7 +245,7 @@ function Shell({ children }: { children: React.ReactNode }) {
             </main>
 
             <nav
-                className="md:hidden fixed bottom-0 left-0 right-0 z-40 flex items-center justify-around px-4 pb-safe"
+                className="md:hidden fixed bottom-0 left-0 right-0 z-40 flex items-center justify-around px-2 pb-safe"
                 style={{ backgroundColor: "#ffffff", borderTop: "2px solid #e8eaf6" }}
             >
                 {navItems.map((item) => {
@@ -271,7 +257,7 @@ function Shell({ children }: { children: React.ReactNode }) {
                         <Link
                             key={item.href}
                             href={item.href}
-                            className="flex flex-col items-center gap-1 p-3 transition-colors relative"
+                            className="flex flex-col items-center gap-0.5 p-2.5 transition-colors relative"
                             style={{ color: isActive ? "#1a237e" : "#9ca3af" }}
                         >
                             {isActive && (
@@ -284,7 +270,7 @@ function Shell({ children }: { children: React.ReactNode }) {
                                 />
                             )}
                             <Icon className="h-5 w-5" />
-                            <span className="text-[10px] font-bold text-center">{item.name}</span>
+                            <span className="text-[9px] font-bold text-center leading-tight">{item.name}</span>
                         </Link>
                     );
                 })}
