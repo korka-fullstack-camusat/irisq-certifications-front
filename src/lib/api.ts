@@ -221,9 +221,9 @@ export async function submitFinalEvaluation(
     return res.json();
 }
 
-// ──────────────────────────────────────────────────────────────
+// ───────────────────────────────────────────────────────────────
 // Sessions (admin only for mutations)
-// ──────────────────────────────────────────────────────────────
+// ───────────────────────────────────────────────────────────────
 
 export interface Session {
     _id: string;
@@ -344,9 +344,9 @@ export async function downloadAllDossiersZip(filters?: ExportFilters & { session
     return triggerZipDownload(res, "dossiers.zip");
 }
 
-// ──────────────────────────────────────────────────────────────
+// ───────────────────────────────────────────────────────────────
 // Document validation checklist (admin / RH)
-// ──────────────────────────────────────────────────────────────
+// ───────────────────────────────────────────────────────────────
 
 export interface DocumentValidationEntry {
     valid?: boolean;
@@ -389,9 +389,172 @@ export async function requestDocumentResubmit(
     return res.json();
 }
 
-// ──────────────────────────────────────────────────────────────
+// ───────────────────────────────────────────────────────────────
 // Candidate space (self-service)
-// ──────────────────────────────────────────────────────────────
+// ───────────────────────────────────────────────────────────────
+
+// ───────────────────────────────────────────────────────────────
+// Candidate Account (new registration-first flow)
+// ───────────────────────────────────────────────────────────────
+
+export interface CandidateRegisterPayload {
+    nom: string;
+    prenom: string;
+    date_naissance: string;
+    lieu_naissance?: string;
+    nationalite?: string;
+    telephone: string;
+    email: string;
+    annees_experience: string;
+    adresse?: string;
+    password: string;
+    password_confirm: string;
+}
+
+export interface CandidateAccount {
+    id: string;
+    nom: string;
+    prenom: string;
+    email: string;
+    telephone: string;
+    date_naissance: string;
+    lieu_naissance?: string | null;
+    nationalite?: string | null;
+    adresse?: string | null;
+    annees_experience: string;
+    created_at: string;
+}
+
+export interface CandidateApplication {
+    id: string;
+    public_id?: string;
+    status?: string;
+    certification?: string;
+    exam_mode?: string;
+    exam_type?: string;
+    session_id?: string | null;
+    submitted_at?: string;
+    exam_grade?: string | null;
+    final_grade?: string | null;
+    documents_validation?: Record<string, DocumentValidationEntry>;
+}
+
+export interface CandidateAccountLoginResult {
+    access_token: string;
+    account_id: string;
+}
+
+export interface CandidateMePayload {
+    account: CandidateAccount;
+    applications: CandidateApplication[];
+}
+
+export interface CandidateApplyPayload {
+    form_id?: string;
+    session_id?: string;
+    certification: string;
+    exam_mode: "online" | "onsite";
+    exam_type: "direct" | "after_formation";
+    cv_url?: string;
+    piece_identite_url?: string;
+    justificatif_experience_url?: string;
+    diplomes_url?: string;
+    attestation_formation_url?: string;
+    amenagement?: string;
+    amenagement_details?: string;
+    declaration_accepted: boolean;
+}
+
+export interface PublicCertificationsPayload {
+    certifications: string[];
+    sessions: {
+        id: string;
+        name: string;
+        description?: string | null;
+        start_date?: string | null;
+        end_date?: string | null;
+        status?: string;
+    }[];
+}
+
+async function accountFetch(input: RequestInfo | URL, init?: RequestInit) {
+    const headers = new Headers(init?.headers || {});
+    const token = getCandidateAccountToken();
+    if (token) headers.set("Authorization", `Bearer ${token}`);
+    return fetch(input, { ...init, headers });
+}
+
+const CANDIDATE_ACCOUNT_TOKEN_KEY = "candidate_account_token";
+
+export function getCandidateAccountToken(): string | null {
+    if (typeof window === "undefined") return null;
+    return localStorage.getItem(CANDIDATE_ACCOUNT_TOKEN_KEY);
+}
+
+export function setCandidateAccountToken(token: string) {
+    if (typeof window === "undefined") return;
+    localStorage.setItem(CANDIDATE_ACCOUNT_TOKEN_KEY, token);
+}
+
+export function clearCandidateAccountToken() {
+    if (typeof window === "undefined") return;
+    localStorage.removeItem(CANDIDATE_ACCOUNT_TOKEN_KEY);
+}
+
+export async function registerCandidateAccount(payload: CandidateRegisterPayload): Promise<CandidateAccountLoginResult> {
+    const res = await fetch(url("candidate-account/register"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || "Impossible de créer le compte");
+    }
+    return res.json();
+}
+
+export async function loginCandidateAccount(email: string, password: string): Promise<CandidateAccountLoginResult> {
+    const res = await fetch(url("candidate-account/login"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+    });
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || "Identifiants invalides");
+    }
+    return res.json();
+}
+
+export async function fetchCandidateMe(): Promise<CandidateMePayload> {
+    const res = await accountFetch(url("candidate-account/me"));
+    if (!res.ok) throw new Error("Session expirée");
+    return res.json();
+}
+
+export async function fetchCandidateCertifications(): Promise<PublicCertificationsPayload> {
+    const res = await accountFetch(url("candidate-account/certifications"));
+    if (!res.ok) throw new Error("Impossible de charger les certifications");
+    return res.json();
+}
+
+export async function applyForCertification(payload: CandidateApplyPayload): Promise<CandidateApplication> {
+    const res = await accountFetch(url("candidate-account/apply"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || "Échec de la candidature");
+    }
+    return res.json();
+}
+
+// ───────────────────────────────────────────────────────────────
+// Candidate self-service (legacy public_id + password)
+// ───────────────────────────────────────────────────────────────
 
 const CANDIDATE_TOKEN_KEY = "candidate_token";
 
