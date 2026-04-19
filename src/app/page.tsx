@@ -100,8 +100,9 @@ export default function Home() {
             transition={{ duration: 0.65, delay: 0.32 }}
             className="flex flex-col sm:flex-row items-center justify-center gap-3 w-full mt-2"
           >
+            {/* Créer un compte candidat */}
             <Link
-              href="/demande-certification"
+              href="/candidat/register"
               className="w-full sm:flex-1 flex items-center justify-center gap-2 rounded-xl px-5 py-3.5 text-base font-bold text-white shadow-lg hover:-translate-y-0.5 transition-all duration-200 whitespace-nowrap"
               style={{
                 backgroundColor: "#2e7d32",
@@ -112,6 +113,7 @@ export default function Home() {
               Candidater
             </Link>
 
+            {/* Espace candidat */}
             <Link
               href="/candidat/login"
               className="w-full sm:flex-1 flex items-center justify-center gap-2 rounded-xl px-5 py-3.5 text-base font-bold shadow-lg hover:-translate-y-0.5 transition-all duration-200 whitespace-nowrap"
@@ -126,6 +128,7 @@ export default function Home() {
               Espace Candidat
             </Link>
 
+            {/* Espace gestionnaire */}
             <Link
               href="/login"
               className="w-full sm:flex-1 flex items-center justify-center gap-2 rounded-xl px-5 py-3.5 text-base font-bold text-white shadow-lg hover:-translate-y-0.5 transition-all duration-200 whitespace-nowrap"

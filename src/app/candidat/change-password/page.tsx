@@ -1,41 +1,33 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
+import Link from "next/link";
 import { motion } from "framer-motion";
-import { Loader2, KeyRound, ShieldCheck, Eye, EyeOff } from "lucide-react";
+import { Loader2, KeyRound, CheckCircle2 } from "lucide-react";
 
-import {
-    candidateChangePassword,
-    setCandidateToken,
-    getCandidateToken,
-    clearCandidateToken,
-} from "@/lib/api";
+import { candidateChangePassword, setCandidateToken } from "@/lib/api";
 
 export default function CandidateChangePasswordPage() {
     const router = useRouter();
     const [currentPassword, setCurrentPassword] = useState("");
     const [newPassword, setNewPassword] = useState("");
     const [confirmPassword, setConfirmPassword] = useState("");
-    const [showNew, setShowNew] = useState(false);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
-
-    useEffect(() => {
-        if (!getCandidateToken()) router.replace("/candidat/login");
-    }, [router]);
+    const [success, setSuccess] = useState(false);
 
     async function handleSubmit(e: React.FormEvent) {
         e.preventDefault();
         setError(null);
 
-        if (newPassword.length < 6) {
-            setError("Le nouveau mot de passe doit contenir au moins 6 caractères.");
+        if (newPassword !== confirmPassword) {
+            setError("Les nouveaux mots de passe ne correspondent pas.");
             return;
         }
-        if (newPassword !== confirmPassword) {
-            setError("Les deux mots de passe ne correspondent pas.");
+        if (newPassword.length < 6) {
+            setError("Le nouveau mot de passe doit contenir au moins 6 caractères.");
             return;
         }
 
@@ -43,10 +35,10 @@ export default function CandidateChangePasswordPage() {
             setLoading(true);
             const { access_token } = await candidateChangePassword(currentPassword, newPassword);
             setCandidateToken(access_token);
-            clearCandidateToken();
-            router.replace("/candidat/login");
+            setSuccess(true);
+            setTimeout(() => router.replace("/candidat"), 2000);
         } catch (err) {
-            setError(err instanceof Error ? err.message : "Erreur lors du changement");
+            setError(err instanceof Error ? err.message : "Échec du changement de mot de passe");
         } finally {
             setLoading(false);
         }
@@ -69,95 +61,83 @@ export default function CandidateChangePasswordPage() {
                             <Image src="/logo.png" alt="IRISQ" width={32} height={32} className="object-contain" />
                         </div>
                         <div>
-                            <p className="text-[10px] font-bold tracking-[0.2em] text-white/70 uppercase">
-                                Première connexion
-                            </p>
-                            <h1 className="text-lg font-black text-white">Changer votre mot de passe</h1>
+                            <p className="text-[10px] font-bold tracking-[0.2em] text-white/70 uppercase">IRISQ Certifications</p>
+                            <h1 className="text-lg font-black text-white">Changer le mot de passe</h1>
                         </div>
                     </div>
 
-                    <form onSubmit={handleSubmit} className="p-6 space-y-4">
-                        <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs leading-relaxed">
-                            Pour sécuriser votre espace, merci de remplacer le mot de passe provisoire envoyé par email par un mot de passe personnel.
+                    {success ? (
+                        <div className="p-8 text-center">
+                            <CheckCircle2 className="h-12 w-12 mx-auto mb-4" style={{ color: "#2e7d32" }} />
+                            <p className="font-bold text-gray-800">Mot de passe mis à jour !</p>
+                            <p className="text-sm text-gray-500 mt-1">Redirection…</p>
                         </div>
-
-                        <div>
-                            <label className="text-xs font-bold uppercase tracking-widest text-gray-500 inline-flex items-center gap-1">
-                                <KeyRound className="h-3 w-3" /> Mot de passe provisoire
-                            </label>
-                            <input
-                                type="password"
-                                value={currentPassword}
-                                onChange={e => setCurrentPassword(e.target.value)}
-                                required
-                                autoComplete="current-password"
-                                className="mt-2 w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
-                                placeholder="Reçu par email"
-                            />
-                        </div>
-
-                        <div>
-                            <label className="text-xs font-bold uppercase tracking-widest text-gray-500 inline-flex items-center gap-1">
-                                <KeyRound className="h-3 w-3" /> Nouveau mot de passe
-                            </label>
-                            <div className="relative">
+                    ) : (
+                        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+                            <div>
+                                <label className="text-xs font-bold uppercase tracking-widest text-gray-500 inline-flex items-center gap-1">
+                                    <KeyRound className="h-3 w-3" /> Mot de passe actuel
+                                </label>
                                 <input
-                                    type={showNew ? "text" : "password"}
+                                    type="password"
+                                    value={currentPassword}
+                                    onChange={e => setCurrentPassword(e.target.value)}
+                                    required
+                                    autoComplete="current-password"
+                                    className="mt-2 w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+                                    placeholder="••••••"
+                                />
+                            </div>
+                            <div>
+                                <label className="text-xs font-bold uppercase tracking-widest text-gray-500 inline-flex items-center gap-1">
+                                    <KeyRound className="h-3 w-3" /> Nouveau mot de passe (min 6 caractères)
+                                </label>
+                                <input
+                                    type="password"
                                     value={newPassword}
                                     onChange={e => setNewPassword(e.target.value)}
                                     required
-                                    minLength={6}
                                     autoComplete="new-password"
-                                    className="mt-2 w-full rounded-xl border border-gray-200 px-4 py-2.5 pr-11 text-sm focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
-                                    placeholder="Au moins 6 caractères"
+                                    className="mt-2 w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+                                    placeholder="••••••"
                                 />
-                                <button
-                                    type="button"
-                                    onClick={() => setShowNew(v => !v)}
-                                    className="absolute right-3 top-1/2 -translate-y-1/2 mt-1 text-gray-400 hover:text-gray-600"
-                                    tabIndex={-1}
-                                >
-                                    {showNew ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                                </button>
                             </div>
-                        </div>
-
-                        <div>
-                            <label className="text-xs font-bold uppercase tracking-widest text-gray-500 inline-flex items-center gap-1">
-                                <KeyRound className="h-3 w-3" /> Confirmer le nouveau
-                            </label>
-                            <input
-                                type="password"
-                                value={confirmPassword}
-                                onChange={e => setConfirmPassword(e.target.value)}
-                                required
-                                minLength={6}
-                                autoComplete="new-password"
-                                className="mt-2 w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
-                                placeholder="Ressaisir le mot de passe"
-                            />
-                        </div>
-
-                        {error && (
-                            <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm">
-                                {error}
+                            <div>
+                                <label className="text-xs font-bold uppercase tracking-widest text-gray-500 inline-flex items-center gap-1">
+                                    <KeyRound className="h-3 w-3" /> Confirmer le nouveau mot de passe
+                                </label>
+                                <input
+                                    type="password"
+                                    value={confirmPassword}
+                                    onChange={e => setConfirmPassword(e.target.value)}
+                                    required
+                                    autoComplete="new-password"
+                                    className="mt-2 w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+                                    placeholder="••••••"
+                                />
                             </div>
-                        )}
 
-                        <button
-                            type="submit"
-                            disabled={loading}
-                            className="w-full inline-flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold text-white transition-all hover:-translate-y-0.5 disabled:opacity-50 disabled:hover:translate-y-0"
-                            style={{ backgroundColor: "#1a237e", boxShadow: "0 6px 16px rgba(26,35,126,0.25)" }}
-                        >
-                            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}
-                            {loading ? "Mise à jour…" : "Valider et se reconnecter"}
-                        </button>
+                            {error && (
+                                <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm">{error}</div>
+                            )}
 
-                        <p className="text-[11px] text-gray-400 text-center">
-                            Après validation, vous serez redirigé(e) vers l&apos;écran de connexion pour vous identifier avec votre nouveau mot de passe.
-                        </p>
-                    </form>
+                            <button
+                                type="submit"
+                                disabled={loading}
+                                className="w-full inline-flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold text-white transition-all hover:-translate-y-0.5 disabled:opacity-50"
+                                style={{ backgroundColor: "#1a237e", boxShadow: "0 6px 16px rgba(26,35,126,0.25)" }}
+                            >
+                                {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <KeyRound className="h-4 w-4" />}
+                                {loading ? "Modification…" : "Changer le mot de passe"}
+                            </button>
+                        </form>
+                    )}
+
+                    <div className="px-6 pb-6 text-center">
+                        <Link href="/candidat" className="text-xs text-gray-400 hover:text-gray-600">
+                            ← Retour au tableau de bord
+                        </Link>
+                    </div>
                 </div>
             </motion.div>
         </div>
