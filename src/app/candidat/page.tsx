@@ -3,39 +3,34 @@
 import Link from "next/link";
 import { motion } from "framer-motion";
 import {
-    FileText,
-    AlertTriangle,
+    ClipboardCheck,
     CheckCircle2,
     Clock,
-    ShieldCheck,
+    AlertTriangle,
     Loader2,
     Mail,
     Hash,
     ArrowRight,
-    Upload,
-    BellRing,
+    ShieldCheck,
+    Award,
+    GraduationCap,
+    Calendar,
+    FileText,
 } from "lucide-react";
 
-import { useCandidate } from "@/lib/candidate-context";
-import { type DocumentValidationEntry } from "@/lib/api";
-
-const DOC_LABELS: Record<string, string> = {
-    "CV": "Curriculum Vitae",
-    "Pièce d'identité": "Pièce d'identité",
-    "Justificatif d'expérience": "Justificatif d'expérience",
-    "Diplômes": "Diplômes / attestations",
-};
+import { useCandidateAccount } from "@/lib/account-context";
 
 function statusStyle(status?: string) {
-    if (status === "approved") return { bg: "#e8f5e9", color: "#2e7d32", label: "Candidature validée" };
-    if (status === "rejected") return { bg: "#ffebee", color: "#c62828", label: "Candidature refusée" };
-    return { bg: "#fff8e1", color: "#b45309", label: "En cours d'analyse" };
+    if (status === "approved") return { bg: "#e8f5e9", color: "#2e7d32", label: "Validée" };
+    if (status === "rejected") return { bg: "#ffebee", color: "#c62828", label: "Refusée" };
+    if (status === "evaluated") return { bg: "#e3f2fd", color: "#1565c0", label: "Évaluée" };
+    return { bg: "#fff8e1", color: "#b45309", label: "En cours" };
 }
 
 export default function CandidateDashboardPage() {
-    const { dossier, loading } = useCandidate();
+    const { account, applications, loading } = useCandidateAccount();
 
-    if (loading || !dossier) {
+    if (loading || !account) {
         return (
             <div className="flex items-center justify-center py-20">
                 <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
@@ -43,15 +38,8 @@ export default function CandidateDashboardPage() {
         );
     }
 
-    const validation = dossier.documents_validation || {};
-    const issues = Object.entries(DOC_LABELS)
-        .map(([key, label]) => {
-            const v: DocumentValidationEntry = validation[key] || {};
-            return { key, label, v };
-        })
-        .filter(d => d.v.resubmit_requested);
-
-    const st = statusStyle(dossier.status);
+    const displayName = `${account.prenom} ${account.nom}`.trim() || account.email;
+    const hasApplications = applications.length > 0;
 
     return (
         <div className="space-y-6">
@@ -66,86 +54,131 @@ export default function CandidateDashboardPage() {
                         className="h-14 w-14 rounded-2xl flex items-center justify-center text-white text-lg font-black shrink-0"
                         style={{ backgroundColor: "#1a237e" }}
                     >
-                        {(dossier.name || dossier.public_id || "??").substring(0, 2).toUpperCase()}
+                        {displayName.substring(0, 2).toUpperCase()}
                     </div>
                     <div className="flex-1 min-w-0">
                         <h1 className="text-xl font-black" style={{ color: "#1a237e" }}>
-                            Bonjour {dossier.name || "Candidat"}
+                            Bonjour {account.prenom || "Candidat"}
                         </h1>
                         <div className="mt-2 flex items-center gap-4 text-xs text-gray-500 flex-wrap">
-                            {dossier.public_id && (
+                            <span className="inline-flex items-center gap-1">
+                                <Mail className="h-3 w-3" /> {account.email}
+                            </span>
+                            {hasApplications && applications[0]?.public_id && (
                                 <span className="inline-flex items-center gap-1 font-mono px-2 py-1 rounded bg-gray-100">
-                                    <Hash className="h-3 w-3" /> {dossier.public_id}
-                                </span>
-                            )}
-                            {dossier.email && (
-                                <span className="inline-flex items-center gap-1">
-                                    <Mail className="h-3 w-3" /> {dossier.email}
-                                </span>
-                            )}
-                            {dossier.answers?.["Certification souhaitée"] && (
-                                <span className="inline-flex items-center gap-1">
-                                    <ShieldCheck className="h-3 w-3" /> {dossier.answers["Certification souhaitée"]}
+                                    <Hash className="h-3 w-3" /> {applications[0].public_id}
                                 </span>
                             )}
                         </div>
                     </div>
-                    <span
-                        className="inline-flex items-center gap-1 text-xs font-bold px-3 py-1.5 rounded-full"
-                        style={{ backgroundColor: st.bg, color: st.color }}
+                    <Link
+                        href="/candidat/candidater"
+                        className="inline-flex items-center gap-2 text-sm font-bold px-4 py-2.5 rounded-xl text-white shrink-0 transition-all hover:-translate-y-0.5"
+                        style={{ backgroundColor: "#2e7d32", boxShadow: "0 6px 16px rgba(46,125,50,0.22)" }}
                     >
-                        {dossier.status === "approved" ? <CheckCircle2 className="h-3 w-3" /> : dossier.status === "rejected" ? <AlertTriangle className="h-3 w-3" /> : <Clock className="h-3 w-3" />}
-                        {st.label}
-                    </span>
+                        <ClipboardCheck className="h-4 w-4" />
+                        Postuler à une certification
+                    </Link>
                 </div>
             </motion.div>
 
-            {/* Notifications */}
+            {/* Applications section */}
             <section className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
                 <div className="px-6 py-4 border-b border-gray-100 flex items-center gap-2">
-                    <BellRing className="h-4 w-4" style={{ color: "#1a237e" }} />
+                    <FileText className="h-4 w-4" style={{ color: "#1a237e" }} />
                     <h2 className="text-sm font-black uppercase tracking-widest" style={{ color: "#1a237e" }}>
-                        Notifications
+                        Mes candidatures
                     </h2>
+                    {hasApplications && (
+                        <span className="ml-auto text-xs text-gray-400">{applications.length} au total</span>
+                    )}
                 </div>
 
-                {issues.length === 0 ? (
+                {!hasApplications ? (
                     <div className="p-8 text-center">
-                        <CheckCircle2 className="h-8 w-8 mx-auto text-emerald-500" />
-                        <p className="mt-2 text-sm text-gray-600">Aucune action requise pour le moment.</p>
-                        <p className="text-xs text-gray-400">Vous serez notifié(e) ici si un document pose problème.</p>
+                        <GraduationCap className="h-10 w-10 mx-auto text-gray-300" />
+                        <p className="mt-3 text-sm text-gray-600 font-bold">Aucune candidature pour le moment.</p>
+                        <p className="text-xs text-gray-400 mt-1">
+                            Postulez à une certification pour recevoir un code de codification (ex. IC26D01L-0003).
+                        </p>
+                        <Link
+                            href="/candidat/candidater"
+                            className="mt-5 inline-flex items-center gap-2 text-sm font-bold px-5 py-2.5 rounded-xl text-white transition-all hover:-translate-y-0.5"
+                            style={{ backgroundColor: "#1a237e", boxShadow: "0 6px 16px rgba(26,35,126,0.22)" }}
+                        >
+                            <ClipboardCheck className="h-4 w-4" /> Postuler maintenant
+                        </Link>
                     </div>
                 ) : (
                     <ul className="divide-y divide-gray-50">
-                        {issues.map(({ key, label, v }) => (
-                            <li key={key} className="px-6 py-4 flex items-start gap-3">
-                                <div className="h-10 w-10 rounded-xl flex items-center justify-center shrink-0 bg-red-50">
-                                    <AlertTriangle className="h-5 w-5 text-red-600" />
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                    <p className="text-[10px] font-bold uppercase tracking-widest text-red-700">
-                                        Document à renvoyer
-                                    </p>
-                                    <p className="font-bold text-gray-800">{label}</p>
-                                    {v.resubmit_message && (
-                                        <p className="text-xs text-red-700 mt-1 italic">« {v.resubmit_message} »</p>
-                                    )}
-                                </div>
-                                <Link
-                                    href="/candidat/documents"
-                                    className="inline-flex items-center gap-1 text-xs font-bold px-3 py-2 rounded-lg text-white shrink-0"
-                                    style={{ backgroundColor: "#1a237e" }}
-                                >
-                                    <Upload className="h-3 w-3" /> Renvoyer
-                                </Link>
-                            </li>
-                        ))}
+                        {applications.map(app => {
+                            const st = statusStyle(app.status);
+                            return (
+                                <li key={app.id} className="px-6 py-4 flex items-start gap-3 flex-wrap">
+                                    <div className="h-10 w-10 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: "#e8eaf6" }}>
+                                        <Award className="h-5 w-5" style={{ color: "#1a237e" }} />
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <p className="font-bold text-gray-800 truncate">
+                                            {app.certification || "Certification IRISQ"}
+                                        </p>
+                                        <div className="flex items-center gap-3 text-xs text-gray-500 mt-1 flex-wrap">
+                                            {app.public_id && (
+                                                <span className="inline-flex items-center gap-1 font-mono px-2 py-0.5 rounded bg-gray-100">
+                                                    <Hash className="h-3 w-3" /> {app.public_id}
+                                                </span>
+                                            )}
+                                            {app.exam_mode && (
+                                                <span className="inline-flex items-center gap-1">
+                                                    <ShieldCheck className="h-3 w-3" />
+                                                    {app.exam_mode === "online" ? "En ligne" : "Présentiel"}
+                                                </span>
+                                            )}
+                                            {app.submitted_at && (
+                                                <span className="inline-flex items-center gap-1">
+                                                    <Calendar className="h-3 w-3" />
+                                                    {new Date(app.submitted_at).toLocaleDateString("fr-FR")}
+                                                </span>
+                                            )}
+                                        </div>
+                                    </div>
+                                    <span
+                                        className="inline-flex items-center gap-1 text-xs font-bold px-3 py-1.5 rounded-full shrink-0"
+                                        style={{ backgroundColor: st.bg, color: st.color }}
+                                    >
+                                        {app.status === "approved" ? (
+                                            <CheckCircle2 className="h-3 w-3" />
+                                        ) : app.status === "rejected" ? (
+                                            <AlertTriangle className="h-3 w-3" />
+                                        ) : (
+                                            <Clock className="h-3 w-3" />
+                                        )}
+                                        {st.label}
+                                    </span>
+                                </li>
+                            );
+                        })}
                     </ul>
                 )}
             </section>
 
             {/* Quick links */}
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid gap-4 sm:grid-cols-3">
+                <Link
+                    href="/candidat/candidater"
+                    className="group bg-white rounded-2xl p-5 border border-gray-100 shadow-sm hover:-translate-y-0.5 transition-transform"
+                >
+                    <div className="flex items-center gap-3">
+                        <div className="h-10 w-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: "#e8f5e9" }}>
+                            <ClipboardCheck className="h-5 w-5" style={{ color: "#2e7d32" }} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                            <p className="text-xs font-bold uppercase tracking-widest text-gray-400">Action</p>
+                            <p className="font-black text-gray-800">Postuler</p>
+                        </div>
+                        <ArrowRight className="h-4 w-4 text-gray-400 group-hover:text-green-600 transition-colors" />
+                    </div>
+                </Link>
                 <Link
                     href="/candidat/dossiers"
                     className="group bg-white rounded-2xl p-5 border border-gray-100 shadow-sm hover:-translate-y-0.5 transition-transform"
@@ -154,28 +187,25 @@ export default function CandidateDashboardPage() {
                         <div className="h-10 w-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: "#e8eaf6" }}>
                             <FileText className="h-5 w-5" style={{ color: "#1a237e" }} />
                         </div>
-                        <div className="flex-1">
+                        <div className="flex-1 min-w-0">
                             <p className="text-xs font-bold uppercase tracking-widest text-gray-400">Consulter</p>
                             <p className="font-black text-gray-800">Mes dossiers</p>
                         </div>
                         <ArrowRight className="h-4 w-4 text-gray-400 group-hover:text-indigo-600 transition-colors" />
                     </div>
                 </Link>
-                <Link
-                    href="/candidat/documents"
-                    className="group bg-white rounded-2xl p-5 border border-gray-100 shadow-sm hover:-translate-y-0.5 transition-transform"
-                >
+                <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
                     <div className="flex items-center gap-3">
-                        <div className="h-10 w-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: "#e8f5e9" }}>
-                            <Upload className="h-5 w-5" style={{ color: "#2e7d32" }} />
+                        <div className="h-10 w-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: "#fff8e1" }}>
+                            <GraduationCap className="h-5 w-5" style={{ color: "#b45309" }} />
                         </div>
-                        <div className="flex-1">
-                            <p className="text-xs font-bold uppercase tracking-widest text-gray-400">Action</p>
-                            <p className="font-black text-gray-800">Renvoyer un document</p>
+                        <div className="flex-1 min-w-0">
+                            <p className="text-xs font-bold uppercase tracking-widest text-gray-400">À venir</p>
+                            <p className="font-black text-gray-800 truncate">Formations</p>
+                            <p className="text-[11px] text-gray-400">Dates &amp; liens Teams</p>
                         </div>
-                        <ArrowRight className="h-4 w-4 text-gray-400 group-hover:text-green-600 transition-colors" />
                     </div>
-                </Link>
+                </div>
             </div>
         </div>
     );

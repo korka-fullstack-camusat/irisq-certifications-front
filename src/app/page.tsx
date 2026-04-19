@@ -101,7 +101,7 @@ export default function Home() {
             className="flex flex-col sm:flex-row items-center justify-center gap-3 w-full mt-2"
           >
             <Link
-              href="/demande-certification"
+              href="/candidat/register"
               className="w-full sm:flex-1 flex items-center justify-center gap-2 rounded-xl px-5 py-3.5 text-base font-bold text-white shadow-lg hover:-translate-y-0.5 transition-all duration-200 whitespace-nowrap"
               style={{
                 backgroundColor: "#2e7d32",
@@ -109,7 +109,7 @@ export default function Home() {
               }}
             >
               <UserPlus className="h-5 w-5 flex-shrink-0" />
-              Candidater
+              Créer mon compte
             </Link>
 
             <Link
