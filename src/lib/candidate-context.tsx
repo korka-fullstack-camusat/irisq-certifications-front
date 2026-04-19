@@ -2,14 +2,14 @@
 
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
-import { candidateMe, clearCandidateToken, getCandidateToken, type CandidateDossier } from "./api";
+import { candidateMe, clearCandidateToken, getCandidateToken, type CandidateAccount } from "./api";
 
 interface CandidateCtx {
-    dossier: CandidateDossier | null;
+    account: CandidateAccount | null;
     loading: boolean;
     refresh: () => Promise<void>;
     logout: () => void;
-    setDossier: (d: CandidateDossier) => void;
+    setAccount: (a: CandidateAccount) => void;
 }
 
 const Ctx = createContext<CandidateCtx | undefined>(undefined);
@@ -17,18 +17,14 @@ const Ctx = createContext<CandidateCtx | undefined>(undefined);
 export function CandidateProvider({ children }: { children: React.ReactNode }) {
     const router = useRouter();
     const pathname = usePathname();
-    const [dossier, setDossier] = useState<CandidateDossier | null>(null);
+    const [account, setAccount] = useState<CandidateAccount | null>(null);
     const [loading, setLoading] = useState(true);
 
     const refresh = useCallback(async () => {
         try {
             setLoading(true);
             const data = await candidateMe();
-            if (data.must_change_password) {
-                router.replace("/candidat/change-password");
-                return;
-            }
-            setDossier(data);
+            setAccount(data);
         } catch {
             clearCandidateToken();
             router.replace("/candidat/login");
@@ -52,7 +48,7 @@ export function CandidateProvider({ children }: { children: React.ReactNode }) {
     }, [pathname]);
 
     return (
-        <Ctx.Provider value={{ dossier, loading, refresh, logout, setDossier }}>
+        <Ctx.Provider value={{ account, loading, refresh, logout, setAccount }}>
             {children}
         </Ctx.Provider>
     );
