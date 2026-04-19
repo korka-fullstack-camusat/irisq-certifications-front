@@ -2,14 +2,22 @@
 
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
-import { candidateMe, clearCandidateToken, getCandidateToken, type CandidateDossier } from "./api";
+import {
+    candidateMe,
+    candidateFetchDossiers,
+    clearCandidateToken,
+    getCandidateToken,
+    type CandidateAccount,
+    type CandidateDossier,
+} from "./api";
 
 interface CandidateCtx {
-    dossier: CandidateDossier | null;
+    account: CandidateAccount | null;
+    dossiers: CandidateDossier[];
     loading: boolean;
     refresh: () => Promise<void>;
+    refreshDossiers: () => Promise<void>;
     logout: () => void;
-    setDossier: (d: CandidateDossier) => void;
 }
 
 const Ctx = createContext<CandidateCtx | undefined>(undefined);
@@ -17,8 +25,18 @@ const Ctx = createContext<CandidateCtx | undefined>(undefined);
 export function CandidateProvider({ children }: { children: React.ReactNode }) {
     const router = useRouter();
     const pathname = usePathname();
-    const [dossier, setDossier] = useState<CandidateDossier | null>(null);
+    const [account, setAccount] = useState<CandidateAccount | null>(null);
+    const [dossiers, setDossiers] = useState<CandidateDossier[]>([]);
     const [loading, setLoading] = useState(true);
+
+    const refreshDossiers = useCallback(async () => {
+        try {
+            const data = await candidateFetchDossiers();
+            setDossiers(data);
+        } catch {
+            setDossiers([]);
+        }
+    }, []);
 
     const refresh = useCallback(async () => {
         try {
@@ -28,14 +46,15 @@ export function CandidateProvider({ children }: { children: React.ReactNode }) {
                 router.replace("/candidat/change-password");
                 return;
             }
-            setDossier(data);
+            setAccount(data);
+            await refreshDossiers();
         } catch {
             clearCandidateToken();
             router.replace("/candidat/login");
         } finally {
             setLoading(false);
         }
-    }, [router]);
+    }, [router, refreshDossiers]);
 
     const logout = useCallback(() => {
         clearCandidateToken();
@@ -52,7 +71,7 @@ export function CandidateProvider({ children }: { children: React.ReactNode }) {
     }, [pathname]);
 
     return (
-        <Ctx.Provider value={{ dossier, loading, refresh, logout, setDossier }}>
+        <Ctx.Provider value={{ account, dossiers, loading, refresh, refreshDossiers, logout }}>
             {children}
         </Ctx.Provider>
     );

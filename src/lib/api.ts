@@ -1,5 +1,4 @@
 export const API_URL = (process.env.NEXT_PUBLIC_API_URL)
-// Helper: nettoie le path pour construire l'URL correctement sans slash final
 
 async function apiFetch(input: RequestInfo | URL, init?: RequestInit) {
     const headers = new Headers(init?.headers || {});
@@ -103,7 +102,6 @@ export async function uploadFiles(formData: FormData): Promise<{ file_urls: stri
     const data = await res.json();
     console.log("📦 Upload raw response:", data);
 
-    // Normalise la réponse quelle que soit la forme retournée par le backend
     const fileUrls: string[] =
         data?.file_urls ??
         data?.urls ??
@@ -390,7 +388,7 @@ export async function requestDocumentResubmit(
 }
 
 // ──────────────────────────────────────────────────────────────
-// Candidate space (self-service)
+// Espace candidat (self-service)
 // ──────────────────────────────────────────────────────────────
 
 const CANDIDATE_TOKEN_KEY = "candidate_token";
@@ -417,12 +415,27 @@ async function candidateFetch(input: RequestInfo | URL, init?: RequestInit) {
     return fetch(input, { ...init, headers });
 }
 
+// Compte candidat
+export interface CandidateAccount {
+    id: string;
+    account_id: string;
+    email: string;
+    first_name: string;
+    last_name: string;
+    phone?: string | null;
+    profile?: string | null;
+    date_of_birth?: string | null;
+    created_at?: string;
+    must_change_password?: boolean;
+}
+
+// Dossier de candidature
 export interface CandidateDossier {
     _id: string;
     public_id?: string;
     candidate_id?: string;
-    name?: string;
-    email?: string;
+    form_id?: string;
+    account_id?: string;
     status?: string;
     session_id?: string;
     submitted_at?: string;
@@ -432,33 +445,57 @@ export interface CandidateDossier {
     exam_grade?: string;
     final_grade?: string;
     final_appreciation?: string;
-    must_change_password?: boolean;
+    exam_mode?: string;
+    exam_type?: string;
 }
 
 export interface CandidateLoginResult {
     access_token: string;
-    response_id: string;
+    account_id: string;
     must_change_password: boolean;
 }
 
-export async function candidateLogin(publicId: string, password: string): Promise<CandidateLoginResult> {
-    const res = await fetch(url("candidate/login"), {
+export interface CandidateRegisterData {
+    email: string;
+    password: string;
+    first_name: string;
+    last_name: string;
+    phone?: string;
+    profile?: string;
+    date_of_birth?: string;
+}
+
+export async function candidateRegister(data: CandidateRegisterData): Promise<CandidateAccount> {
+    const res = await fetch(url("candidate/register"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ public_id: publicId, password }),
+        body: JSON.stringify(data),
     });
     if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        throw new Error(err.detail || "Identifiants invalides");
+        throw new Error(err.detail || "Erreur lors de la création du compte");
     }
     return res.json();
 }
 
-export async function candidateForgotPassword(publicId: string, email: string): Promise<{ message: string }> {
+export async function candidateLogin(email: string, password: string): Promise<CandidateLoginResult> {
+    const res = await fetch(url("candidate/login"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+    });
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || "Email ou mot de passe invalide");
+    }
+    return res.json();
+}
+
+export async function candidateForgotPassword(email: string): Promise<{ message: string }> {
     const res = await fetch(url("candidate/forgot-password"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ public_id: publicId, email }),
+        body: JSON.stringify({ email }),
     });
     if (!res.ok) {
         const err = await res.json().catch(() => ({}));
@@ -480,17 +517,54 @@ export async function candidateChangePassword(currentPassword: string, newPasswo
     return res.json();
 }
 
-export async function candidateMe(): Promise<CandidateDossier> {
+export async function candidateMe(): Promise<CandidateAccount> {
     const res = await candidateFetch(url("candidate/me"));
     if (!res.ok) throw new Error("Session expirée");
     return res.json();
 }
 
-export async function candidateResubmitDocument(documentName: string, fileUrl: string): Promise<CandidateDossier> {
+export async function candidateFetchCertifications(): Promise<any[]> {
+    const res = await candidateFetch(url("candidate/certifications"));
+    if (!res.ok) throw new Error("Impossible de récupérer les certifications");
+    return res.json();
+}
+
+export async function candidateFetchDossiers(): Promise<CandidateDossier[]> {
+    const res = await candidateFetch(url("candidate/dossiers"));
+    if (!res.ok) throw new Error("Impossible de récupérer les dossiers");
+    return res.json();
+}
+
+export async function candidateApply(
+    formId: string,
+    data: {
+        session_id?: string;
+        exam_mode?: string;
+        exam_type?: string;
+        answers?: Record<string, any>;
+    }
+): Promise<CandidateDossier> {
+    const res = await candidateFetch(url(`candidate/apply/${formId}`), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+    });
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || "Erreur lors de la soumission de la candidature");
+    }
+    return res.json();
+}
+
+export async function candidateResubmitDocument(
+    dossierId: string,
+    documentName: string,
+    fileUrl: string
+): Promise<CandidateDossier> {
     const res = await candidateFetch(url("candidate/resubmit-document"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ document_name: documentName, file_url: fileUrl }),
+        body: JSON.stringify({ dossier_id: dossierId, document_name: documentName, file_url: fileUrl }),
     });
     if (!res.ok) {
         const err = await res.json().catch(() => ({}));
