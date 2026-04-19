@@ -5,13 +5,13 @@ import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { Loader2, KeyRound, ShieldCheck, Fingerprint } from "lucide-react";
+import { Loader2, KeyRound, ShieldCheck, Mail } from "lucide-react";
 
 import { candidateLogin, setCandidateToken, getCandidateToken } from "@/lib/api";
 
 export default function CandidateLoginPage() {
     const router = useRouter();
-    const [publicId, setPublicId] = useState("");
+    const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -25,7 +25,7 @@ export default function CandidateLoginPage() {
         setError(null);
         try {
             setLoading(true);
-            const { access_token, must_change_password } = await candidateLogin(publicId.trim(), password);
+            const { access_token, must_change_password } = await candidateLogin(email.trim(), password);
             setCandidateToken(access_token);
             router.replace(must_change_password ? "/candidat/change-password" : "/candidat");
         } catch (err) {
@@ -61,21 +61,21 @@ export default function CandidateLoginPage() {
 
                     <form onSubmit={handleSubmit} className="p-6 space-y-4">
                         <p className="text-sm text-gray-600">
-                            Connectez-vous avec votre <strong>ID Public</strong> et le <strong>mot de passe</strong> reçus par email lors de votre inscription.
+                            Connectez-vous avec votre <strong>adresse email</strong> et votre <strong>mot de passe</strong>.
                         </p>
 
                         <div>
                             <label className="text-xs font-bold uppercase tracking-widest text-gray-500 inline-flex items-center gap-1">
-                                <Fingerprint className="h-3 w-3" /> ID Public
+                                <Mail className="h-3 w-3" /> Adresse email
                             </label>
                             <input
-                                type="text"
-                                value={publicId}
-                                onChange={e => setPublicId(e.target.value)}
+                                type="email"
+                                value={email}
+                                onChange={e => setEmail(e.target.value)}
                                 required
-                                autoComplete="username"
-                                className="mt-2 w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm font-mono focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
-                                placeholder="IC24D01-0001"
+                                autoComplete="email"
+                                className="mt-2 w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+                                placeholder="votre@email.com"
                             />
                         </div>
 
@@ -119,7 +119,13 @@ export default function CandidateLoginPage() {
                         </button>
                     </form>
 
-                    <div className="px-6 pb-6 text-center">
+                    <div className="px-6 pb-6 text-center space-y-2">
+                        <p className="text-sm text-gray-500">
+                            Pas encore de compte ?{" "}
+                            <Link href="/candidat/register" className="font-bold text-green-700 hover:underline">
+                                Créer un compte
+                            </Link>
+                        </p>
                         <Link href="/" className="text-xs text-gray-400 hover:text-gray-600">
                             ← Retour à l&apos;accueil
                         </Link>

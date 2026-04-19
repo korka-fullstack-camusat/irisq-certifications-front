@@ -8,7 +8,7 @@ import { LogIn, UserPlus, GraduationCap } from "lucide-react";
 export default function Home() {
   return (
     <div className="relative min-h-screen font-sans bg-[#f4f6f9] overflow-x-hidden">
-      {/* HEADER — fixe, centré */}
+      {/* HEADER */}
       <header className="fixed top-0 left-0 right-0 z-50 bg-[#f4f6f9]">
         <div className="flex flex-col items-center justify-center py-3 sm:py-4 px-4">
           <motion.div
@@ -37,10 +37,8 @@ export default function Home() {
         </div>
       </header>
 
-      {/* HERO — centré */}
       <main className="flex min-h-screen items-center justify-center px-5 sm:px-10 lg:px-16 pt-40 pb-20">
         <div className="w-full max-w-3xl mx-auto text-center flex flex-col items-center gap-7">
-          {/* Badge */}
           <motion.div
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
@@ -54,7 +52,6 @@ export default function Home() {
             </span>
           </motion.div>
 
-          {/* Titre */}
           <motion.h1
             initial={{ opacity: 0, y: 24 }}
             animate={{ opacity: 1, y: 0 }}
@@ -62,26 +59,24 @@ export default function Home() {
             className="text-3xl sm:text-5xl lg:text-[3.5rem] font-extrabold leading-tight tracking-tight"
             style={{ color: "#1a237e" }}
           >
-            Pilotez vos formations{" "}
+            Pilotez vos certifications{" "}
             <span style={{ color: "#2e7d32" }}>
               du début jusqu&apos;au diplôme.
             </span>
           </motion.h1>
 
-          {/* Sous-titre */}
           <motion.p
             initial={{ opacity: 0, y: 24 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.65, delay: 0.2 }}
             className="text-base sm:text-lg lg:text-xl leading-relaxed max-w-2xl text-gray-500"
           >
-            Gérez vos apprenants, vos évaluations et vos certifications depuis une seule plateforme.{" "}
+            Créez votre compte candidat, accédez aux formations disponibles et candidatez en quelques étapes.{" "}
             <span className="font-semibold" style={{ color: "#1a237e" }}>
-              Simple, puissant, conçu pour les organismes de formation ambitieux.
+              Vos informations sont enregistrées pour toutes vos futures candidatures.
             </span>
           </motion.p>
 
-          {/* Séparateur */}
           <motion.div
             initial={{ opacity: 0, scaleX: 0 }}
             animate={{ opacity: 1, scaleX: 1 }}
@@ -93,7 +88,6 @@ export default function Home() {
             <div className="flex-1 h-px" style={{ backgroundColor: "#2e7d32" }} />
           </motion.div>
 
-          {/* Boutons */}
           <motion.div
             initial={{ opacity: 0, y: 24 }}
             animate={{ opacity: 1, y: 0 }}
@@ -101,7 +95,7 @@ export default function Home() {
             className="flex flex-col sm:flex-row items-center justify-center gap-3 w-full mt-2"
           >
             <Link
-              href="/demande-certification"
+              href="/candidat/register"
               className="w-full sm:flex-1 flex items-center justify-center gap-2 rounded-xl px-5 py-3.5 text-base font-bold text-white shadow-lg hover:-translate-y-0.5 transition-all duration-200 whitespace-nowrap"
               style={{
                 backgroundColor: "#2e7d32",
@@ -109,7 +103,7 @@ export default function Home() {
               }}
             >
               <UserPlus className="h-5 w-5 flex-shrink-0" />
-              Candidater
+              Créer mon compte
             </Link>
 
             <Link
@@ -141,7 +135,6 @@ export default function Home() {
         </div>
       </main>
 
-      {/* Bande verte en bas */}
       <div className="fixed bottom-0 left-0 right-0 h-1.5 z-50" style={{ backgroundColor: "#2e7d32" }} />
     </div>
   );

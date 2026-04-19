@@ -1,32 +1,27 @@
 "use client";
 
 import { useState } from "react";
-import Image from "next/image";
 import Link from "next/link";
+import Image from "next/image";
 import { motion } from "framer-motion";
-import { Loader2, KeyRound, Fingerprint, Mail, MailCheck, ArrowLeft } from "lucide-react";
-
+import { Loader2, Mail, CheckCircle2 } from "lucide-react";
 import { candidateForgotPassword } from "@/lib/api";
 
 export default function CandidateForgotPasswordPage() {
-    const [publicId, setPublicId] = useState("");
     const [email, setEmail] = useState("");
     const [loading, setLoading] = useState(false);
+    const [sent, setSent] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [confirmation, setConfirmation] = useState<string | null>(null);
 
     async function handleSubmit(e: React.FormEvent) {
         e.preventDefault();
         setError(null);
-        setConfirmation(null);
         try {
             setLoading(true);
-            const { message } = await candidateForgotPassword(publicId.trim(), email.trim());
-            setConfirmation(message);
-            setPublicId("");
-            setEmail("");
+            await candidateForgotPassword(email.trim());
+            setSent(true);
         } catch (err) {
-            setError(err instanceof Error ? err.message : "Erreur lors de la demande");
+            setError(err instanceof Error ? err.message : "Une erreur est survenue");
         } finally {
             setLoading(false);
         }
@@ -49,68 +44,34 @@ export default function CandidateForgotPasswordPage() {
                             <Image src="/logo.png" alt="IRISQ" width={32} height={32} className="object-contain" />
                         </div>
                         <div>
-                            <p className="text-[10px] font-bold tracking-[0.2em] text-white/70 uppercase">
-                                IRISQ Certifications
-                            </p>
+                            <p className="text-[10px] font-bold tracking-[0.2em] text-white/70 uppercase">IRISQ Certifications</p>
                             <h1 className="text-lg font-black text-white">Mot de passe oublié</h1>
                         </div>
                     </div>
 
-                    {confirmation ? (
-                        <div className="p-6 space-y-4">
-                            <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm inline-flex items-start gap-2">
-                                <MailCheck className="h-5 w-5 mt-0.5 shrink-0" />
-                                <div>
-                                    <p className="font-bold mb-1">Demande prise en compte</p>
-                                    <p>{confirmation}</p>
-                                </div>
-                            </div>
-                            <p className="text-xs text-gray-500 leading-relaxed">
-                                Vérifiez votre boîte mail (et vos spams). Dès que vous avez le nouveau mot de passe provisoire,
-                                connectez-vous à votre espace candidat — vous serez invité(e) à le modifier immédiatement.
+                    {sent ? (
+                        <div className="p-8 text-center">
+                            <CheckCircle2 className="h-10 w-10 text-green-500 mx-auto mb-3" />
+                            <p className="font-bold text-gray-800">Email envoyé</p>
+                            <p className="text-sm text-gray-500 mt-1">
+                                Si un compte correspond à cet email, vous recevrez un mot de passe provisoire.
                             </p>
-                            <div className="flex flex-col gap-2 pt-2">
-                                <Link
-                                    href="/candidat/login"
-                                    className="w-full inline-flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold text-white transition-all hover:-translate-y-0.5"
-                                    style={{ backgroundColor: "#1a237e", boxShadow: "0 6px 16px rgba(26,35,126,0.25)" }}
-                                >
-                                    Retour à la connexion
-                                </Link>
-                                <button
-                                    type="button"
-                                    onClick={() => setConfirmation(null)}
-                                    className="w-full inline-flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold text-gray-500 hover:text-gray-700"
-                                >
-                                    Envoyer une nouvelle demande
-                                </button>
-                            </div>
+                            <Link
+                                href="/candidat/login"
+                                className="mt-4 inline-block text-sm font-bold text-indigo-600 hover:underline"
+                            >
+                                Retour à la connexion
+                            </Link>
                         </div>
                     ) : (
                         <form onSubmit={handleSubmit} className="p-6 space-y-4">
                             <p className="text-sm text-gray-600">
-                                Saisissez votre <strong>ID Public</strong> et l&apos;<strong>email</strong> utilisé lors de votre inscription.
-                                Un nouveau mot de passe provisoire vous sera envoyé par email.
+                                Saisissez votre adresse email pour recevoir un mot de passe provisoire.
                             </p>
 
                             <div>
                                 <label className="text-xs font-bold uppercase tracking-widest text-gray-500 inline-flex items-center gap-1">
-                                    <Fingerprint className="h-3 w-3" /> ID Public
-                                </label>
-                                <input
-                                    type="text"
-                                    value={publicId}
-                                    onChange={e => setPublicId(e.target.value)}
-                                    required
-                                    autoComplete="username"
-                                    className="mt-2 w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm font-mono focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
-                                    placeholder="IC24D01-0001"
-                                />
-                            </div>
-
-                            <div>
-                                <label className="text-xs font-bold uppercase tracking-widest text-gray-500 inline-flex items-center gap-1">
-                                    <Mail className="h-3 w-3" /> Email
+                                    <Mail className="h-3 w-3" /> Adresse email
                                 </label>
                                 <input
                                     type="email"
@@ -119,7 +80,7 @@ export default function CandidateForgotPasswordPage() {
                                     required
                                     autoComplete="email"
                                     className="mt-2 w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
-                                    placeholder="vous@exemple.com"
+                                    placeholder="votre@email.com"
                                 />
                             </div>
 
@@ -132,24 +93,20 @@ export default function CandidateForgotPasswordPage() {
                             <button
                                 type="submit"
                                 disabled={loading}
-                                className="w-full inline-flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold text-white transition-all hover:-translate-y-0.5 disabled:opacity-50 disabled:hover:translate-y-0"
+                                className="w-full inline-flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold text-white transition-all hover:-translate-y-0.5 disabled:opacity-50"
                                 style={{ backgroundColor: "#1a237e", boxShadow: "0 6px 16px rgba(26,35,126,0.25)" }}
                             >
-                                {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <KeyRound className="h-4 w-4" />}
-                                {loading ? "Envoi en cours…" : "Réinitialiser mon mot de passe"}
+                                {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
+                                {loading ? "Envoi…" : "Envoyer le lien"}
                             </button>
+
+                            <div className="text-center">
+                                <Link href="/candidat/login" className="text-xs text-gray-400 hover:text-gray-600">
+                                    ← Retour à la connexion
+                                </Link>
+                            </div>
                         </form>
                     )}
-
-                    <div className="px-6 pb-6 text-center">
-                        <Link
-                            href="/candidat/login"
-                            className="text-xs text-gray-400 hover:text-gray-600 inline-flex items-center gap-1"
-                        >
-                            <ArrowLeft className="h-3 w-3" />
-                            Retour à la connexion
-                        </Link>
-                    </div>
                 </div>
             </motion.div>
         </div>
