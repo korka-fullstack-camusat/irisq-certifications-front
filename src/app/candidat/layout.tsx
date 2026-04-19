@@ -6,48 +6,48 @@ import { usePathname } from "next/navigation";
 import {
     LayoutDashboard,
     FolderOpen,
-    Upload,
+    ClipboardCheck,
     LogOut,
     X,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import Image from "next/image";
-import { CandidateProvider, useCandidate } from "@/lib/candidate-context";
+import { CandidateAccountProvider, useCandidateAccount } from "@/lib/account-context";
 
 const AUTH_PATHS = new Set([
     "/candidat/login",
-    "/candidat/change-password",
+    "/candidat/register",
     "/candidat/forgot-password",
+    "/candidat/change-password",
 ]);
 
 const navItems = [
     { name: "Tableau de bord", href: "/candidat", icon: LayoutDashboard },
-    { name: "Mes dossiers", href: "/candidat/dossiers", icon: FolderOpen },
-    { name: "Mes corrections", href: "/candidat/documents", icon: Upload },
+    { name: "Mes candidatures", href: "/candidat/dossiers", icon: FolderOpen },
+    { name: "Postuler", href: "/candidat/candidater", icon: ClipboardCheck },
 ];
 
 export default function CandidateLayout({ children }: { children: React.ReactNode }) {
     const pathname = usePathname();
 
-    // Public auth pages don't use the shell.
     if (AUTH_PATHS.has(pathname)) {
         return <>{children}</>;
     }
 
     return (
-        <CandidateProvider>
+        <CandidateAccountProvider>
             <Shell>{children}</Shell>
-        </CandidateProvider>
+        </CandidateAccountProvider>
     );
 }
 
 function Shell({ children }: { children: React.ReactNode }) {
     const pathname = usePathname();
-    const { dossier, logout } = useCandidate();
+    const { account, logout } = useCandidateAccount();
     const [showLogoutModal, setShowLogoutModal] = useState(false);
 
-    const initials = (dossier?.name || dossier?.public_id || "??").substring(0, 2).toUpperCase();
-    const displayName = dossier?.name || dossier?.public_id || "Candidat";
+    const displayName = account ? `${account.prenom} ${account.nom}`.trim() || account.email : "Candidat";
+    const initials = displayName.substring(0, 2).toUpperCase();
 
     const handleLogout = () => {
         setShowLogoutModal(false);
@@ -104,11 +104,6 @@ function Shell({ children }: { children: React.ReactNode }) {
                                     <p className="text-gray-400 text-sm mb-6">
                                         Voulez-vous vraiment vous déconnecter ?
                                     </p>
-                                    <div className="flex items-center gap-3 mb-6">
-                                        <div className="flex-1 h-px bg-gray-100" />
-                                        <span className="w-2 h-2 rotate-45" style={{ backgroundColor: "#c62828", display: "inline-block" }} />
-                                        <div className="flex-1 h-px bg-gray-100" />
-                                    </div>
                                     <div className="flex gap-3">
                                         <button
                                             onClick={() => setShowLogoutModal(false)}
@@ -135,7 +130,6 @@ function Shell({ children }: { children: React.ReactNode }) {
                 )}
             </AnimatePresence>
 
-            {/* Sidebar desktop */}
             <aside
                 className="fixed top-0 left-0 h-screen w-64 hidden md:flex flex-col z-20 shadow-lg"
                 style={{ backgroundColor: "#ffffff", borderRight: "2px solid #e8eaf6" }}
@@ -212,8 +206,6 @@ function Shell({ children }: { children: React.ReactNode }) {
                     <button
                         onClick={() => setShowLogoutModal(true)}
                         className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all text-left group"
-                        onMouseEnter={e => (e.currentTarget as HTMLElement).style.backgroundColor = "#f4f6f9"}
-                        onMouseLeave={e => (e.currentTarget as HTMLElement).style.backgroundColor = "transparent"}
                         title="Cliquer pour se déconnecter"
                     >
                         <div
@@ -224,7 +216,7 @@ function Shell({ children }: { children: React.ReactNode }) {
                         </div>
                         <div className="flex flex-col min-w-0">
                             <span className="text-sm font-bold text-gray-800 truncate">{displayName}</span>
-                            <span className="text-xs text-gray-400 font-mono truncate">{dossier?.public_id || "—"}</span>
+                            <span className="text-xs text-gray-400 truncate">{account?.email || "—"}</span>
                         </div>
                         <LogOut className="h-4 w-4 ml-auto opacity-0 group-hover:opacity-100 transition-opacity shrink-0" style={{ color: "#c62828" }} />
                     </button>
