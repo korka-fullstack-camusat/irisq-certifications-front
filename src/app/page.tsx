@@ -3,7 +3,7 @@
 import { motion } from "framer-motion";
 import Link from "next/link";
 import Image from "next/image";
-import { LogIn, UserPlus, GraduationCap } from "lucide-react";
+import { LogIn, UserPlus } from "lucide-react";
 
 export default function Home() {
   return (
@@ -109,21 +109,7 @@ export default function Home() {
               }}
             >
               <UserPlus className="h-5 w-5 flex-shrink-0" />
-              Créer mon compte
-            </Link>
-
-            <Link
-              href="/candidat/login"
-              className="w-full sm:flex-1 flex items-center justify-center gap-2 rounded-xl px-5 py-3.5 text-base font-bold shadow-lg hover:-translate-y-0.5 transition-all duration-200 whitespace-nowrap"
-              style={{
-                backgroundColor: "#ffffff",
-                color: "#1a237e",
-                border: "2px solid #1a237e",
-                boxShadow: "0 8px 24px rgba(26, 35, 126, 0.12)",
-              }}
-            >
-              <GraduationCap className="h-5 w-5 flex-shrink-0" />
-              Espace Candidat
+              Postuler
             </Link>
 
             <Link
@@ -135,7 +121,7 @@ export default function Home() {
               }}
             >
               <LogIn className="h-5 w-5 flex-shrink-0" />
-              Espace Gestionnaire
+              Se connecter
             </Link>
           </motion.div>
         </div>

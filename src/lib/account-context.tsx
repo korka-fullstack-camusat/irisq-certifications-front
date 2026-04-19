@@ -35,7 +35,7 @@ export function CandidateAccountProvider({ children }: { children: React.ReactNo
             setApplications(data.applications || []);
         } catch {
             clearCandidateAccountToken();
-            router.replace("/candidat/login");
+            router.replace("/login");
         } finally {
             setLoading(false);
         }
@@ -43,12 +43,12 @@ export function CandidateAccountProvider({ children }: { children: React.ReactNo
 
     const logout = useCallback(() => {
         clearCandidateAccountToken();
-        router.replace("/candidat/login");
+        router.replace("/login");
     }, [router]);
 
     useEffect(() => {
         if (!getCandidateAccountToken()) {
-            router.replace("/candidat/login");
+            router.replace("/login");
             return;
         }
         refresh();
