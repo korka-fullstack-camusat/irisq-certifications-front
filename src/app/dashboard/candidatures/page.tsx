@@ -13,6 +13,12 @@ import {
     Download,
     Monitor,
     MapPin,
+    Mail,
+    Clock,
+    CheckCircle2,
+    XCircle,
+    Hourglass,
+    AlertTriangle,
 } from "lucide-react";
 import { motion } from "framer-motion";
 
@@ -33,6 +39,7 @@ interface CandidatureRow {
     status?: string;
     submitted_at?: string;
     exam_mode?: string;
+    exam_type?: string;
     answers?: Record<string, any>;
     documents_validation?: Record<string, { valid?: boolean; resubmit_requested?: boolean }>;
 }
@@ -41,6 +48,7 @@ const FORMATION_FIELD = "Certification souhaitée";
 const UNCATEGORIZED = "Sans formation renseignée";
 
 type ModeTab = "all" | "online" | "onsite";
+type ExamTypeTab = "all" | "direct" | "after_formation";
 
 function getExamMode(r: CandidatureRow): "online" | "onsite" | "" {
     const raw = (r.exam_mode || "").toString().toLowerCase().trim();
@@ -49,6 +57,25 @@ function getExamMode(r: CandidatureRow): "online" | "onsite" | "" {
     if (fromAnswers.includes("ligne")) return "online";
     if (fromAnswers.includes("présent") || fromAnswers.includes("present")) return "onsite";
     return "";
+}
+
+function getExamType(r: CandidatureRow): "direct" | "after_formation" | "" {
+    const raw = (r.exam_type as string | undefined || "").toString().toLowerCase().trim();
+    if (raw === "direct") return "direct";
+    if (raw === "after_formation") return "after_formation";
+    const fromAnswers = (r.answers?.["Type d'examen"] || "").toString().trim();
+    if (fromAnswers.toLowerCase().includes("direct")) return "direct";
+    if (fromAnswers.toLowerCase().includes("formation")) return "after_formation";
+    return "";
+}
+
+function validationState(row: CandidatureRow): "all_valid" | "has_issue" | "pending" {
+    const v = row.documents_validation || {};
+    const entries = Object.values(v);
+    if (entries.length === 0) return "pending";
+    if (entries.some(e => e.resubmit_requested)) return "has_issue";
+    if (entries.every(e => e.valid === true)) return "all_valid";
+    return "pending";
 }
 
 const PREDEFINED_FORMATIONS = [
@@ -61,12 +88,6 @@ const PREDEFINED_FORMATIONS = [
     "Implementor ISO 14001:2015",
     "Lead Implementor ISO 14001:2015",
 ];
-
-const MODE_LABELS: Record<ModeTab, { label: string; icon: typeof Monitor; color: string }> = {
-    all:    { label: "Toutes les demandes",  icon: Users,   color: "#1a237e" },
-    online: { label: "Candidats en ligne",   icon: Monitor, color: "#1a237e" },
-    onsite: { label: "Candidats présentiel", icon: MapPin,  color: "#2e7d32" },
-};
 
 function CandidaturesInner() {
     const { user, isLoading } = useAuth();
@@ -82,6 +103,7 @@ function CandidaturesInner() {
     const [loadingRows, setLoadingRows] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [exporting, setExporting] = useState(false);
+    const [examTypeTab, setExamTypeTab] = useState<ExamTypeTab>("all");
 
     useEffect(() => {
         if (!isLoading && (!user || user.role !== "RH")) {
@@ -124,22 +146,26 @@ function CandidaturesInner() {
         [sessions, selectedId],
     );
 
-    const filteredRows = useMemo(
-        () => modeTab === "all" ? rows : rows.filter(r => getExamMode(r) === modeTab),
-        [rows, modeTab],
-    );
+    // Liste plate filtrée par mode (pour En ligne / Présentiel), puis par type d'examen
+    const filteredCandidates = useMemo(() => {
+        if (modeTab === "all") return rows;
+        let list = rows.filter(r => getExamMode(r) === modeTab);
+        if (examTypeTab !== "all") list = list.filter(r => getExamType(r) === examTypeTab);
+        return list;
+    }, [rows, modeTab, examTypeTab]);
 
+    // Dossiers formations (vue "Toutes les demandes" uniquement)
     const formations = useMemo(() => {
         const map = new Map<string, CandidatureRow[]>();
         for (const name of PREDEFINED_FORMATIONS) map.set(name, []);
-        for (const r of filteredRows) {
+        for (const r of rows) {
             const raw = r.answers?.[FORMATION_FIELD];
             const name = (typeof raw === "string" && raw.trim()) ? raw.trim() : UNCATEGORIZED;
             if (!map.has(name)) map.set(name, []);
             map.get(name)!.push(r);
         }
         return Array.from(map.entries()).map(([name, items]) => ({ name, items }));
-    }, [filteredRows]);
+    }, [rows]);
 
     async function handleExport() {
         if (!selectedId || exporting) return;
@@ -155,8 +181,12 @@ function CandidaturesInner() {
 
     if (isLoading || !user) return null;
 
-    const totalFiltered = filteredRows.length;
-    const { label: modeLabel, icon: ModeIcon, color: modeColor } = MODE_LABELS[modeTab];
+    const modeConfig = {
+        all:    { label: "Toutes les demandes",  icon: Users,   color: "#1a237e", desc: "Vue globale" },
+        online: { label: "Candidats en ligne",   icon: Monitor, color: "#1a237e", desc: "Examen à distance" },
+        onsite: { label: "Candidats présentiel", icon: MapPin,  color: "#2e7d32", desc: "Examen sur site" },
+    } as const;
+    const { label: modeLabel, icon: ModeIcon, color: modeColor } = modeConfig[modeTab];
 
     return (
         <div className="space-y-6">
@@ -203,11 +233,10 @@ function CandidaturesInner() {
                     </div>
                 ) : sessions.length === 0 ? (
                     <div className="text-sm text-gray-500">
-                        Aucune session créée. Rendez-vous sur{" "}
+                        Aucune session créée.{" "}
                         <Link href="/dashboard/sessions" className="font-bold text-indigo-600 hover:underline">
-                            Sessions
-                        </Link>{" "}
-                        pour en créer une.
+                            Créer une session
+                        </Link>
                     </div>
                 ) : (
                     <div className="flex items-center gap-3 flex-wrap">
@@ -237,7 +266,7 @@ function CandidaturesInner() {
                             </span>
                         )}
                         <span className="text-xs text-gray-400 ml-auto">
-                            {totalFiltered} dossier{totalFiltered > 1 ? "s" : ""}
+                            {filteredCandidates.length} dossier{filteredCandidates.length > 1 ? "s" : ""}
                         </span>
                     </div>
                 )}
@@ -247,56 +276,182 @@ function CandidaturesInner() {
                 <div className="p-4 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm">{error}</div>
             )}
 
-            {/* Dossiers formations */}
             {loadingRows ? (
-                <div className="p-8 text-center text-gray-400 text-sm">Chargement…</div>
-            ) : !selectedId ? null : formations.every(f => f.items.length === 0) ? (
-                <div className="p-12 text-center rounded-2xl bg-white border border-dashed border-gray-200">
-                    <Folder className="h-10 w-10 mx-auto mb-3 text-gray-300" />
-                    <p className="text-gray-500 text-sm">
-                        {modeTab === "all" ? "Aucun dossier disponible." : `Aucun candidat ${modeTab === "online" ? "en ligne" : "en présentiel"} pour cette session.`}
-                    </p>
+                <div className="p-8 text-center text-gray-400 text-sm flex items-center justify-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin" /> Chargement…
+                </div>
+            ) : !selectedId ? null : modeTab !== "all" ? (
+                /* ── VUE LISTE : En ligne ou Présentiel ── */
+                <div className="space-y-4">
+                    {/* Filtre Type d'examen */}
+                    <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-xs font-bold uppercase tracking-widest text-gray-400">Type d'examen</span>
+                        {(["all", "direct", "after_formation"] as ExamTypeTab[]).map(tab => {
+                            const labels: Record<ExamTypeTab, string> = {
+                                all: "Tous",
+                                direct: "Examen direct",
+                                after_formation: "Après formation IRISQ",
+                            };
+                            const active = examTypeTab === tab;
+                            return (
+                                <button
+                                    key={tab}
+                                    onClick={() => setExamTypeTab(tab)}
+                                    className="px-3 py-1.5 rounded-full text-xs font-bold transition-all border"
+                                    style={{
+                                        backgroundColor: active ? "#1a237e" : "#f5f5f5",
+                                        color: active ? "#ffffff" : "#555",
+                                        borderColor: active ? "#1a237e" : "#e0e0e0",
+                                    }}
+                                >
+                                    {labels[tab]}
+                                </button>
+                            );
+                        })}
+                    </div>
+
+                    {filteredCandidates.length === 0 ? (
+                        <div className="p-12 text-center rounded-2xl bg-white border border-dashed border-gray-200">
+                            <ModeIcon className="h-10 w-10 mx-auto mb-3 text-gray-300" />
+                            <p className="text-gray-500 text-sm">
+                                Aucun candidat {modeTab === "online" ? "en ligne" : "en présentiel"} pour cette session.
+                            </p>
+                        </div>
+                    ) : (
+                    <div className="grid gap-3">
+                        {filteredCandidates.map((r, i) => {
+                            const status = (r.status || "pending") as "pending" | "approved" | "rejected";
+                            const docState = validationState(r);
+                            const formation = r.answers?.[FORMATION_FIELD] || "—";
+                            return (
+                                <motion.div
+                                    key={r._id}
+                                    initial={{ opacity: 0, y: 8 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    transition={{ delay: i * 0.03 }}
+                                >
+                                    <Link
+                                        href={`/dashboard/candidatures/${r._id}`}
+                                        className="group flex items-center gap-4 p-4 rounded-2xl bg-white border border-gray-100 shadow-sm hover:shadow-md hover:border-indigo-200 transition-all"
+                                    >
+                                        {/* Avatar */}
+                                        <div
+                                            className="h-11 w-11 rounded-xl flex items-center justify-center shrink-0 text-white text-sm font-black"
+                                            style={{ backgroundColor: modeTab === "online" ? "#1a237e" : "#2e7d32" }}
+                                        >
+                                            {(r.name || "?").substring(0, 2).toUpperCase()}
+                                        </div>
+
+                                        {/* Infos */}
+                                        <div className="flex-1 min-w-0">
+                                            <div className="flex items-center gap-2 flex-wrap">
+                                                <span className="font-bold text-gray-800 truncate">{r.name || "Candidat"}</span>
+                                                {r.public_id && (
+                                                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-gray-100 text-gray-500">
+                                                        {r.public_id}
+                                                    </span>
+                                                )}
+                                                {docState === "all_valid" && (
+                                                    <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700">
+                                                        <CheckCircle2 className="h-3 w-3" /> Docs OK
+                                                    </span>
+                                                )}
+                                                {docState === "has_issue" && (
+                                                    <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700">
+                                                        <AlertTriangle className="h-3 w-3" /> Relance
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <div className="mt-1 flex items-center gap-4 text-xs text-gray-500 flex-wrap">
+                                                <span className="truncate max-w-[180px] font-medium text-gray-600">{formation}</span>
+                                                {r.email && (
+                                                    <span className="inline-flex items-center gap-1">
+                                                        <Mail className="h-3 w-3" /> {r.email}
+                                                    </span>
+                                                )}
+                                                {r.submitted_at && (
+                                                    <span className="inline-flex items-center gap-1">
+                                                        <Clock className="h-3 w-3" /> {new Date(r.submitted_at).toLocaleDateString("fr-FR")}
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        {/* Statut */}
+                                        {status === "approved" && (
+                                            <span className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full shrink-0"
+                                                style={{ backgroundColor: "#e8f5e9", color: "#2e7d32", border: "1px solid #c8e6c9" }}>
+                                                <CheckCircle2 className="h-3.5 w-3.5" /> Validée
+                                            </span>
+                                        )}
+                                        {status === "rejected" && (
+                                            <span className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full shrink-0"
+                                                style={{ backgroundColor: "#ffebee", color: "#c62828", border: "1px solid #ffcdd2" }}>
+                                                <XCircle className="h-3.5 w-3.5" /> Rejetée
+                                            </span>
+                                        )}
+                                        {status === "pending" && (
+                                            <span className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full shrink-0"
+                                                style={{ backgroundColor: "#fff8e1", color: "#b26a00", border: "1px solid #ffe0b2" }}>
+                                                <Hourglass className="h-3.5 w-3.5" /> En attente
+                                            </span>
+                                        )}
+                                        <ChevronRight className="h-5 w-5 text-gray-300 group-hover:text-indigo-500 transition-colors shrink-0" />
+                                    </Link>
+                                </motion.div>
+                            );
+                        })}
+                    </div>
+                    )}
                 </div>
             ) : (
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                    {formations.map((f, i) => {
-                        const pending = f.items.filter(r => !r.status || r.status === "pending").length;
-                        const approved = f.items.filter(r => r.status === "approved").length;
-                        const isEmpty = f.items.length === 0;
-                        return (
-                            <motion.div
-                                key={f.name}
-                                initial={{ opacity: 0, y: 8 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                transition={{ delay: i * 0.03 }}
-                            >
-                                <Link
-                                    href={`/dashboard/candidatures/formation?session=${encodeURIComponent(selectedId)}&name=${encodeURIComponent(f.name)}${modeTab !== "all" ? `&mode=${modeTab}` : ""}`}
-                                    className="group flex items-start gap-4 p-5 rounded-2xl bg-white border border-gray-100 shadow-sm hover:shadow-md hover:border-indigo-200 transition-all h-full"
+                /* ── VUE DOSSIERS : Toutes les demandes ── */
+                formations.every(f => f.items.length === 0) ? (
+                    <div className="p-12 text-center rounded-2xl bg-white border border-dashed border-gray-200">
+                        <Folder className="h-10 w-10 mx-auto mb-3 text-gray-300" />
+                        <p className="text-gray-500 text-sm">Aucun dossier disponible pour cette session.</p>
+                    </div>
+                ) : (
+                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                        {formations.map((f, i) => {
+                            const pending = f.items.filter(r => !r.status || r.status === "pending").length;
+                            const approved = f.items.filter(r => r.status === "approved").length;
+                            const isEmpty = f.items.length === 0;
+                            return (
+                                <motion.div
+                                    key={f.name}
+                                    initial={{ opacity: 0, y: 8 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    transition={{ delay: i * 0.03 }}
                                 >
-                                    <div
-                                        className="h-12 w-12 rounded-xl flex items-center justify-center shrink-0"
-                                        style={{ backgroundColor: isEmpty ? "#f3f4f6" : "#fff8e1" }}
+                                    <Link
+                                        href={`/dashboard/candidatures/formation?session=${encodeURIComponent(selectedId)}&name=${encodeURIComponent(f.name)}`}
+                                        className="group flex items-start gap-4 p-5 rounded-2xl bg-white border border-gray-100 shadow-sm hover:shadow-md hover:border-indigo-200 transition-all h-full"
                                     >
-                                        <Folder className="h-5 w-5" style={{ color: isEmpty ? "#9ca3af" : "#f59e0b" }} />
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                        <h3 className="font-bold text-gray-800 leading-snug line-clamp-2">{f.name}</h3>
-                                        <div className="mt-2 flex items-center gap-3 text-xs text-gray-500 flex-wrap">
-                                            <span className="inline-flex items-center gap-1">
-                                                <Users className="h-3 w-3" /> {f.items.length} candidat{f.items.length > 1 ? "s" : ""}
-                                            </span>
-                                            {pending > 0 && <span className="text-amber-700">{pending} en attente</span>}
-                                            {approved > 0 && <span className="text-green-700">{approved} validé{approved > 1 ? "s" : ""}</span>}
-                                            {isEmpty && <span className="text-gray-400 italic">Vide</span>}
+                                        <div
+                                            className="h-12 w-12 rounded-xl flex items-center justify-center shrink-0"
+                                            style={{ backgroundColor: isEmpty ? "#f3f4f6" : "#fff8e1" }}
+                                        >
+                                            <Folder className="h-5 w-5" style={{ color: isEmpty ? "#9ca3af" : "#f59e0b" }} />
                                         </div>
-                                    </div>
-                                    <ChevronRight className="h-5 w-5 text-gray-300 group-hover:text-indigo-500 transition-colors shrink-0" />
-                                </Link>
-                            </motion.div>
-                        );
-                    })}
-                </div>
+                                        <div className="flex-1 min-w-0">
+                                            <h3 className="font-bold text-gray-800 leading-snug line-clamp-2">{f.name}</h3>
+                                            <div className="mt-2 flex items-center gap-3 text-xs text-gray-500 flex-wrap">
+                                                <span className="inline-flex items-center gap-1">
+                                                    <Users className="h-3 w-3" /> {f.items.length} candidat{f.items.length > 1 ? "s" : ""}
+                                                </span>
+                                                {pending > 0 && <span className="text-amber-700">{pending} en attente</span>}
+                                                {approved > 0 && <span className="text-green-700">{approved} validé{approved > 1 ? "s" : ""}</span>}
+                                                {isEmpty && <span className="text-gray-400 italic">Vide</span>}
+                                            </div>
+                                        </div>
+                                        <ChevronRight className="h-5 w-5 text-gray-300 group-hover:text-indigo-500 transition-colors shrink-0" />
+                                    </Link>
+                                </motion.div>
+                            );
+                        })}
+                    </div>
+                )
             )}
         </div>
     );
