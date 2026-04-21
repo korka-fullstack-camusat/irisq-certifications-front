@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -74,7 +74,7 @@ function isExamPassed(r: Row): boolean {
     return false;
 }
 
-export default function CandidatsCertifiesPage() {
+function CandidatsCertifiesContent() {
     const { user, isLoading } = useAuth();
     const router = useRouter();
 
@@ -105,7 +105,6 @@ export default function CandidatsCertifiesPage() {
                     list.map(s => fetchSessionResponses(s._id).catch(() => [] as Row[])),
                 );
                 const merged: Row[] = all.flat();
-                // Only approved candidatures who have passed the exam
                 setRows(merged.filter(r => r.status === "approved" && isExamPassed(r)));
             } catch (e) {
                 setError(e instanceof Error ? e.message : "Erreur");
@@ -178,7 +177,6 @@ export default function CandidatsCertifiesPage() {
                 </div>
             )}
 
-            {/* Sous-dossiers par mode d'examen */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 {([
                     { key: "all", label: "Tous les certifiés", count: baseFiltered.length, icon: Users, color: "#1a237e", bg: "#e8eaf6", desc: "Vue globale" },
@@ -224,7 +222,6 @@ export default function CandidatsCertifiesPage() {
                 })}
             </div>
 
-            {/* Filters */}
             <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm flex flex-wrap items-center gap-3">
                 <div className="relative flex-1 min-w-[220px]">
                     <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
@@ -368,5 +365,13 @@ export default function CandidatsCertifiesPage() {
                 </>
             )}
         </div>
+    );
+}
+
+export default function CandidatsCertifiesPage() {
+    return (
+        <Suspense fallback={null}>
+            <CandidatsCertifiesContent />
+        </Suspense>
     );
 }
