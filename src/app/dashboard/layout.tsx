@@ -48,8 +48,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             href: "/dashboard/candidatures",
             icon: FolderOpen,
             children: [
-                { name: "En ligne",   href: "/dashboard/candidatures?mode=online" },
-                { name: "Présentiel", href: "/dashboard/candidatures?mode=onsite" },
+                { name: "Candidature en ligne",   href: "/dashboard/candidatures?mode=online" },
+                { name: "Candidature présentiel", href: "/dashboard/candidatures?mode=onsite" },
             ],
         },
         { name: "Candidatures validées", href: "/dashboard/candidatures-validees", icon: ShieldCheck, children: [] },
@@ -166,7 +166,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 SIDEBAR — desktop
             ══════════════════════════════════════════ */}
             <aside
-                className="fixed top-0 left-0 h-screen w-64 hidden md:flex flex-col z-20 shadow-lg"
+                className="fixed top-0 left-0 h-screen w-72 hidden md:flex flex-col z-20 shadow-lg"
                 style={{ backgroundColor: "#ffffff", borderRight: "2px solid #e8eaf6" }}
             >
                 {/* Logo + nom */}
@@ -348,7 +348,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             {/* ══════════════════════════════════════════
                 MAIN CONTENT
             ══════════════════════════════════════════ */}
-            <main className="flex-1 flex flex-col min-w-0 md:pl-64">
+            <main className="flex-1 flex flex-col min-w-0 md:pl-72">
 
                 {/* Header mobile */}
                 <header
