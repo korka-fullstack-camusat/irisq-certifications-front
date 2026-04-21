@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, Suspense } from "react";
+import { useEffect, useMemo, useRef, useState, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
@@ -9,6 +9,7 @@ import {
     FolderOpen,
     Loader2,
     ChevronRight,
+    ChevronDown,
     Users,
     Download,
     Monitor,
@@ -19,6 +20,8 @@ import {
     XCircle,
     Hourglass,
     AlertTriangle,
+    Search,
+    SlidersHorizontal,
 } from "lucide-react";
 import { motion } from "framer-motion";
 
@@ -104,6 +107,9 @@ function CandidaturesInner() {
     const [error, setError] = useState<string | null>(null);
     const [exporting, setExporting] = useState(false);
     const [examTypeTab, setExamTypeTab] = useState<ExamTypeTab>("all");
+    const [searchQuery, setSearchQuery] = useState("");
+    const [examTypeOpen, setExamTypeOpen] = useState(false);
+    const filterRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
         if (!isLoading && (!user || user.role !== "RH")) {
@@ -141,18 +147,44 @@ function CandidaturesInner() {
         })();
     }, [selectedId]);
 
+    // Reset filters when switching between modes
+    useEffect(() => {
+        setExamTypeTab("all");
+        setSearchQuery("");
+        setExamTypeOpen(false);
+    }, [modeTab]);
+
+    // Close exam type dropdown on outside click
+    useEffect(() => {
+        function handleClick(e: MouseEvent) {
+            if (filterRef.current && !filterRef.current.contains(e.target as Node)) {
+                setExamTypeOpen(false);
+            }
+        }
+        document.addEventListener("mousedown", handleClick);
+        return () => document.removeEventListener("mousedown", handleClick);
+    }, []);
+
     const selectedSession = useMemo(
         () => sessions.find(s => s._id === selectedId) || null,
         [sessions, selectedId],
     );
 
-    // Liste plate filtrée par mode (pour En ligne / Présentiel), puis par type d'examen
+    // Liste plate filtrée par mode, type d'examen, et recherche textuelle
     const filteredCandidates = useMemo(() => {
         if (modeTab === "all") return rows;
         let list = rows.filter(r => getExamMode(r) === modeTab);
         if (examTypeTab !== "all") list = list.filter(r => getExamType(r) === examTypeTab);
+        if (searchQuery.trim()) {
+            const q = searchQuery.toLowerCase().trim();
+            list = list.filter(r =>
+                (r.name || "").toLowerCase().includes(q) ||
+                (r.email || "").toLowerCase().includes(q) ||
+                (r.public_id || "").toLowerCase().includes(q)
+            );
+        }
         return list;
-    }, [rows, modeTab, examTypeTab]);
+    }, [rows, modeTab, examTypeTab, searchQuery]);
 
     // Dossiers formations (vue "Toutes les demandes" uniquement)
     const formations = useMemo(() => {
@@ -283,32 +315,69 @@ function CandidaturesInner() {
             ) : !selectedId ? null : modeTab !== "all" ? (
                 /* ── VUE LISTE : En ligne ou Présentiel ── */
                 <div className="space-y-4">
-                    {/* Filtre Type d'examen */}
-                    <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-xs font-bold uppercase tracking-widest text-gray-400">Type d'examen</span>
-                        {(["all", "direct", "after_formation"] as ExamTypeTab[]).map(tab => {
-                            const labels: Record<ExamTypeTab, string> = {
-                                all: "Tous",
-                                direct: "Examen direct",
-                                after_formation: "Après formation IRISQ",
-                            };
-                            const active = examTypeTab === tab;
-                            return (
-                                <button
-                                    key={tab}
-                                    onClick={() => setExamTypeTab(tab)}
-                                    className="px-3 py-1.5 rounded-full text-xs font-bold transition-all border"
-                                    style={{
-                                        backgroundColor: active ? "#1a237e" : "#f5f5f5",
-                                        color: active ? "#ffffff" : "#555",
-                                        borderColor: active ? "#1a237e" : "#e0e0e0",
-                                    }}
-                                >
-                                    {labels[tab]}
-                                </button>
-                            );
-                        })}
-                    </div>
+                    {/* Barre de recherche + filtre Type d'examen */}
+                    {(() => {
+                        const examTypeLabels: Record<ExamTypeTab, string> = {
+                            all: "Tous",
+                            direct: "Examen direct",
+                            after_formation: "Après formation IRISQ",
+                        };
+                        return (
+                            <div className="flex items-center gap-3">
+                                {/* Search */}
+                                <div className="relative flex-1">
+                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+                                    <input
+                                        type="text"
+                                        value={searchQuery}
+                                        onChange={e => setSearchQuery(e.target.value)}
+                                        placeholder="Rechercher par nom, email ou ID…"
+                                        className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 bg-white"
+                                    />
+                                </div>
+                                {/* Filter dropdown */}
+                                <div className="relative shrink-0" ref={filterRef}>
+                                    <button
+                                        onClick={() => setExamTypeOpen(v => !v)}
+                                        className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border text-sm font-semibold transition-all whitespace-nowrap"
+                                        style={{
+                                            backgroundColor: examTypeTab !== "all" ? "#1a237e" : "#ffffff",
+                                            color: examTypeTab !== "all" ? "#ffffff" : "#555",
+                                            borderColor: examTypeTab !== "all" ? "#1a237e" : "#e0e0e0",
+                                        }}
+                                    >
+                                        <SlidersHorizontal className="h-4 w-4" />
+                                        {examTypeLabels[examTypeTab]}
+                                        <ChevronDown
+                                            className="h-3.5 w-3.5"
+                                            style={{ transform: examTypeOpen ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 0.15s" }}
+                                        />
+                                    </button>
+                                    {examTypeOpen && (
+                                        <div className="absolute right-0 top-full mt-1.5 w-52 bg-white rounded-xl border border-gray-100 shadow-lg z-20 overflow-hidden py-1">
+                                            {(["all", "direct", "after_formation"] as ExamTypeTab[]).map(tab => (
+                                                <button
+                                                    key={tab}
+                                                    onClick={() => { setExamTypeTab(tab); setExamTypeOpen(false); }}
+                                                    className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-left transition-colors hover:bg-gray-50"
+                                                    style={{
+                                                        color: examTypeTab === tab ? "#1a237e" : "#555",
+                                                        fontWeight: examTypeTab === tab ? 700 : 500,
+                                                    }}
+                                                >
+                                                    <span
+                                                        className="w-1.5 h-1.5 rounded-full shrink-0"
+                                                        style={{ backgroundColor: examTypeTab === tab ? "#1a237e" : "transparent", border: examTypeTab === tab ? "none" : "1.5px solid #ccc" }}
+                                                    />
+                                                    {examTypeLabels[tab]}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        );
+                    })()}
 
                     {filteredCandidates.length === 0 ? (
                         <div className="p-12 text-center rounded-2xl bg-white border border-dashed border-gray-200">

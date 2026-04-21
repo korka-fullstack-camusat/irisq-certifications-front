@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
     LayoutDashboard,
     LogOut,
@@ -20,6 +20,8 @@ import { useAuth } from "@/lib/auth";
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
     const pathname = usePathname();
     const router = useRouter();
+    const searchParams = useSearchParams();
+    const currentMode = searchParams.get("mode");
     const [showLogoutModal, setShowLogoutModal] = useState(false);
 
     const { user, logout, isLoading } = useAuth();
@@ -201,9 +203,18 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                         {navItems.map((item) => {
                             const hasChildren = item.children.length > 0;
                             const isExpanded = expandedItems.has(item.name);
-                            const isActive = item.href === "/dashboard"
-                                ? pathname === item.href
-                                : pathname.startsWith(item.href);
+
+                            // Is a direct child sub-item currently selected?
+                            const isChildActive = hasChildren && item.children.some(child => {
+                                const url = new URL(child.href, "http://x");
+                                return pathname === url.pathname && currentMode === url.searchParams.get("mode");
+                            });
+
+                            // Parent is "active" (blue) only when on its own page with no sub-item selected
+                            const isActive = hasChildren
+                                ? (pathname === item.href && !currentMode)
+                                : (item.href === "/dashboard" ? pathname === item.href : pathname.startsWith(item.href));
+
                             const Icon = item.icon;
                             return (
                                 <div key={item.href}>
@@ -213,14 +224,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                                             href={item.href}
                                             className="relative flex-1 flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all"
                                             style={{
-                                                color: isActive ? "#ffffff" : "#555",
-                                                backgroundColor: isActive ? "#1a237e" : "transparent",
+                                                color: isActive ? "#ffffff" : isChildActive ? "#1a237e" : "#555",
+                                                backgroundColor: isActive ? "#1a237e" : isChildActive ? "#eef0fb" : "transparent",
                                             }}
                                             onMouseEnter={e => {
                                                 if (!isActive) (e.currentTarget as HTMLElement).style.backgroundColor = "#e8eaf6";
                                             }}
                                             onMouseLeave={e => {
-                                                if (!isActive) (e.currentTarget as HTMLElement).style.backgroundColor = "transparent";
+                                                if (!isActive) (e.currentTarget as HTMLElement).style.backgroundColor = isChildActive ? "#eef0fb" : "transparent";
                                             }}
                                         >
                                             {isActive && (
@@ -244,7 +255,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                                                 type="button"
                                                 onClick={() => toggleItem(item.name)}
                                                 className="p-1.5 rounded-lg transition-colors hover:bg-gray-100"
-                                                style={{ color: isActive ? "#1a237e" : "#9ca3af" }}
+                                                style={{ color: isActive || isChildActive ? "#1a237e" : "#9ca3af" }}
                                             >
                                                 <ChevronDown
                                                     className="h-4 w-4 transition-transform duration-200"
@@ -270,25 +281,28 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                                                     style={{ borderLeft: "2px solid #e8eaf6" }}
                                                 >
                                                     {item.children.map(child => {
-                                                        const childActive = pathname + (typeof window !== "undefined" ? window.location.search : "") === child.href
-                                                            || (pathname === "/dashboard/candidatures" && child.href.includes(
-                                                                typeof window !== "undefined" ? window.location.search : ""
-                                                            ));
+                                                        const url = new URL(child.href, "http://x");
+                                                        const childActive = pathname === url.pathname && currentMode === url.searchParams.get("mode");
                                                         return (
                                                             <Link
                                                                 key={child.href}
                                                                 href={child.href}
-                                                                className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-all"
+                                                                className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-all"
                                                                 style={{
-                                                                    color: "#555",
-                                                                    backgroundColor: "transparent",
+                                                                    color: childActive ? "#ffffff" : "#555",
+                                                                    backgroundColor: childActive ? "#1a237e" : "transparent",
+                                                                    fontWeight: childActive ? 700 : 500,
                                                                 }}
-                                                                onMouseEnter={e => (e.currentTarget as HTMLElement).style.backgroundColor = "#e8eaf6"}
-                                                                onMouseLeave={e => (e.currentTarget as HTMLElement).style.backgroundColor = "transparent"}
+                                                                onMouseEnter={e => {
+                                                                    if (!childActive) (e.currentTarget as HTMLElement).style.backgroundColor = "#e8eaf6";
+                                                                }}
+                                                                onMouseLeave={e => {
+                                                                    if (!childActive) (e.currentTarget as HTMLElement).style.backgroundColor = "transparent";
+                                                                }}
                                                             >
                                                                 <span
                                                                     className="w-1.5 h-1.5 rounded-full shrink-0"
-                                                                    style={{ backgroundColor: "#1a237e" }}
+                                                                    style={{ backgroundColor: childActive ? "#ffffff" : "#1a237e" }}
                                                                 />
                                                                 {child.name}
                                                             </Link>
