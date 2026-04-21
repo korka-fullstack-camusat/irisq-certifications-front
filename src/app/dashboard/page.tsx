@@ -14,8 +14,6 @@ import {
   MapPin,
   Folder,
   Users,
-  Hourglass,
-  XCircle,
   Download,
   ChevronRight,
 } from "lucide-react";
@@ -74,39 +72,6 @@ function formatRelative(iso?: string) {
   return d.toLocaleDateString("fr-FR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 }
 
-function StatCard({
-  label,
-  value,
-  icon: Icon,
-  color,
-  bg,
-  delay = 0,
-}: {
-  label: string;
-  value: number;
-  icon: React.ElementType;
-  color: string;
-  bg: string;
-  delay?: number;
-}) {
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay }}
-      className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm flex items-center gap-4"
-    >
-      <div className="h-12 w-12 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: bg }}>
-        <Icon className="h-5 w-5" style={{ color }} />
-      </div>
-      <div className="min-w-0">
-        <p className="text-2xl font-black" style={{ color }}>{value}</p>
-        <p className="text-xs font-semibold text-gray-500 truncate">{label}</p>
-      </div>
-    </motion.div>
-  );
-}
-
 export default function DashboardOverviewPage() {
   const { user, isLoading } = useAuth();
 
@@ -155,16 +120,6 @@ export default function DashboardOverviewPage() {
 
   const pending = useMemo(() => rows.filter(isPending), [rows]);
 
-  const stats = useMemo(() => {
-    const total = rows.length;
-    const pendingCount = rows.filter(r => !r.status || r.status === "pending").length;
-    const approved = rows.filter(r => r.status === "approved").length;
-    const rejected = rows.filter(r => r.status === "rejected").length;
-    const online = rows.filter(r => getExamMode(r) === "online").length;
-    const onsite = rows.filter(r => getExamMode(r) === "onsite").length;
-    return { total, pending: pendingCount, approved, rejected, online, onsite };
-  }, [rows]);
-
   const formations = useMemo(() => {
     const map = new Map<string, CandidatureRow[]>();
     for (const name of PREDEFINED_FORMATIONS) map.set(name, []);
@@ -208,7 +163,7 @@ export default function DashboardOverviewPage() {
             onClick={handleExport}
             disabled={exporting || rows.length === 0}
             className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold text-white transition-all hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0"
-            style={{ backgroundColor: "#2e7d32", boxShadow: "0 6px 16px rgba(46,125,50,0.25)" }}
+            style={{ backgroundColor: "#1a237e", boxShadow: "0 6px 16px rgba(26,35,126,0.20)" }}
           >
             {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
             {exporting ? "Préparation…" : "Exporter (ZIP)"}
@@ -216,7 +171,7 @@ export default function DashboardOverviewPage() {
         )}
       </div>
 
-      {/* ── Bannière session active / picker ── */}
+      {/* ── Session picker ── */}
       <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
         {loadingSessions ? (
           <div className="flex items-center gap-2 text-sm text-gray-400">
@@ -247,10 +202,11 @@ export default function DashboardOverviewPage() {
             </select>
             {selectedSession && (
               <span
-                className="inline-flex items-center gap-1 text-[10px] uppercase tracking-widest font-bold px-2 py-1 rounded-full"
+                className="text-[10px] uppercase tracking-widest font-bold px-2 py-1 rounded-full border"
                 style={{
-                  backgroundColor: selectedSession.status === "active" ? "#e8f5e9" : "#ffebee",
-                  color: selectedSession.status === "active" ? "#2e7d32" : "#c62828",
+                  borderColor: selectedSession.status === "active" ? "#2e7d32" : "#9ca3af",
+                  color: selectedSession.status === "active" ? "#2e7d32" : "#6b7280",
+                  backgroundColor: "transparent",
                 }}
               >
                 {selectedSession.status}
@@ -267,20 +223,59 @@ export default function DashboardOverviewPage() {
         <div className="p-4 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm">{error}</div>
       )}
 
-      {/* ── Statistiques ── */}
+      {/* ── Dossiers par formation ── */}
       {selectedId && !loadingRows && (
         <div>
-          <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-3">Statistiques</p>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            <StatCard label="Total candidats" value={stats.total}     icon={Users}        color="#1a237e" bg="#e8eaf6" delay={0} />
-            <StatCard label="En attente"      value={stats.pending}   icon={Hourglass}    color="#b26a00" bg="#fff8e1" delay={0.04} />
-            <StatCard label="Validées"        value={stats.approved}  icon={CheckCircle2} color="#2e7d32" bg="#e8f5e9" delay={0.08} />
-            <StatCard label="Rejetées"        value={stats.rejected}  icon={XCircle}      color="#c62828" bg="#ffebee" delay={0.12} />
-          </div>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mt-3">
-            <StatCard label="En ligne"   value={stats.online} icon={Monitor} color="#1a237e" bg="#e8eaf6" delay={0.16} />
-            <StatCard label="Présentiel" value={stats.onsite} icon={MapPin}  color="#2e7d32" bg="#e8f5e9" delay={0.20} />
-          </div>
+          <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-3">Dossiers par formation</p>
+          {formations.every(f => f.items.length === 0) ? (
+            <div className="p-12 text-center rounded-2xl bg-white border border-dashed border-gray-200">
+              <Folder className="h-10 w-10 mx-auto mb-3 text-gray-300" />
+              <p className="text-gray-500 text-sm">Aucun dossier disponible pour cette session.</p>
+            </div>
+          ) : (
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {formations.map((f, i) => {
+                const pendingCount = f.items.filter(r => !r.status || r.status === "pending").length;
+                const approvedCount = f.items.filter(r => r.status === "approved").length;
+                const isEmpty = f.items.length === 0;
+                return (
+                  <motion.div
+                    key={f.name}
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: i * 0.03 }}
+                  >
+                    <Link
+                      href={`/dashboard/formation?session=${encodeURIComponent(selectedId)}&name=${encodeURIComponent(f.name)}`}
+                      className="group flex items-start gap-4 p-4 rounded-xl bg-white border border-gray-200 hover:border-gray-400 hover:shadow-sm transition-all h-full"
+                    >
+                      <div className="h-10 w-10 rounded-lg flex items-center justify-center shrink-0 bg-gray-100">
+                        <Folder className="h-5 w-5 text-gray-500" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-semibold text-gray-800 text-sm leading-snug line-clamp-2">{f.name}</h3>
+                        <div className="mt-1.5 flex items-center gap-3 text-xs text-gray-400 flex-wrap">
+                          <span className="inline-flex items-center gap-1">
+                            <Users className="h-3 w-3" /> {f.items.length} candidat{f.items.length > 1 ? "s" : ""}
+                          </span>
+                          {pendingCount > 0 && <span>{pendingCount} en attente</span>}
+                          {approvedCount > 0 && <span>{approvedCount} validé{approvedCount > 1 ? "s" : ""}</span>}
+                          {isEmpty && <span className="italic">Vide</span>}
+                        </div>
+                      </div>
+                      <ChevronRight className="h-4 w-4 text-gray-300 group-hover:text-gray-500 transition-colors shrink-0 mt-0.5" />
+                    </Link>
+                  </motion.div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {loadingRows && selectedId && (
+        <div className="p-8 flex justify-center">
+          <Loader2 className="h-5 w-5 animate-spin text-gray-400" />
         </div>
       )}
 
@@ -291,7 +286,7 @@ export default function DashboardOverviewPage() {
             <Bell className="h-4 w-4" />
             Candidatures en cours
           </h2>
-          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700">
+          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border border-gray-200 text-gray-500">
             {pending.length} en attente
           </span>
         </div>
@@ -332,16 +327,13 @@ export default function DashboardOverviewPage() {
                     href={href}
                     className="flex items-start gap-3 px-5 py-3 hover:bg-gray-50 transition-colors"
                   >
-                    <div
-                      className="h-9 w-9 rounded-xl flex items-center justify-center shrink-0"
-                      style={{ backgroundColor: hasIssue ? "#fef2f2" : allValid ? "#e8f5e9" : "#fffbeb" }}
-                    >
+                    <div className="h-8 w-8 rounded-lg flex items-center justify-center shrink-0 bg-gray-100">
                       {hasIssue ? (
-                        <AlertTriangle className="h-4 w-4 text-red-500" />
+                        <AlertTriangle className="h-4 w-4 text-gray-500" />
                       ) : allValid ? (
-                        <CheckCircle2 className="h-4 w-4 text-green-600" />
+                        <CheckCircle2 className="h-4 w-4 text-gray-500" />
                       ) : (
-                        <Clock className="h-4 w-4 text-amber-600" />
+                        <Clock className="h-4 w-4 text-gray-400" />
                       )}
                     </div>
                     <div className="flex-1 min-w-0">
@@ -355,17 +347,17 @@ export default function DashboardOverviewPage() {
                           </span>
                         )}
                         {mode === "online" && (
-                          <span className="inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700">
+                          <span className="inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded border border-gray-200 text-gray-500">
                             <Monitor className="h-2.5 w-2.5" /> En ligne
                           </span>
                         )}
                         {mode === "onsite" && (
-                          <span className="inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700">
+                          <span className="inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded border border-gray-200 text-gray-500">
                             <MapPin className="h-2.5 w-2.5" /> Présentiel
                           </span>
                         )}
                       </div>
-                      <p className="text-xs text-gray-500 mt-0.5 truncate">
+                      <p className="text-xs text-gray-400 mt-0.5 truncate">
                         {hasIssue
                           ? "Document à renvoyer — relance envoyée"
                           : allValid
@@ -386,59 +378,6 @@ export default function DashboardOverviewPage() {
           </ul>
         )}
       </div>
-
-      {/* ── Dossiers par formation ── */}
-      {selectedId && !loadingRows && (
-        <div>
-          <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-3">Dossiers par formation</p>
-          {formations.every(f => f.items.length === 0) ? (
-            <div className="p-12 text-center rounded-2xl bg-white border border-dashed border-gray-200">
-              <Folder className="h-10 w-10 mx-auto mb-3 text-gray-300" />
-              <p className="text-gray-500 text-sm">Aucun dossier disponible pour cette session.</p>
-            </div>
-          ) : (
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {formations.map((f, i) => {
-                const pendingCount = f.items.filter(r => !r.status || r.status === "pending").length;
-                const approvedCount = f.items.filter(r => r.status === "approved").length;
-                const isEmpty = f.items.length === 0;
-                return (
-                  <motion.div
-                    key={f.name}
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: i * 0.03 }}
-                  >
-                    <Link
-                      href={`/dashboard/formation?session=${encodeURIComponent(selectedId)}&name=${encodeURIComponent(f.name)}`}
-                      className="group flex items-start gap-4 p-5 rounded-2xl bg-white border border-gray-100 shadow-sm hover:shadow-md hover:border-indigo-200 transition-all h-full"
-                    >
-                      <div
-                        className="h-12 w-12 rounded-xl flex items-center justify-center shrink-0"
-                        style={{ backgroundColor: isEmpty ? "#f3f4f6" : "#fff8e1" }}
-                      >
-                        <Folder className="h-5 w-5" style={{ color: isEmpty ? "#9ca3af" : "#f59e0b" }} />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <h3 className="font-bold text-gray-800 leading-snug line-clamp-2">{f.name}</h3>
-                        <div className="mt-2 flex items-center gap-3 text-xs text-gray-500 flex-wrap">
-                          <span className="inline-flex items-center gap-1">
-                            <Users className="h-3 w-3" /> {f.items.length} candidat{f.items.length > 1 ? "s" : ""}
-                          </span>
-                          {pendingCount > 0 && <span className="text-amber-700">{pendingCount} en attente</span>}
-                          {approvedCount > 0 && <span className="text-green-700">{approvedCount} validé{approvedCount > 1 ? "s" : ""}</span>}
-                          {isEmpty && <span className="text-gray-400 italic">Vide</span>}
-                        </div>
-                      </div>
-                      <ChevronRight className="h-5 w-5 text-gray-300 group-hover:text-indigo-500 transition-colors shrink-0" />
-                    </Link>
-                  </motion.div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      )}
     </div>
   );
 }
