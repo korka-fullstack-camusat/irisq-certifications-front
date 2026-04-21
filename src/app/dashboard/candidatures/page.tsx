@@ -11,6 +11,8 @@ import {
     ChevronRight,
     Users,
     Download,
+    Monitor,
+    MapPin,
 } from "lucide-react";
 import { motion } from "framer-motion";
 
@@ -37,6 +39,17 @@ interface CandidatureRow {
 const FORMATION_FIELD = "Certification souhaitée";
 const UNCATEGORIZED = "Sans formation renseignée";
 
+type ModeTab = "all" | "online" | "onsite";
+
+function getExamMode(r: CandidatureRow): "online" | "onsite" | "" {
+    const raw = (r.exam_mode || "").toString().toLowerCase().trim();
+    if (raw === "online" || raw === "onsite") return raw;
+    const fromAnswers = (r.answers?.["Mode d'examen"] || "").toString().toLowerCase().trim();
+    if (fromAnswers.includes("ligne")) return "online";
+    if (fromAnswers.includes("présent") || fromAnswers.includes("present")) return "onsite";
+    return "";
+}
+
 const PREDEFINED_FORMATIONS = [
     "Implementor ISO/IEC17025:2017",
     "Lead Implementor ISO/IEC17025:2017",
@@ -59,6 +72,7 @@ export default function CandidaturesPage() {
     const [loadingRows, setLoadingRows] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [exporting, setExporting] = useState(false);
+    const [modeTab, setModeTab] = useState<ModeTab>("all");
 
     useEffect(() => {
         if (!isLoading && (!user || user.role !== "RH")) {
@@ -105,11 +119,19 @@ export default function CandidaturesPage() {
         [sessions, selectedId],
     );
 
+    const onlineCount = useMemo(() => rows.filter(r => getExamMode(r) === "online").length, [rows]);
+    const onsiteCount = useMemo(() => rows.filter(r => getExamMode(r) === "onsite").length, [rows]);
+
+    const filteredRows = useMemo(() => {
+        if (modeTab === "all") return rows;
+        return rows.filter(r => getExamMode(r) === modeTab);
+    }, [rows, modeTab]);
+
     const formations = useMemo(() => {
         const map = new Map<string, CandidatureRow[]>();
         for (const name of PREDEFINED_FORMATIONS) map.set(name, []);
 
-        for (const r of rows) {
+        for (const r of filteredRows) {
             const raw = r.answers?.[FORMATION_FIELD];
             const name = (typeof raw === "string" && raw.trim()) ? raw.trim() : UNCATEGORIZED;
             if (!map.has(name)) map.set(name, []);
@@ -117,7 +139,7 @@ export default function CandidaturesPage() {
         }
 
         return Array.from(map.entries()).map(([name, items]) => ({ name, items }));
-    }, [rows]);
+    }, [filteredRows]);
 
     async function handleExport() {
         if (!selectedId || exporting) return;
@@ -210,6 +232,51 @@ export default function CandidaturesPage() {
             </div>
 
 
+            {/* Sous-sections : filtrage par mode d'examen */}
+            {!loadingSessions && sessions.length > 0 && (
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    {([
+                        { key: "all",    label: "Toutes les demandes",   count: totalCandidats, icon: Users,   color: "#1a237e", bg: "#e8eaf6", desc: "Vue globale" },
+                        { key: "online", label: "Candidats en ligne",    count: onlineCount,    icon: Monitor, color: "#1a237e", bg: "#e8eaf6", desc: "Examen à distance" },
+                        { key: "onsite", label: "Candidats présentiel",  count: onsiteCount,    icon: MapPin,  color: "#2e7d32", bg: "#e8f5e9", desc: "Examen sur site" },
+                    ] as const).map(t => {
+                        const Icon = t.icon;
+                        const active = modeTab === t.key;
+                        return (
+                            <button
+                                key={t.key}
+                                type="button"
+                                onClick={() => setModeTab(t.key as ModeTab)}
+                                className="text-left p-4 rounded-2xl border shadow-sm transition-all hover:-translate-y-0.5"
+                                style={{
+                                    backgroundColor: active ? t.bg : "#ffffff",
+                                    borderColor: active ? t.color : "#e5e7eb",
+                                    boxShadow: active ? `0 6px 16px ${t.color}22` : undefined,
+                                }}
+                            >
+                                <div className="flex items-center gap-3">
+                                    <div
+                                        className="h-10 w-10 rounded-xl flex items-center justify-center shrink-0"
+                                        style={{ backgroundColor: t.bg }}
+                                    >
+                                        <Icon className="h-5 w-5" style={{ color: t.color }} />
+                                    </div>
+                                    <div className="min-w-0 flex-1">
+                                        <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: active ? t.color : "#9ca3af" }}>
+                                            {t.desc}
+                                        </p>
+                                        <p className="text-sm font-bold text-gray-800 truncate">{t.label}</p>
+                                    </div>
+                                    <span className="text-lg font-black shrink-0" style={{ color: t.color }}>
+                                        {t.count}
+                                    </span>
+                                </div>
+                            </button>
+                        );
+                    })}
+                </div>
+            )}
+
             {error && (
                 <div className="p-4 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm">
                     {error}
@@ -238,7 +305,7 @@ export default function CandidaturesPage() {
                                 transition={{ delay: i * 0.03 }}
                             >
                                 <Link
-                                    href={`/dashboard/candidatures/formation?session=${encodeURIComponent(selectedId)}&name=${encodeURIComponent(f.name)}`}
+                                    href={`/dashboard/candidatures/formation?session=${encodeURIComponent(selectedId)}&name=${encodeURIComponent(f.name)}${modeTab !== "all" ? `&mode=${modeTab}` : ""}`}
                                     className="group flex items-start gap-4 p-5 rounded-2xl bg-white border border-gray-100 shadow-sm hover:shadow-md hover:border-indigo-200 transition-all h-full"
                                 >
                                     <div

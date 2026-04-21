@@ -75,6 +75,7 @@ function FormationFolderInner() {
     const searchParams = useSearchParams();
     const sessionId = searchParams.get("session") || "";
     const formationName = searchParams.get("name") || "";
+    const modeParam = searchParams.get("mode") as ExamModeTab | null;
 
     const [session, setSession] = useState<Session | null>(null);
     const [rows, setRows] = useState<CandidatureRow[]>([]);
@@ -82,7 +83,9 @@ function FormationFolderInner() {
     const [error, setError] = useState<string | null>(null);
     const [query, setQuery] = useState("");
     const [statusFilter, setStatusFilter] = useState<"all" | "pending" | "approved" | "rejected">("all");
-    const [modeTab, setModeTab] = useState<ExamModeTab>("all");
+    const [modeTab, setModeTab] = useState<ExamModeTab>(
+        modeParam === "online" || modeParam === "onsite" ? modeParam : "all"
+    );
     const [page, setPage] = useState(1);
     const [pageSize, setPageSize] = useState(10);
     const [exportOpen, setExportOpen] = useState(false);
