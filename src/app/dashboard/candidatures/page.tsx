@@ -19,6 +19,7 @@ import {
     AlertTriangle,
     Search,
     SlidersHorizontal,
+    ArrowLeft,
 } from "lucide-react";
 import { motion } from "framer-motion";
 
@@ -33,6 +34,7 @@ import { useAuth } from "@/lib/auth";
 interface CandidatureRow {
     _id: string;
     public_id?: string;
+    candidate_id?: string;
     name?: string;
     email?: string;
     status?: string;
@@ -42,6 +44,8 @@ interface CandidatureRow {
     answers?: Record<string, any>;
     documents_validation?: Record<string, { valid?: boolean; resubmit_requested?: boolean }>;
 }
+
+const FORMATION_FIELD = "Certification souhaitée";
 
 type ModeTab = "online" | "onsite";
 type ExamTypeTab = "all" | "direct" | "after_formation";
@@ -59,9 +63,9 @@ function getExamType(r: CandidatureRow): "direct" | "after_formation" | "" {
     const raw = (r.exam_type as string | undefined || "").toString().toLowerCase().trim();
     if (raw === "direct") return "direct";
     if (raw === "after_formation") return "after_formation";
-    const fromAnswers = (r.answers?.["Type d'examen"] || "").toString().toLowerCase().trim();
-    if (fromAnswers.includes("direct")) return "direct";
-    if (fromAnswers.includes("formation")) return "after_formation";
+    const fromAnswers = (r.answers?.["Type d'examen"] || "").toString().trim();
+    if (fromAnswers.toLowerCase().includes("direct")) return "direct";
+    if (fromAnswers.toLowerCase().includes("formation")) return "after_formation";
     return "";
 }
 
@@ -73,12 +77,6 @@ function validationState(row: CandidatureRow): "all_valid" | "has_issue" | "pend
     if (entries.every(e => e.valid === true)) return "all_valid";
     return "pending";
 }
-
-const examTypeLabels: Record<ExamTypeTab, string> = {
-    all: "Tous",
-    direct: "Examen direct",
-    after_formation: "Après formation IRISQ",
-};
 
 function CandidaturesInner() {
     const { user, isLoading } = useAuth();
@@ -100,7 +98,9 @@ function CandidaturesInner() {
     const filterRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
-        if (!isLoading && (!user || user.role !== "RH")) router.replace("/dashboard");
+        if (!isLoading && (!user || user.role !== "RH")) {
+            router.replace("/dashboard");
+        }
     }, [isLoading, user, router]);
 
     useEffect(() => {
@@ -133,23 +133,26 @@ function CandidaturesInner() {
         })();
     }, [selectedId]);
 
-    // Reset filters when switching between En ligne / Présentiel
     useEffect(() => {
         setExamTypeTab("all");
         setSearchQuery("");
         setExamTypeOpen(false);
     }, [modeTab]);
 
-    // Close dropdown on outside click
     useEffect(() => {
-        function handler(e: MouseEvent) {
-            if (filterRef.current && !filterRef.current.contains(e.target as Node)) setExamTypeOpen(false);
+        function handleClick(e: MouseEvent) {
+            if (filterRef.current && !filterRef.current.contains(e.target as Node)) {
+                setExamTypeOpen(false);
+            }
         }
-        document.addEventListener("mousedown", handler);
-        return () => document.removeEventListener("mousedown", handler);
+        document.addEventListener("mousedown", handleClick);
+        return () => document.removeEventListener("mousedown", handleClick);
     }, []);
 
-    const selectedSession = useMemo(() => sessions.find(s => s._id === selectedId) || null, [sessions, selectedId]);
+    const selectedSession = useMemo(
+        () => sessions.find(s => s._id === selectedId) || null,
+        [sessions, selectedId],
+    );
 
     const filteredCandidates = useMemo(() => {
         let list = rows.filter(r => getExamMode(r) === modeTab);
@@ -179,23 +182,55 @@ function CandidaturesInner() {
 
     if (isLoading || !user) return null;
 
-    const isOnline = modeTab === "online";
-    const modeColor = isOnline ? "#1a237e" : "#2e7d32";
-    const ModeIcon = isOnline ? Monitor : MapPin;
-    const modeLabel = isOnline ? "Candidature en ligne" : "Candidature présentiel";
+    const modeConfig = {
+        online: { label: "Candidature en ligne",   icon: Monitor, color: "#1a237e" },
+        onsite: { label: "Candidature présentiel",  icon: MapPin,  color: "#2e7d32" },
+    } as const;
+    const { label: modeLabel, icon: ModeIcon, color: modeColor } = modeConfig[modeTab];
+
+    const examTypeLabels: Record<ExamTypeTab, string> = {
+        all: "Tous",
+        direct: "Examen direct",
+        after_formation: "Après formation IRISQ",
+    };
 
     return (
         <div className="space-y-6">
             {/* En-tête */}
             <div className="flex items-start justify-between gap-4 flex-wrap">
                 <div>
-                    <h1 className="text-2xl font-black flex items-center gap-2" style={{ color: "#1a237e" }}>
-                        <ModeIcon className="h-6 w-6" style={{ color: modeColor }} />
+                    <Link
+                        href="/dashboard"
+                        className="inline-flex items-center gap-1 text-xs font-bold text-gray-500 hover:text-gray-700 mb-2"
+                    >
+                        <ArrowLeft className="h-3 w-3" /> Tableau de bord
+                    </Link>
+                    <h1 className="text-2xl font-black flex items-center gap-2" style={{ color: modeColor }}>
+                        <ModeIcon className="h-6 w-6" />
                         {modeLabel}
                     </h1>
-                    <p className="text-sm mt-1" style={{ color: modeColor }}>
-                        {isOnline ? "Examens à distance" : "Examens sur site"}
-                    </p>
+                    <div className="flex items-center gap-3 mt-1">
+                        <Link
+                            href="/dashboard/candidatures?mode=online"
+                            className="text-xs font-bold px-3 py-1 rounded-full transition-colors"
+                            style={{
+                                backgroundColor: modeTab === "online" ? "#1a237e" : "#e8eaf6",
+                                color: modeTab === "online" ? "#ffffff" : "#1a237e",
+                            }}
+                        >
+                            En ligne
+                        </Link>
+                        <Link
+                            href="/dashboard/candidatures?mode=onsite"
+                            className="text-xs font-bold px-3 py-1 rounded-full transition-colors"
+                            style={{
+                                backgroundColor: modeTab === "onsite" ? "#2e7d32" : "#e8f5e9",
+                                color: modeTab === "onsite" ? "#ffffff" : "#2e7d32",
+                            }}
+                        >
+                            Présentiel
+                        </Link>
+                    </div>
                 </div>
                 {selectedId && (
                     <button
@@ -211,15 +246,17 @@ function CandidaturesInner() {
             </div>
 
             {/* Session picker */}
-            <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm">
+            <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
                 {loadingSessions ? (
                     <div className="flex items-center gap-2 text-sm text-gray-400">
                         <Loader2 className="h-4 w-4 animate-spin" /> Chargement des sessions…
                     </div>
                 ) : sessions.length === 0 ? (
                     <div className="text-sm text-gray-500">
-                        Aucune session.{" "}
-                        <Link href="/dashboard/sessions" className="font-bold text-indigo-600 hover:underline">Créer une session</Link>
+                        Aucune session créée.{" "}
+                        <Link href="/dashboard/sessions" className="font-bold text-indigo-600 hover:underline">
+                            Créer une session
+                        </Link>
                     </div>
                 ) : (
                     <div className="flex items-center gap-3 flex-wrap">
@@ -239,7 +276,7 @@ function CandidaturesInner() {
                         </select>
                         {selectedSession && (
                             <span
-                                className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase"
+                                className="inline-flex items-center gap-1 text-[10px] uppercase tracking-widest font-bold px-2 py-1 rounded-full"
                                 style={{
                                     backgroundColor: selectedSession.status === "active" ? "#e8f5e9" : "#ffebee",
                                     color: selectedSession.status === "active" ? "#2e7d32" : "#c62828",
@@ -255,7 +292,9 @@ function CandidaturesInner() {
                 )}
             </div>
 
-            {error && <div className="p-4 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm">{error}</div>}
+            {error && (
+                <div className="p-4 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm">{error}</div>
+            )}
 
             {loadingRows ? (
                 <div className="p-8 text-center text-gray-400 text-sm flex items-center justify-center gap-2">
@@ -263,8 +302,9 @@ function CandidaturesInner() {
                 </div>
             ) : !selectedId ? null : (
                 <div className="space-y-4">
-                    {/* Barre de recherche + filtre */}
+                    {/* Barre de recherche + filtre Type d'examen */}
                     <div className="flex items-center gap-3">
+                        {/* Search */}
                         <div className="relative flex-1">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
                             <input
@@ -275,6 +315,7 @@ function CandidaturesInner() {
                                 className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 bg-white"
                             />
                         </div>
+                        {/* Filter dropdown */}
                         <div className="relative shrink-0" ref={filterRef}>
                             <button
                                 onClick={() => setExamTypeOpen(v => !v)}
@@ -299,7 +340,10 @@ function CandidaturesInner() {
                                             key={tab}
                                             onClick={() => { setExamTypeTab(tab); setExamTypeOpen(false); }}
                                             className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-left transition-colors hover:bg-gray-50"
-                                            style={{ color: examTypeTab === tab ? "#1a237e" : "#555", fontWeight: examTypeTab === tab ? 700 : 500 }}
+                                            style={{
+                                                color: examTypeTab === tab ? "#1a237e" : "#555",
+                                                fontWeight: examTypeTab === tab ? 700 : 500,
+                                            }}
                                         >
                                             <span
                                                 className="w-1.5 h-1.5 rounded-full shrink-0"
@@ -313,12 +357,11 @@ function CandidaturesInner() {
                         </div>
                     </div>
 
-                    {/* Liste candidats */}
                     {filteredCandidates.length === 0 ? (
                         <div className="p-12 text-center rounded-2xl bg-white border border-dashed border-gray-200">
                             <ModeIcon className="h-10 w-10 mx-auto mb-3 text-gray-300" />
                             <p className="text-gray-500 text-sm">
-                                Aucun candidat {isOnline ? "en ligne" : "en présentiel"} pour cette session.
+                                Aucun candidat {modeTab === "online" ? "en ligne" : "en présentiel"} pour cette session.
                             </p>
                         </div>
                     ) : (
@@ -326,7 +369,7 @@ function CandidaturesInner() {
                             {filteredCandidates.map((r, i) => {
                                 const status = (r.status || "pending") as "pending" | "approved" | "rejected";
                                 const docState = validationState(r);
-                                const formation = r.answers?.["Certification souhaitée"] || "—";
+                                const formation = r.answers?.[FORMATION_FIELD] || "—";
                                 return (
                                     <motion.div
                                         key={r._id}
@@ -338,17 +381,22 @@ function CandidaturesInner() {
                                             href={`/dashboard/candidatures/${r._id}?from=${modeTab}`}
                                             className="group flex items-center gap-4 p-4 rounded-2xl bg-white border border-gray-100 shadow-sm hover:shadow-md hover:border-indigo-200 transition-all"
                                         >
+                                            {/* Avatar */}
                                             <div
                                                 className="h-11 w-11 rounded-xl flex items-center justify-center shrink-0 text-white text-sm font-black"
-                                                style={{ backgroundColor: modeColor }}
+                                                style={{ backgroundColor: modeTab === "online" ? "#1a237e" : "#2e7d32" }}
                                             >
                                                 {(r.name || "?").substring(0, 2).toUpperCase()}
                                             </div>
+
+                                            {/* Infos */}
                                             <div className="flex-1 min-w-0">
                                                 <div className="flex items-center gap-2 flex-wrap">
                                                     <span className="font-bold text-gray-800 truncate">{r.name || "Candidat"}</span>
                                                     {r.public_id && (
-                                                        <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-gray-100 text-gray-500">{r.public_id}</span>
+                                                        <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-gray-100 text-gray-500">
+                                                            {r.public_id}
+                                                        </span>
                                                     )}
                                                     {docState === "all_valid" && (
                                                         <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700">
@@ -364,25 +412,34 @@ function CandidaturesInner() {
                                                 <div className="mt-1 flex items-center gap-4 text-xs text-gray-500 flex-wrap">
                                                     <span className="truncate max-w-[180px] font-medium text-gray-600">{formation}</span>
                                                     {r.email && (
-                                                        <span className="inline-flex items-center gap-1"><Mail className="h-3 w-3" /> {r.email}</span>
+                                                        <span className="inline-flex items-center gap-1">
+                                                            <Mail className="h-3 w-3" /> {r.email}
+                                                        </span>
                                                     )}
                                                     {r.submitted_at && (
-                                                        <span className="inline-flex items-center gap-1"><Clock className="h-3 w-3" /> {new Date(r.submitted_at).toLocaleDateString("fr-FR")}</span>
+                                                        <span className="inline-flex items-center gap-1">
+                                                            <Clock className="h-3 w-3" /> {new Date(r.submitted_at).toLocaleDateString("fr-FR")}
+                                                        </span>
                                                     )}
                                                 </div>
                                             </div>
+
+                                            {/* Statut */}
                                             {status === "approved" && (
-                                                <span className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full shrink-0" style={{ backgroundColor: "#e8f5e9", color: "#2e7d32", border: "1px solid #c8e6c9" }}>
+                                                <span className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full shrink-0"
+                                                    style={{ backgroundColor: "#e8f5e9", color: "#2e7d32", border: "1px solid #c8e6c9" }}>
                                                     <CheckCircle2 className="h-3.5 w-3.5" /> Validée
                                                 </span>
                                             )}
                                             {status === "rejected" && (
-                                                <span className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full shrink-0" style={{ backgroundColor: "#ffebee", color: "#c62828", border: "1px solid #ffcdd2" }}>
+                                                <span className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full shrink-0"
+                                                    style={{ backgroundColor: "#ffebee", color: "#c62828", border: "1px solid #ffcdd2" }}>
                                                     <XCircle className="h-3.5 w-3.5" /> Rejetée
                                                 </span>
                                             )}
                                             {status === "pending" && (
-                                                <span className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full shrink-0" style={{ backgroundColor: "#fff8e1", color: "#b26a00", border: "1px solid #ffe0b2" }}>
+                                                <span className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full shrink-0"
+                                                    style={{ backgroundColor: "#fff8e1", color: "#b26a00", border: "1px solid #ffe0b2" }}>
                                                     <Hourglass className="h-3.5 w-3.5" /> En attente
                                                 </span>
                                             )}

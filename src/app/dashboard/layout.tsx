@@ -1,25 +1,24 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import Link from "next/link";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import {
     LayoutDashboard,
     LogOut,
     X,
     CalendarDays,
-    ShieldCheck,
-    Trophy,
     Monitor,
     MapPin,
+    ShieldCheck,
+    Trophy,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import Image from "next/image";
 import { useAuth } from "@/lib/auth";
 
-export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
     const pathname = usePathname();
-    const router = useRouter();
     const searchParams = useSearchParams();
     const currentMode = searchParams.get("mode");
     const [showLogoutModal, setShowLogoutModal] = useState(false);
@@ -27,27 +26,27 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     const { user, logout, isLoading } = useAuth();
 
     const navItems = [
-        { name: "Tableau de bord",        href: "/dashboard",                          icon: LayoutDashboard },
-        { name: "Gestion sessions",        href: "/dashboard/sessions",                 icon: CalendarDays },
-        { name: "Candidature en ligne",    href: "/dashboard/candidatures?mode=online", icon: Monitor },
-        { name: "Candidature présentiel",  href: "/dashboard/candidatures?mode=onsite", icon: MapPin },
-        { name: "Candidatures validées",   href: "/dashboard/candidatures-validees",    icon: ShieldCheck },
-        { name: "Candidats certifiés",     href: "/dashboard/candidats-certifies",      icon: Trophy },
+        { name: "Tableau de bord",        href: "/dashboard",                           icon: LayoutDashboard, mode: null      as string | null },
+        { name: "Gestion sessions",       href: "/dashboard/sessions",                  icon: CalendarDays,    mode: null      as string | null },
+        { name: "Candidature en ligne",   href: "/dashboard/candidatures?mode=online",  icon: Monitor,         mode: "online"  as string | null },
+        { name: "Candidature présentiel", href: "/dashboard/candidatures?mode=onsite",  icon: MapPin,          mode: "onsite"  as string | null },
+        { name: "Candidatures validées",  href: "/dashboard/candidatures-validees",     icon: ShieldCheck,     mode: null      as string | null },
+        { name: "Candidats certifiés",    href: "/dashboard/candidats-certifies",       icon: Trophy,          mode: null      as string | null },
     ];
-
-    function getIsActive(href: string): boolean {
-        const url = new URL(href, "http://x");
-        const itemMode = url.searchParams.get("mode");
-        const itemPath = url.pathname;
-        if (itemMode) return pathname === itemPath && currentMode === itemMode;
-        if (href === "/dashboard") return pathname === "/dashboard";
-        return pathname.startsWith(itemPath);
-    }
 
     const handleLogout = () => {
         setShowLogoutModal(false);
         logout();
     };
+
+    function isItemActive(item: { href: string; mode: string | null }) {
+        const url = new URL(item.href, "http://x");
+        if (item.mode) {
+            return pathname === url.pathname && currentMode === item.mode;
+        }
+        if (url.pathname === "/dashboard") return pathname === "/dashboard";
+        return pathname.startsWith(url.pathname) && !currentMode;
+    }
 
     if (isLoading || !user) return null;
 
@@ -188,8 +187,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                         Navigation
                     </p>
                     <nav className="space-y-0.5">
-                        {navItems.map(item => {
-                            const isActive = getIsActive(item.href);
+                        {navItems.map((item) => {
+                            const isActive = isItemActive(item);
                             const Icon = item.icon;
                             return (
                                 <Link
@@ -217,7 +216,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                                             transition={{ duration: 0.2 }}
                                         />
                                     )}
-                                    <Icon className="h-5 w-5 shrink-0" style={{ color: isActive ? "#ffffff" : "#2e7d32" }} />
+                                    <Icon
+                                        className="h-5 w-5 shrink-0"
+                                        style={{ color: isActive ? "#ffffff" : "#2e7d32" }}
+                                    />
                                     {item.name}
                                 </Link>
                             );
@@ -289,17 +291,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 BOTTOM NAV — mobile
             ══════════════════════════════════════════ */}
             <nav
-                className="md:hidden fixed bottom-0 left-0 right-0 z-40 flex items-center justify-around px-4 pb-safe"
+                className="md:hidden fixed bottom-0 left-0 right-0 z-40 flex items-center justify-around px-4 pb-safe overflow-x-auto"
                 style={{ backgroundColor: "#ffffff", borderTop: "2px solid #e8eaf6" }}
             >
                 {navItems.map((item) => {
-                    const isActive = getIsActive(item.href);
+                    const isActive = isItemActive(item);
                     const Icon = item.icon;
                     return (
                         <Link
                             key={item.href}
                             href={item.href}
-                            className="flex flex-col items-center gap-1 p-3 transition-colors relative"
+                            className="flex flex-col items-center gap-1 p-3 transition-colors relative shrink-0"
                             style={{ color: isActive ? "#1a237e" : "#9ca3af" }}
                         >
                             {isActive && (
@@ -312,11 +314,19 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                                 />
                             )}
                             <Icon className="h-5 w-5" />
-                            <span className="text-[10px] font-bold">{item.name}</span>
+                            <span className="text-[10px] font-bold text-center leading-tight">{item.name}</span>
                         </Link>
                     );
                 })}
             </nav>
         </div>
+    );
+}
+
+export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+    return (
+        <Suspense fallback={null}>
+            <DashboardLayoutContent>{children}</DashboardLayoutContent>
+        </Suspense>
     );
 }
