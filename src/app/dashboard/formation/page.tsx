@@ -63,15 +63,11 @@ function StatCard({
     label,
     value,
     icon: Icon,
-    color,
-    bg,
     delay = 0,
 }: {
     label: string;
     value: number;
     icon: React.ElementType;
-    color: string;
-    bg: string;
     delay?: number;
 }) {
     return (
@@ -79,14 +75,14 @@ function StatCard({
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay }}
-            className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm flex items-center gap-4"
+            className="bg-white rounded-xl p-4 border border-gray-200 flex items-center gap-3"
         >
-            <div className="h-12 w-12 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: bg }}>
-                <Icon className="h-5 w-5" style={{ color }} />
+            <div className="h-10 w-10 rounded-lg flex items-center justify-center shrink-0 bg-gray-100">
+                <Icon className="h-4 w-4 text-gray-500" />
             </div>
             <div className="min-w-0">
-                <p className="text-2xl font-black" style={{ color }}>{value}</p>
-                <p className="text-xs font-semibold text-gray-500 truncate">{label}</p>
+                <p className="text-xl font-black text-gray-800">{value}</p>
+                <p className="text-xs text-gray-400 truncate">{label}</p>
             </div>
         </motion.div>
     );
@@ -160,7 +156,7 @@ function FormationFolderInner() {
 
     if (!sessionId || !formationName) {
         return (
-            <div className="p-8 rounded-2xl bg-amber-50 border border-amber-200 text-amber-700 text-sm">
+            <div className="p-8 rounded-2xl bg-gray-50 border border-gray-200 text-gray-600 text-sm">
                 Paramètres manquants. <Link href="/dashboard" className="font-bold underline">Retour au tableau de bord</Link>
             </div>
         );
@@ -177,22 +173,16 @@ function FormationFolderInner() {
 
             {/* Header */}
             <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm flex items-start gap-4 flex-wrap">
-                <div className="h-12 w-12 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: "#fff8e1" }}>
-                    <FolderOpen className="h-5 w-5" style={{ color: "#f59e0b" }} />
+                <div className="h-10 w-10 rounded-lg flex items-center justify-center shrink-0 bg-gray-100">
+                    <FolderOpen className="h-5 w-5 text-gray-500" />
                 </div>
                 <div className="flex-1 min-w-0">
                     <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Formation</p>
-                    <h1 className="text-xl font-black leading-snug" style={{ color: "#1a237e" }}>{formationName}</h1>
+                    <h1 className="text-xl font-black leading-snug text-gray-800">{formationName}</h1>
                     {session && (
-                        <p className="text-xs text-gray-500 mt-1">
-                            Session : <span className="font-semibold">{session.name}</span>
-                            <span
-                                className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase"
-                                style={{
-                                    backgroundColor: session.status === "active" ? "#e8f5e9" : "#ffebee",
-                                    color: session.status === "active" ? "#2e7d32" : "#c62828",
-                                }}
-                            >
+                        <p className="text-xs text-gray-400 mt-1">
+                            Session : <span className="font-semibold text-gray-600">{session.name}</span>
+                            <span className="ml-2 text-[10px] font-bold uppercase border border-gray-300 text-gray-500 px-1.5 py-0.5 rounded">
                                 {session.status}
                             </span>
                         </p>
@@ -205,19 +195,17 @@ function FormationFolderInner() {
                         type="button"
                         onClick={() => setExportOpen(true)}
                         disabled={stats.total === 0}
-                        className="inline-flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs font-bold text-white transition-all hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0"
-                        style={{ backgroundColor: "#2e7d32", boxShadow: "0 6px 16px rgba(46,125,50,0.20)" }}
+                        className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-200 text-xs font-semibold text-gray-700 hover:bg-gray-50 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                         <Download className="h-3.5 w-3.5" /> Exporter
                     </button>
 
-                    {/* Voir les candidatures dropdown */}
                     <div className="relative" ref={detailRef}>
                         <button
                             type="button"
                             onClick={() => setDetailOpen(v => !v)}
-                            className="inline-flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs font-bold text-white transition-all hover:-translate-y-0.5"
-                            style={{ backgroundColor: "#1a237e", boxShadow: "0 6px 16px rgba(26,35,126,0.20)" }}
+                            className="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold text-white transition-all hover:opacity-90"
+                            style={{ backgroundColor: "#1a237e" }}
                         >
                             Voir les candidatures
                             <ChevronDown
@@ -232,7 +220,7 @@ function FormationFolderInner() {
                                     onClick={() => setDetailOpen(false)}
                                     className="flex items-center gap-2.5 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
                                 >
-                                    <Monitor className="h-4 w-4 shrink-0" style={{ color: "#1a237e" }} />
+                                    <Monitor className="h-4 w-4 shrink-0 text-gray-400" />
                                     Candidature en ligne
                                 </Link>
                                 <Link
@@ -240,7 +228,7 @@ function FormationFolderInner() {
                                     onClick={() => setDetailOpen(false)}
                                     className="flex items-center gap-2.5 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
                                 >
-                                    <MapPin className="h-4 w-4 shrink-0" style={{ color: "#2e7d32" }} />
+                                    <MapPin className="h-4 w-4 shrink-0 text-gray-400" />
                                     Candidature présentiel
                                 </Link>
                             </div>
@@ -274,25 +262,25 @@ function FormationFolderInner() {
                 </div>
             ) : (
                 <>
-                    {/* Statistiques principales */}
+                    {/* Vue d'ensemble */}
                     <div>
                         <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-3">Vue d'ensemble</p>
                         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                            <StatCard label="Total candidats"   value={stats.total}    icon={Users}         color="#1a237e" bg="#e8eaf6" delay={0}    />
-                            <StatCard label="En attente"        value={stats.pending}  icon={Hourglass}     color="#b26a00" bg="#fff8e1" delay={0.04} />
-                            <StatCard label="Validées"          value={stats.approved} icon={CheckCircle2}  color="#2e7d32" bg="#e8f5e9" delay={0.08} />
-                            <StatCard label="Rejetées"          value={stats.rejected} icon={XCircle}       color="#c62828" bg="#ffebee" delay={0.12} />
+                            <StatCard label="Total candidats" value={stats.total}    icon={Users}        delay={0}    />
+                            <StatCard label="En attente"      value={stats.pending}  icon={Hourglass}    delay={0.04} />
+                            <StatCard label="Validées"         value={stats.approved} icon={CheckCircle2} delay={0.08} />
+                            <StatCard label="Rejetées"         value={stats.rejected} icon={XCircle}      delay={0.12} />
                         </div>
                     </div>
 
-                    {/* Répartition par mode et type */}
+                    {/* Répartition */}
                     <div>
                         <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-3">Répartition</p>
                         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                            <StatCard label="En ligne"              value={stats.online}        icon={Monitor}        color="#1a237e" bg="#e8eaf6" delay={0.16} />
-                            <StatCard label="Présentiel"            value={stats.onsite}        icon={MapPin}         color="#2e7d32" bg="#e8f5e9" delay={0.20} />
-                            <StatCard label="Examen direct"         value={stats.direct}        icon={Award}          color="#b45309" bg="#fff8e1" delay={0.24} />
-                            <StatCard label="Après formation IRISQ" value={stats.afterFormation} icon={GraduationCap} color="#047857" bg="#ecfdf5" delay={0.28} />
+                            <StatCard label="En ligne"              value={stats.online}        icon={Monitor}       delay={0.16} />
+                            <StatCard label="Présentiel"            value={stats.onsite}        icon={MapPin}        delay={0.20} />
+                            <StatCard label="Examen direct"         value={stats.direct}        icon={Award}         delay={0.24} />
+                            <StatCard label="Après formation IRISQ" value={stats.afterFormation} icon={GraduationCap} delay={0.28} />
                         </div>
                     </div>
                 </>
