@@ -40,6 +40,15 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
         });
     }
 
+    function expandItem(name: string) {
+        setExpandedItems(prev => {
+            if (prev.has(name)) return prev;
+            const next = new Set(prev);
+            next.add(name);
+            return next;
+        });
+    }
+
     const navItems = [
         { name: "Tableau de bord", href: "/dashboard", icon: LayoutDashboard, children: [] },
         { name: "Gestion sessions", href: "/dashboard/sessions", icon: CalendarDays, children: [] },
@@ -222,6 +231,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
                                     <div className="flex items-center gap-1">
                                         <Link
                                             href={item.href}
+                                            onClick={() => { if (hasChildren) expandItem(item.name); }}
                                             className="relative flex-1 flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all"
                                             style={{
                                                 color: isActive ? "#ffffff" : isChildActive ? "#1a237e" : "#555",
