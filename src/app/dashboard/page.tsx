@@ -12,6 +12,8 @@ import {
   AlertTriangle,
   ChevronRight,
   Loader2,
+  Monitor,
+  MapPin,
 } from "lucide-react";
 
 import {
@@ -28,12 +30,22 @@ interface CandidatureRow {
   email?: string;
   status?: string;
   submitted_at?: string;
+  exam_mode?: string;
   answers?: Record<string, any>;
   documents_validation?: Record<string, { valid?: boolean; resubmit_requested?: boolean }>;
 }
 
 function isPending(r: CandidatureRow): boolean {
   return !r.status || r.status === "pending";
+}
+
+function getExamMode(r: CandidatureRow): "online" | "onsite" | "" {
+  const raw = (r.exam_mode || "").toString().toLowerCase().trim();
+  if (raw === "online" || raw === "onsite") return raw;
+  const fromAnswers = (r.answers?.["Mode d'examen"] || "").toString().toLowerCase().trim();
+  if (fromAnswers.includes("ligne")) return "online";
+  if (fromAnswers.includes("présent") || fromAnswers.includes("present")) return "onsite";
+  return "";
 }
 
 function formatRelative(iso?: string) {
@@ -174,6 +186,12 @@ export default function DashboardOverviewPage() {
               const entries = Object.values(v);
               const hasIssue = entries.some(e => e.resubmit_requested);
               const allValid = entries.length > 0 && entries.every(e => e.valid === true);
+              const mode = getExamMode(r);
+              const href = mode === "online"
+                ? "/dashboard/candidatures?mode=online"
+                : mode === "onsite"
+                  ? "/dashboard/candidatures?mode=onsite"
+                  : "/dashboard/candidatures";
               return (
                 <motion.li
                   key={r._id}
@@ -182,7 +200,7 @@ export default function DashboardOverviewPage() {
                   transition={{ delay: i * 0.03 }}
                 >
                   <Link
-                    href="/dashboard/candidatures"
+                    href={href}
                     className="flex items-start gap-3 px-5 py-3 hover:bg-gray-50 transition-colors"
                   >
                     <div
@@ -205,6 +223,16 @@ export default function DashboardOverviewPage() {
                         {r.public_id && (
                           <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-gray-100 text-gray-500">
                             {r.public_id}
+                          </span>
+                        )}
+                        {mode === "online" && (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700">
+                            <Monitor className="h-2.5 w-2.5" /> En ligne
+                          </span>
+                        )}
+                        {mode === "onsite" && (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700">
+                            <MapPin className="h-2.5 w-2.5" /> Présentiel
                           </span>
                         )}
                       </div>
