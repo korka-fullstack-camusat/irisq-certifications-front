@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, Suspense } from "react";
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import {
     ArrowLeft,
     FileText,
@@ -48,11 +48,17 @@ function extractUrl(value: unknown): string | null {
     return null;
 }
 
-export default function CandidatureDossierPage() {
+function CandidatureDossierInner() {
     const { user, isLoading } = useAuth();
     const router = useRouter();
     const params = useParams<{ candidatId: string }>();
+    const searchParams = useSearchParams();
     const candidatId = params?.candidatId as string;
+
+    const fromMode = searchParams.get("from");
+    const backHref = fromMode === "online" || fromMode === "onsite"
+        ? `/dashboard/candidatures?mode=${fromMode}`
+        : "/dashboard/candidatures";
 
     const [response, setResponse] = useState<any>(null);
     const [loading, setLoading] = useState(true);
@@ -223,7 +229,7 @@ export default function CandidatureDossierPage() {
     return (
         <div className="space-y-6">
             <Link
-                href="/dashboard/candidatures"
+                href={backHref}
                 className="inline-flex items-center gap-1 text-xs font-bold text-gray-500 hover:text-gray-700"
             >
                 <ArrowLeft className="h-3 w-3" /> Retour à la revue des demandes
@@ -663,5 +669,13 @@ export default function CandidatureDossierPage() {
                 </div>
             )}
         </div>
+    );
+}
+
+export default function CandidatureDossierPage() {
+    return (
+        <Suspense fallback={<div className="p-8 text-center text-gray-400 text-sm">Chargement…</div>}>
+            <CandidatureDossierInner />
+        </Suspense>
     );
 }

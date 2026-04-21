@@ -400,7 +400,7 @@ function CandidaturesInner() {
                                     transition={{ delay: i * 0.03 }}
                                 >
                                     <Link
-                                        href={`/dashboard/candidatures/${r._id}`}
+                                        href={`/dashboard/candidatures/${r._id}?from=${modeTab}`}
                                         className="group flex items-center gap-4 p-4 rounded-2xl bg-white border border-gray-100 shadow-sm hover:shadow-md hover:border-indigo-200 transition-all"
                                     >
                                         {/* Avatar */}
