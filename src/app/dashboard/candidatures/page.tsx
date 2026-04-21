@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, Suspense } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
     Folder,
     CalendarDays,
@@ -32,6 +32,7 @@ interface CandidatureRow {
     email?: string;
     status?: string;
     submitted_at?: string;
+    exam_mode?: string;
     answers?: Record<string, any>;
     documents_validation?: Record<string, { valid?: boolean; resubmit_requested?: boolean }>;
 }
@@ -61,9 +62,18 @@ const PREDEFINED_FORMATIONS = [
     "Lead Implementor ISO 14001:2015",
 ];
 
-export default function CandidaturesPage() {
+const MODE_LABELS: Record<ModeTab, { label: string; icon: typeof Monitor; color: string }> = {
+    all:    { label: "Toutes les demandes",  icon: Users,   color: "#1a237e" },
+    online: { label: "Candidats en ligne",   icon: Monitor, color: "#1a237e" },
+    onsite: { label: "Candidats présentiel", icon: MapPin,  color: "#2e7d32" },
+};
+
+function CandidaturesInner() {
     const { user, isLoading } = useAuth();
     const router = useRouter();
+    const searchParams = useSearchParams();
+    const modeParam = searchParams.get("mode") as ModeTab | null;
+    const modeTab: ModeTab = modeParam === "online" || modeParam === "onsite" ? modeParam : "all";
 
     const [sessions, setSessions] = useState<Session[]>([]);
     const [selectedId, setSelectedId] = useState<string>("");
@@ -72,7 +82,6 @@ export default function CandidaturesPage() {
     const [loadingRows, setLoadingRows] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [exporting, setExporting] = useState(false);
-    const [modeTab, setModeTab] = useState<ModeTab>("all");
 
     useEffect(() => {
         if (!isLoading && (!user || user.role !== "RH")) {
@@ -97,15 +106,11 @@ export default function CandidaturesPage() {
     }, []);
 
     useEffect(() => {
-        if (!selectedId) {
-            setRows([]);
-            return;
-        }
+        if (!selectedId) { setRows([]); return; }
         (async () => {
             try {
                 setLoadingRows(true);
-                const r = await fetchSessionResponses(selectedId);
-                setRows(r);
+                setRows(await fetchSessionResponses(selectedId));
             } catch (e) {
                 setError(e instanceof Error ? e.message : "Erreur");
             } finally {
@@ -119,25 +124,20 @@ export default function CandidaturesPage() {
         [sessions, selectedId],
     );
 
-    const onlineCount = useMemo(() => rows.filter(r => getExamMode(r) === "online").length, [rows]);
-    const onsiteCount = useMemo(() => rows.filter(r => getExamMode(r) === "onsite").length, [rows]);
-
-    const filteredRows = useMemo(() => {
-        if (modeTab === "all") return rows;
-        return rows.filter(r => getExamMode(r) === modeTab);
-    }, [rows, modeTab]);
+    const filteredRows = useMemo(
+        () => modeTab === "all" ? rows : rows.filter(r => getExamMode(r) === modeTab),
+        [rows, modeTab],
+    );
 
     const formations = useMemo(() => {
         const map = new Map<string, CandidatureRow[]>();
         for (const name of PREDEFINED_FORMATIONS) map.set(name, []);
-
         for (const r of filteredRows) {
             const raw = r.answers?.[FORMATION_FIELD];
             const name = (typeof raw === "string" && raw.trim()) ? raw.trim() : UNCATEGORIZED;
             if (!map.has(name)) map.set(name, []);
             map.get(name)!.push(r);
         }
-
         return Array.from(map.entries()).map(([name, items]) => ({ name, items }));
     }, [filteredRows]);
 
@@ -155,27 +155,39 @@ export default function CandidaturesPage() {
 
     if (isLoading || !user) return null;
 
-    const totalCandidats = rows.length;
+    const totalFiltered = filteredRows.length;
+    const { label: modeLabel, icon: ModeIcon, color: modeColor } = MODE_LABELS[modeTab];
 
     return (
         <div className="space-y-6">
+            {/* En-tête */}
             <div className="flex items-start justify-between gap-4 flex-wrap">
                 <div>
                     <h1 className="text-2xl font-black flex items-center gap-2" style={{ color: "#1a237e" }}>
                         <FolderOpen className="h-6 w-6" />
                         Revue des demandes
                     </h1>
-                    <p className="text-sm text-gray-500 mt-1">
-                        Sélectionnez une formation pour consulter les demandes associées.
-                    </p>
+                    <div className="flex items-center gap-2 mt-1">
+                        <ModeIcon className="h-3.5 w-3.5" style={{ color: modeColor }} />
+                        <p className="text-sm font-semibold" style={{ color: modeColor }}>
+                            {modeLabel}
+                        </p>
+                        {modeTab !== "all" && (
+                            <Link
+                                href="/dashboard/candidatures"
+                                className="text-xs text-gray-400 hover:text-gray-600 underline underline-offset-2"
+                            >
+                                Tout voir
+                            </Link>
+                        )}
+                    </div>
                 </div>
                 {selectedId && (
                     <button
                         onClick={handleExport}
-                        disabled={exporting || totalCandidats === 0}
+                        disabled={exporting || rows.length === 0}
                         className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold text-white transition-all hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0"
                         style={{ backgroundColor: "#2e7d32", boxShadow: "0 6px 16px rgba(46,125,50,0.25)" }}
-                        title="Télécharger tous les dossiers en ZIP"
                     >
                         {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
                         {exporting ? "Préparation…" : "Exporter (ZIP)"}
@@ -225,71 +237,25 @@ export default function CandidaturesPage() {
                             </span>
                         )}
                         <span className="text-xs text-gray-400 ml-auto">
-                            {totalCandidats} dossier{totalCandidats > 1 ? "s" : ""}
+                            {totalFiltered} dossier{totalFiltered > 1 ? "s" : ""}
                         </span>
                     </div>
                 )}
             </div>
 
-
-            {/* Sous-sections : filtrage par mode d'examen */}
-            {!loadingSessions && sessions.length > 0 && (
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    {([
-                        { key: "all",    label: "Toutes les demandes",   count: totalCandidats, icon: Users,   color: "#1a237e", bg: "#e8eaf6", desc: "Vue globale" },
-                        { key: "online", label: "Candidats en ligne",    count: onlineCount,    icon: Monitor, color: "#1a237e", bg: "#e8eaf6", desc: "Examen à distance" },
-                        { key: "onsite", label: "Candidats présentiel",  count: onsiteCount,    icon: MapPin,  color: "#2e7d32", bg: "#e8f5e9", desc: "Examen sur site" },
-                    ] as const).map(t => {
-                        const Icon = t.icon;
-                        const active = modeTab === t.key;
-                        return (
-                            <button
-                                key={t.key}
-                                type="button"
-                                onClick={() => setModeTab(t.key as ModeTab)}
-                                className="text-left p-4 rounded-2xl border shadow-sm transition-all hover:-translate-y-0.5"
-                                style={{
-                                    backgroundColor: active ? t.bg : "#ffffff",
-                                    borderColor: active ? t.color : "#e5e7eb",
-                                    boxShadow: active ? `0 6px 16px ${t.color}22` : undefined,
-                                }}
-                            >
-                                <div className="flex items-center gap-3">
-                                    <div
-                                        className="h-10 w-10 rounded-xl flex items-center justify-center shrink-0"
-                                        style={{ backgroundColor: t.bg }}
-                                    >
-                                        <Icon className="h-5 w-5" style={{ color: t.color }} />
-                                    </div>
-                                    <div className="min-w-0 flex-1">
-                                        <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: active ? t.color : "#9ca3af" }}>
-                                            {t.desc}
-                                        </p>
-                                        <p className="text-sm font-bold text-gray-800 truncate">{t.label}</p>
-                                    </div>
-                                    <span className="text-lg font-black shrink-0" style={{ color: t.color }}>
-                                        {t.count}
-                                    </span>
-                                </div>
-                            </button>
-                        );
-                    })}
-                </div>
-            )}
-
             {error && (
-                <div className="p-4 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm">
-                    {error}
-                </div>
+                <div className="p-4 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm">{error}</div>
             )}
 
-            {/* Formation folders */}
+            {/* Dossiers formations */}
             {loadingRows ? (
                 <div className="p-8 text-center text-gray-400 text-sm">Chargement…</div>
-            ) : !selectedId ? null : formations.length === 0 ? (
+            ) : !selectedId ? null : formations.every(f => f.items.length === 0) ? (
                 <div className="p-12 text-center rounded-2xl bg-white border border-dashed border-gray-200">
                     <Folder className="h-10 w-10 mx-auto mb-3 text-gray-300" />
-                    <p className="text-gray-500 text-sm">Aucun dossier disponible.</p>
+                    <p className="text-gray-500 text-sm">
+                        {modeTab === "all" ? "Aucun dossier disponible." : `Aucun candidat ${modeTab === "online" ? "en ligne" : "en présentiel"} pour cette session.`}
+                    </p>
                 </div>
             ) : (
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -315,26 +281,14 @@ export default function CandidaturesPage() {
                                         <Folder className="h-5 w-5" style={{ color: isEmpty ? "#9ca3af" : "#f59e0b" }} />
                                     </div>
                                     <div className="flex-1 min-w-0">
-                                        <h3 className="font-bold text-gray-800 leading-snug line-clamp-2">
-                                            {f.name}
-                                        </h3>
+                                        <h3 className="font-bold text-gray-800 leading-snug line-clamp-2">{f.name}</h3>
                                         <div className="mt-2 flex items-center gap-3 text-xs text-gray-500 flex-wrap">
                                             <span className="inline-flex items-center gap-1">
                                                 <Users className="h-3 w-3" /> {f.items.length} candidat{f.items.length > 1 ? "s" : ""}
                                             </span>
-                                            {pending > 0 && (
-                                                <span className="inline-flex items-center gap-1 text-amber-700">
-                                                    {pending} en attente
-                                                </span>
-                                            )}
-                                            {approved > 0 && (
-                                                <span className="inline-flex items-center gap-1 text-green-700">
-                                                    {approved} validé{approved > 1 ? "s" : ""}
-                                                </span>
-                                            )}
-                                            {isEmpty && (
-                                                <span className="text-gray-400 italic">Vide</span>
-                                            )}
+                                            {pending > 0 && <span className="text-amber-700">{pending} en attente</span>}
+                                            {approved > 0 && <span className="text-green-700">{approved} validé{approved > 1 ? "s" : ""}</span>}
+                                            {isEmpty && <span className="text-gray-400 italic">Vide</span>}
                                         </div>
                                     </div>
                                     <ChevronRight className="h-5 w-5 text-gray-300 group-hover:text-indigo-500 transition-colors shrink-0" />
@@ -345,5 +299,13 @@ export default function CandidaturesPage() {
                 </div>
             )}
         </div>
+    );
+}
+
+export default function CandidaturesPage() {
+    return (
+        <Suspense fallback={<div className="p-8 text-center text-gray-400 text-sm">Chargement…</div>}>
+            <CandidaturesInner />
+        </Suspense>
     );
 }
