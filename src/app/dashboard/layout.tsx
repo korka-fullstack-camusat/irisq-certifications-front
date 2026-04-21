@@ -2,7 +2,7 @@
 
 import { Suspense, useState } from "react";
 import Link from "next/link";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import {
     LayoutDashboard,
     LogOut,
@@ -19,7 +19,6 @@ import { useAuth } from "@/lib/auth";
 
 function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
     const pathname = usePathname();
-    const router = useRouter();
     const searchParams = useSearchParams();
     const currentMode = searchParams.get("mode");
     const [showLogoutModal, setShowLogoutModal] = useState(false);
