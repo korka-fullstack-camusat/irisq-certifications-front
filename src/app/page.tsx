@@ -1,11 +1,14 @@
 "use client";
 
+import { useState } from "react";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import Image from "next/image";
 import { LogIn, UserPlus, GraduationCap } from "lucide-react";
 
 export default function Home() {
+  const [showModal, setShowModal] = useState(false);
+
   return (
     <div className="relative min-h-screen font-sans bg-[#f4f6f9] overflow-x-hidden">
       {/* HEADER — fixe, centré */}
@@ -109,22 +112,23 @@ export default function Home() {
               }}
             >
               <UserPlus className="h-5 w-5" />
-              Participer
+              Candidater
             </Link>
 
-            <Link
-              href="/candidat/login"
-              className="w-full sm:flex-1 flex items-center justify-center gap-2 rounded-xl px-6 py-3.5 text-base font-bold shadow-lg hover:-translate-y-0.5 transition-all duration-200"
+            <button
+              type="button"
+              onClick={() => setShowModal(true)}
+              className="w-full sm:flex-1 flex items-center justify-center gap-2 rounded-xl px-6 py-3.5 text-base font-bold shadow-lg transition-all duration-200 cursor-not-allowed"
               style={{
-                backgroundColor: "#ffffff",
-                color: "#1a237e",
-                border: "2px solid #1a237e",
-                boxShadow: "0 8px 24px rgba(26, 35, 126, 0.12)",
+                backgroundColor: "#9e9e9e",
+                color: "#ffffff",
+                border: "2px solid #9e9e9e",
+                boxShadow: "none",
               }}
             >
               <GraduationCap className="h-5 w-5" />
               Espace candidat
-            </Link>
+            </button>
 
             <Link
               href="/login"
@@ -140,6 +144,41 @@ export default function Home() {
           </motion.div>
         </div>
       </main>
+
+      {/* Modal accès restreint */}
+      {showModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
+          onClick={() => setShowModal(false)}
+        >
+          <motion.div
+            initial={{ opacity: 0, scale: 0.92 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.2 }}
+            className="bg-white rounded-2xl shadow-2xl p-8 max-w-sm w-full mx-4 text-center"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex justify-center mb-4">
+              <div className="w-16 h-16 rounded-full flex items-center justify-center" style={{ backgroundColor: "#f5f5f5" }}>
+                <GraduationCap className="h-8 w-8" style={{ color: "#9e9e9e" }} />
+              </div>
+            </div>
+            <h3 className="text-lg font-bold mb-2" style={{ color: "#1a237e" }}>
+              Accès non disponible
+            </h3>
+            <p className="text-gray-500 text-sm">
+              Vous n&apos;avez pas accès à cet espace.
+            </p>
+            <button
+              onClick={() => setShowModal(false)}
+              className="mt-6 px-8 py-2.5 rounded-xl text-white text-sm font-bold hover:-translate-y-0.5 transition-all duration-200"
+              style={{ backgroundColor: "#1a237e" }}
+            >
+              Fermer
+            </button>
+          </motion.div>
+        </div>
+      )}
 
       {/* Bande verte en bas */}
       <div className="fixed bottom-0 left-0 right-0 h-1.5 z-50" style={{ backgroundColor: "#2e7d32" }} />
