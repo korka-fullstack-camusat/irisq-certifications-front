@@ -8,10 +8,10 @@ import {
     LogOut,
     X,
     CalendarDays,
-    FolderOpen,
     ShieldCheck,
     Trophy,
-    ChevronDown,
+    Monitor,
+    MapPin,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import Image from "next/image";
@@ -26,35 +26,23 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
     const { user, logout, isLoading } = useAuth();
 
-    const [expandedItems, setExpandedItems] = useState<Set<string>>(() => {
-        const s = new Set<string>();
-        if (pathname.startsWith("/dashboard/candidatures")) s.add("Revue demandes");
-        return s;
-    });
-
-    function toggleItem(name: string) {
-        setExpandedItems(prev => {
-            const next = new Set(prev);
-            next.has(name) ? next.delete(name) : next.add(name);
-            return next;
-        });
-    }
-
     const navItems = [
-        { name: "Tableau de bord", href: "/dashboard", icon: LayoutDashboard, children: [] },
-        { name: "Gestion sessions", href: "/dashboard/sessions", icon: CalendarDays, children: [] },
-        {
-            name: "Revue demandes",
-            href: "/dashboard/candidatures",
-            icon: FolderOpen,
-            children: [
-                { name: "Candidature en ligne",   href: "/dashboard/candidatures?mode=online" },
-                { name: "Candidature présentiel", href: "/dashboard/candidatures?mode=onsite" },
-            ],
-        },
-        { name: "Candidatures validées", href: "/dashboard/candidatures-validees", icon: ShieldCheck, children: [] },
-        { name: "Candidats certifiés", href: "/dashboard/candidats-certifies", icon: Trophy, children: [] },
+        { name: "Tableau de bord",        href: "/dashboard",                          icon: LayoutDashboard },
+        { name: "Gestion sessions",        href: "/dashboard/sessions",                 icon: CalendarDays },
+        { name: "Candidature en ligne",    href: "/dashboard/candidatures?mode=online", icon: Monitor },
+        { name: "Candidature présentiel",  href: "/dashboard/candidatures?mode=onsite", icon: MapPin },
+        { name: "Candidatures validées",   href: "/dashboard/candidatures-validees",    icon: ShieldCheck },
+        { name: "Candidats certifiés",     href: "/dashboard/candidats-certifies",      icon: Trophy },
     ];
+
+    function getIsActive(href: string): boolean {
+        const url = new URL(href, "http://x");
+        const itemMode = url.searchParams.get("mode");
+        const itemPath = url.pathname;
+        if (itemMode) return pathname === itemPath && currentMode === itemMode;
+        if (href === "/dashboard") return pathname === "/dashboard";
+        return pathname.startsWith(itemPath);
+    }
 
     const handleLogout = () => {
         setShowLogoutModal(false);
@@ -200,119 +188,38 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                         Navigation
                     </p>
                     <nav className="space-y-0.5">
-                        {navItems.map((item) => {
-                            const hasChildren = item.children.length > 0;
-                            const isExpanded = expandedItems.has(item.name);
-
-                            // Is a direct child sub-item currently selected?
-                            const isChildActive = hasChildren && item.children.some(child => {
-                                const url = new URL(child.href, "http://x");
-                                return pathname === url.pathname && currentMode === url.searchParams.get("mode");
-                            });
-
-                            // Parent is "active" (blue) only when on its own page with no sub-item selected
-                            const isActive = hasChildren
-                                ? (pathname === item.href && !currentMode)
-                                : (item.href === "/dashboard" ? pathname === item.href : pathname.startsWith(item.href));
-
+                        {navItems.map(item => {
+                            const isActive = getIsActive(item.href);
                             const Icon = item.icon;
                             return (
-                                <div key={item.href}>
-                                    {/* Item principal */}
-                                    <div className="flex items-center gap-1">
-                                        <Link
-                                            href={item.href}
-                                            className="relative flex-1 flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all"
-                                            style={{
-                                                color: isActive ? "#ffffff" : isChildActive ? "#1a237e" : "#555",
-                                                backgroundColor: isActive ? "#1a237e" : isChildActive ? "#eef0fb" : "transparent",
-                                            }}
-                                            onMouseEnter={e => {
-                                                if (!isActive) (e.currentTarget as HTMLElement).style.backgroundColor = "#e8eaf6";
-                                            }}
-                                            onMouseLeave={e => {
-                                                if (!isActive) (e.currentTarget as HTMLElement).style.backgroundColor = isChildActive ? "#eef0fb" : "transparent";
-                                            }}
-                                        >
-                                            {isActive && (
-                                                <motion.span
-                                                    layoutId="sidebar-active-diamond"
-                                                    className="absolute -left-1 w-2.5 h-2.5 rotate-45"
-                                                    style={{ backgroundColor: "#c62828" }}
-                                                    initial={{ opacity: 0 }}
-                                                    animate={{ opacity: 1 }}
-                                                    transition={{ duration: 0.2 }}
-                                                />
-                                            )}
-                                            <Icon
-                                                className="h-5 w-5 shrink-0"
-                                                style={{ color: isActive ? "#ffffff" : "#2e7d32" }}
-                                            />
-                                            {item.name}
-                                        </Link>
-                                        {hasChildren && (
-                                            <button
-                                                type="button"
-                                                onClick={() => toggleItem(item.name)}
-                                                className="p-1.5 rounded-lg transition-colors hover:bg-gray-100"
-                                                style={{ color: isActive || isChildActive ? "#1a237e" : "#9ca3af" }}
-                                            >
-                                                <ChevronDown
-                                                    className="h-4 w-4 transition-transform duration-200"
-                                                    style={{ transform: isExpanded ? "rotate(180deg)" : "rotate(0deg)" }}
-                                                />
-                                            </button>
-                                        )}
-                                    </div>
-
-                                    {/* Sous-items */}
-                                    <AnimatePresence initial={false}>
-                                        {hasChildren && isExpanded && (
-                                            <motion.div
-                                                key="sub"
-                                                initial={{ opacity: 0, height: 0 }}
-                                                animate={{ opacity: 1, height: "auto" }}
-                                                exit={{ opacity: 0, height: 0 }}
-                                                transition={{ duration: 0.18 }}
-                                                className="overflow-hidden"
-                                            >
-                                                <div
-                                                    className="ml-5 mt-0.5 mb-1 space-y-0.5 pl-3"
-                                                    style={{ borderLeft: "2px solid #e8eaf6" }}
-                                                >
-                                                    {item.children.map(child => {
-                                                        const url = new URL(child.href, "http://x");
-                                                        const childActive = pathname === url.pathname && currentMode === url.searchParams.get("mode");
-                                                        return (
-                                                            <Link
-                                                                key={child.href}
-                                                                href={child.href}
-                                                                className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-all"
-                                                                style={{
-                                                                    color: childActive ? "#ffffff" : "#555",
-                                                                    backgroundColor: childActive ? "#1a237e" : "transparent",
-                                                                    fontWeight: childActive ? 700 : 500,
-                                                                }}
-                                                                onMouseEnter={e => {
-                                                                    if (!childActive) (e.currentTarget as HTMLElement).style.backgroundColor = "#e8eaf6";
-                                                                }}
-                                                                onMouseLeave={e => {
-                                                                    if (!childActive) (e.currentTarget as HTMLElement).style.backgroundColor = "transparent";
-                                                                }}
-                                                            >
-                                                                <span
-                                                                    className="w-1.5 h-1.5 rounded-full shrink-0"
-                                                                    style={{ backgroundColor: childActive ? "#ffffff" : "#1a237e" }}
-                                                                />
-                                                                {child.name}
-                                                            </Link>
-                                                        );
-                                                    })}
-                                                </div>
-                                            </motion.div>
-                                        )}
-                                    </AnimatePresence>
-                                </div>
+                                <Link
+                                    key={item.href}
+                                    href={item.href}
+                                    className="relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all"
+                                    style={{
+                                        color: isActive ? "#ffffff" : "#555",
+                                        backgroundColor: isActive ? "#1a237e" : "transparent",
+                                    }}
+                                    onMouseEnter={e => {
+                                        if (!isActive) (e.currentTarget as HTMLElement).style.backgroundColor = "#e8eaf6";
+                                    }}
+                                    onMouseLeave={e => {
+                                        if (!isActive) (e.currentTarget as HTMLElement).style.backgroundColor = "transparent";
+                                    }}
+                                >
+                                    {isActive && (
+                                        <motion.span
+                                            layoutId="sidebar-active-diamond"
+                                            className="absolute -left-1 w-2.5 h-2.5 rotate-45"
+                                            style={{ backgroundColor: "#c62828" }}
+                                            initial={{ opacity: 0 }}
+                                            animate={{ opacity: 1 }}
+                                            transition={{ duration: 0.2 }}
+                                        />
+                                    )}
+                                    <Icon className="h-5 w-5 shrink-0" style={{ color: isActive ? "#ffffff" : "#2e7d32" }} />
+                                    {item.name}
+                                </Link>
                             );
                         })}
                     </nav>
@@ -386,9 +293,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 style={{ backgroundColor: "#ffffff", borderTop: "2px solid #e8eaf6" }}
             >
                 {navItems.map((item) => {
-                    const isActive = item.href === "/dashboard"
-                        ? pathname === item.href
-                        : pathname.startsWith(item.href);
+                    const isActive = getIsActive(item.href);
                     const Icon = item.icon;
                     return (
                         <Link
