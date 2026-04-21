@@ -11,7 +11,7 @@ import {
     FolderOpen,
     ShieldCheck,
     Trophy,
-    ChevronDown,
+    ChevronRight,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import Image from "next/image";
@@ -257,9 +257,9 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
                                                 className="p-1.5 rounded-lg transition-colors hover:bg-gray-100"
                                                 style={{ color: isActive || isChildActive ? "#1a237e" : "#9ca3af" }}
                                             >
-                                                <ChevronDown
+                                                <ChevronRight
                                                     className="h-4 w-4 transition-transform duration-200"
-                                                    style={{ transform: isExpanded ? "rotate(180deg)" : "rotate(0deg)" }}
+                                                    style={{ transform: isExpanded ? "rotate(90deg)" : "rotate(0deg)" }}
                                                 />
                                             </button>
                                         )}
