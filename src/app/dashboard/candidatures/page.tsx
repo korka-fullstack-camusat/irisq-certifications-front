@@ -216,7 +216,7 @@ function CandidaturesInner() {
     const modeConfig = {
         all:    { label: "Toutes les demandes",  icon: Users,   color: "#1a237e", desc: "Vue globale" },
         online: { label: "Candidats en ligne",   icon: Monitor, color: "#1a237e", desc: "Examen à distance" },
-        onsite: { label: "Candidats présentiel", icon: MapPin,  color: "#2e7d32", desc: "Examen sur site" },
+        onsite: { label: "Candidats présentiel", icon: MapPin,  color: "#1a237e", desc: "Examen sur site" },
     } as const;
     const { label: modeLabel, icon: ModeIcon, color: modeColor } = modeConfig[modeTab];
 
@@ -406,7 +406,7 @@ function CandidaturesInner() {
                                         {/* Avatar */}
                                         <div
                                             className="h-11 w-11 rounded-xl flex items-center justify-center shrink-0 text-white text-sm font-black"
-                                            style={{ backgroundColor: modeTab === "online" ? "#1a237e" : "#2e7d32" }}
+                                            style={{ backgroundColor: "#1a237e" }}
                                         >
                                             {(r.name || "?").substring(0, 2).toUpperCase()}
                                         </div>
