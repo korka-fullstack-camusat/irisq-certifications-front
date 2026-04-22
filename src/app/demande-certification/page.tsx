@@ -34,11 +34,115 @@ const STEPS = [
     { id: 6, label: "Déclaration", icon: Shield },
 ];
 
-function inputClass() {
-    return "w-full bg-[#f4f6f9] border border-[#e0e0e0] rounded-xl px-4 py-3 text-sm text-gray-800 placeholder:text-gray-400 focus:outline-none focus:border-[#2e7d32] transition-all";
+function inputClass(hasError = false) {
+    return `w-full bg-[#f4f6f9] border rounded-xl px-4 py-3 text-sm text-gray-800 placeholder:text-gray-400 focus:outline-none transition-all ${hasError
+        ? "border-[#c62828] focus:border-[#c62828] bg-red-50"
+        : "border-[#e0e0e0] focus:border-[#2e7d32]"
+        }`;
 }
 function labelClass() {
     return "block text-xs font-bold uppercase tracking-widest mb-1.5";
+}
+
+// ─────────────────────────────────────────────────────────
+// VALIDATEURS — un validateur par champ, renvoie "" si OK
+// ou un message d'erreur en français sinon.
+// ─────────────────────────────────────────────────────────
+const NAME_REGEX = /^[A-Za-zÀ-ÖØ-öø-ÿ\s\-']+$/;
+const CITY_REGEX = /^[A-Za-zÀ-ÖØ-öø-ÿ\s\-',.]+$/;
+const PHONE_REGEX = /^[\d\s\+\-\(\)\.]+$/;
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+
+const validators = {
+    nom: (v: string): string => {
+        if (!v.trim()) return "Le nom est obligatoire.";
+        if (!NAME_REGEX.test(v)) return "Le nom ne doit contenir que des lettres (pas de chiffres).";
+        if (v.trim().length < 2) return "Le nom doit contenir au moins 2 caractères.";
+        if (v.trim().length > 50) return "Le nom est trop long (50 caractères maximum).";
+        return "";
+    },
+    prenom: (v: string): string => {
+        if (!v.trim()) return "Le prénom est obligatoire.";
+        if (!NAME_REGEX.test(v)) return "Le prénom ne doit contenir que des lettres (pas de chiffres).";
+        if (v.trim().length < 2) return "Le prénom doit contenir au moins 2 caractères.";
+        if (v.trim().length > 50) return "Le prénom est trop long (50 caractères maximum).";
+        return "";
+    },
+    dateNaissance: (v: string): string => {
+        if (!v) return "La date de naissance est obligatoire.";
+        const d = new Date(v);
+        if (isNaN(d.getTime())) return "Date invalide.";
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        if (d > today) return "La date de naissance ne peut pas être dans le futur.";
+        const age = today.getFullYear() - d.getFullYear() -
+            (today < new Date(today.getFullYear(), d.getMonth(), d.getDate()) ? 1 : 0);
+        if (age < 16) return "Vous devez avoir au moins 16 ans.";
+        if (age > 100) return "Veuillez saisir une date de naissance valide.";
+        return "";
+    },
+    lieuNaissance: (v: string): string => {
+        if (!v.trim()) return ""; // champ optionnel
+        if (!CITY_REGEX.test(v)) return "Le lieu ne doit contenir que des lettres.";
+        if (v.trim().length > 80) return "Lieu trop long (80 caractères maximum).";
+        return "";
+    },
+    nationalite: (v: string): string => {
+        if (!v.trim()) return ""; // champ optionnel
+        if (!NAME_REGEX.test(v)) return "La nationalité ne doit contenir que des lettres.";
+        if (v.trim().length > 50) return "Trop long (50 caractères maximum).";
+        return "";
+    },
+    telephone: (v: string): string => {
+        if (!v.trim()) return "Le téléphone est obligatoire.";
+        if (!PHONE_REGEX.test(v)) return "Le téléphone ne doit contenir que des chiffres, +, -, espaces ou parenthèses.";
+        const digits = v.replace(/\D/g, "");
+        if (digits.length < 7) return "Numéro de téléphone trop court (min. 7 chiffres).";
+        if (digits.length > 15) return "Numéro de téléphone trop long (max. 15 chiffres).";
+        return "";
+    },
+    email: (v: string): string => {
+        if (!v.trim()) return "L'email est obligatoire.";
+        if (!EMAIL_REGEX.test(v.trim())) return "Format d'email invalide (ex : prenom.nom@domaine.com).";
+        if (v.length > 120) return "Email trop long.";
+        return "";
+    },
+    anneesExperience: (v: string): string => {
+        if (!v.toString().trim()) return "Les années d'expérience sont obligatoires.";
+        const n = Number(v);
+        if (!Number.isFinite(n)) return "Veuillez saisir un nombre valide.";
+        if (!Number.isInteger(n)) return "Veuillez saisir un nombre entier.";
+        if (n < 0) return "La valeur ne peut pas être négative.";
+        if (n > 70) return "Valeur trop élevée (max. 70).";
+        return "";
+    },
+    adresse: (v: string): string => {
+        if (!v.trim()) return ""; // champ optionnel
+        if (v.trim().length > 200) return "Adresse trop longue (200 caractères maximum).";
+        return "";
+    },
+    amenagementDetails: (v: string): string => {
+        if (!v.trim()) return "Veuillez décrire vos besoins d'aménagement.";
+        if (v.trim().length < 10) return "Merci de préciser davantage (au moins 10 caractères).";
+        return "";
+    },
+} as const;
+
+type FieldName = keyof typeof validators;
+
+// Petit composant pour afficher le message d'erreur sous le label.
+function FieldError({ message }: { message?: string }) {
+    if (!message) return null;
+    return (
+        <motion.p
+            initial={{ opacity: 0, y: -4 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="flex items-center gap-1.5 text-[11px] font-semibold text-[#c62828] mb-1.5"
+        >
+            <AlertCircle className="h-3 w-3 shrink-0" />
+            {message}
+        </motion.p>
+    );
 }
 
 export default function DemandeCertificationPage() {
@@ -73,8 +177,54 @@ export default function DemandeCertificationPage() {
     const [amenagementDetails, setAmenagementDetails] = useState("");
     const [declarationActive, setDeclarationActive] = useState(false);
 
-    // Custom validation error state
+    // Erreur globale (bannière)
     const [validationError, setValidationError] = useState("");
+    // Erreurs par champ — affichées juste au-dessus de l'input concerné
+    const [fieldErrors, setFieldErrors] = useState<Partial<Record<FieldName, string>>>({});
+
+    // Helper : met à jour un champ et relance sa validation
+    const handleField = <K extends FieldName>(
+        name: K,
+        value: string,
+        setter: (v: string) => void
+    ) => {
+        setter(value);
+        const err = validators[name](value);
+        setFieldErrors(prev => ({ ...prev, [name]: err }));
+        setValidationError("");
+    };
+
+    // Validation complète d'une étape : renseigne fieldErrors pour tous les
+    // champs concernés et renvoie true si tous sont OK.
+    const validateStepFields = (s: number): boolean => {
+        const newErrors: Partial<Record<FieldName, string>> = { ...fieldErrors };
+        let ok = true;
+
+        const check = (name: FieldName, value: string) => {
+            const err = validators[name](value);
+            newErrors[name] = err;
+            if (err) ok = false;
+        };
+
+        if (s === 1) {
+            check("nom", nom);
+            check("prenom", prenom);
+            check("dateNaissance", dateNaissance);
+            check("lieuNaissance", lieuNaissance);
+            check("nationalite", nationalite);
+            check("telephone", telephone);
+            check("email", email);
+            check("anneesExperience", anneesExperience);
+            check("adresse", adresse);
+        }
+
+        if (s === 5 && amenagement === "Oui") {
+            check("amenagementDetails", amenagementDetails);
+        }
+
+        setFieldErrors(newErrors);
+        return ok;
+    };
 
     useEffect(() => {
         (async () => {
@@ -131,6 +281,20 @@ export default function DemandeCertificationPage() {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+
+        // Revalide toutes les étapes contenant des champs texte avant l'envoi
+        const step1Ok = validateStepFields(1);
+        const step5Ok = validateStepFields(5);
+        if (!step1Ok) {
+            setValidationError("Certains champs d'identité sont invalides. Retournez à l'étape 1 pour les corriger.");
+            setStep(1);
+            return;
+        }
+        if (!step5Ok) {
+            setValidationError("Veuillez préciser vos besoins d'aménagement.");
+            setStep(5);
+            return;
+        }
 
         console.log("Submit trigger:", { formId, cvFile: !!cvFile, certification, examMode, examType });
         if (!formId || !cvFile || !certification || !examMode || !examType) {
@@ -228,9 +392,9 @@ export default function DemandeCertificationPage() {
 
     const validateStep = (s: number) => {
         if (s === 1) {
-            const identityOk = nom.trim() !== "" && prenom.trim() !== "" && dateNaissance !== "";
-            const contactOk = telephone.trim() !== "" && email.trim() !== "" && anneesExperience.trim() !== "";
-            return identityOk && contactOk;
+            // Tous les champs de l'étape doivent être valides (revérification + errors)
+            const fieldsOk = validateStepFields(1);
+            return fieldsOk;
         }
         if (s === 2) return certification !== "" && (sessions.length === 0 || sessionId !== "");
         if (s === 3) return examMode !== "" && examType !== "";
@@ -242,7 +406,9 @@ export default function DemandeCertificationPage() {
         }
         if (s === 5) {
             if (!amenagement) return false;
-            if (amenagement === "Oui" && amenagementDetails.trim() === "") return false;
+            if (amenagement === "Oui") {
+                return validateStepFields(5);
+            }
             return true;
         }
         if (s === 6) return declarationActive;
@@ -254,7 +420,7 @@ export default function DemandeCertificationPage() {
             setValidationError("");
             setStep(s => Math.min(STEPS.length, s + 1));
         } else {
-            setValidationError("Veuillez remplir tous les champs obligatoires avant de continuer.");
+            setValidationError("Veuillez corriger les erreurs ci-dessus avant de continuer.");
         }
     };
 
@@ -319,6 +485,9 @@ export default function DemandeCertificationPage() {
     );
 
     const progress = ((step - 1) / (STEPS.length - 1)) * 100;
+
+    // Date max (aujourd'hui) pour le champ date de naissance
+    const todayIso = new Date().toISOString().split("T")[0];
 
     return (
         <div className="min-h-screen py-10 px-4 sm:px-6" style={{ backgroundColor: "#f4f6f9" }}>
@@ -395,7 +564,7 @@ export default function DemandeCertificationPage() {
                 </div>
 
                 {/* ── Contenu étape ── */}
-                <form onSubmit={handleSubmit}>
+                <form onSubmit={handleSubmit} noValidate>
                     <AnimatePresence mode="wait">
                         <motion.div
                             key={step}
@@ -420,47 +589,155 @@ export default function DemandeCertificationPage() {
                                 {/* ÉTAPE 1 — Identité & Contact */}
                                 {step === 1 && (
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                                        {/* NOM */}
                                         <div>
-                                            <label className={labelClass()} style={{ color: "#1a237e" }}>Nom <span className="text-[#c62828]">*</span></label>
-                                            <input type="text" value={nom} onChange={e => { setNom(e.target.value); setValidationError("") }} className={inputClass()} placeholder="Dupont" />
+                                            <label className={labelClass()} style={{ color: "#1a237e" }}>
+                                                Nom <span className="text-[#c62828]">*</span>
+                                            </label>
+                                            <FieldError message={fieldErrors.nom} />
+                                            <input
+                                                type="text"
+                                                value={nom}
+                                                onChange={e => handleField("nom", e.target.value, setNom)}
+                                                onBlur={e => handleField("nom", e.target.value, setNom)}
+                                                className={inputClass(!!fieldErrors.nom)}
+                                                placeholder="Dupont"
+                                                maxLength={50}
+                                            />
                                         </div>
+
+                                        {/* PRÉNOM */}
                                         <div>
-                                            <label className={labelClass()} style={{ color: "#1a237e" }}>Prénom <span className="text-[#c62828]">*</span></label>
-                                            <input type="text" value={prenom} onChange={e => { setPrenom(e.target.value); setValidationError("") }} className={inputClass()} placeholder="Jean" />
+                                            <label className={labelClass()} style={{ color: "#1a237e" }}>
+                                                Prénom <span className="text-[#c62828]">*</span>
+                                            </label>
+                                            <FieldError message={fieldErrors.prenom} />
+                                            <input
+                                                type="text"
+                                                value={prenom}
+                                                onChange={e => handleField("prenom", e.target.value, setPrenom)}
+                                                onBlur={e => handleField("prenom", e.target.value, setPrenom)}
+                                                className={inputClass(!!fieldErrors.prenom)}
+                                                placeholder="Jean"
+                                                maxLength={50}
+                                            />
                                         </div>
+
+                                        {/* DATE DE NAISSANCE */}
                                         <div>
-                                            <label className={labelClass()} style={{ color: "#1a237e" }}>Date de naissance <span className="text-[#c62828]">*</span></label>
-                                            <input type="date" value={dateNaissance} onChange={e => { setDateNaissance(e.target.value); setValidationError("") }} className={inputClass()} />
+                                            <label className={labelClass()} style={{ color: "#1a237e" }}>
+                                                Date de naissance <span className="text-[#c62828]">*</span>
+                                            </label>
+                                            <FieldError message={fieldErrors.dateNaissance} />
+                                            <input
+                                                type="date"
+                                                value={dateNaissance}
+                                                max={todayIso}
+                                                onChange={e => handleField("dateNaissance", e.target.value, setDateNaissance)}
+                                                onBlur={e => handleField("dateNaissance", e.target.value, setDateNaissance)}
+                                                className={inputClass(!!fieldErrors.dateNaissance)}
+                                            />
                                         </div>
+
+                                        {/* LIEU DE NAISSANCE */}
                                         <div>
                                             <label className={labelClass()} style={{ color: "#1a237e" }}>Lieu de naissance</label>
-                                            <input type="text" value={lieuNaissance} onChange={e => setLieuNaissance(e.target.value)} className={inputClass()} placeholder="Dakar" />
+                                            <FieldError message={fieldErrors.lieuNaissance} />
+                                            <input
+                                                type="text"
+                                                value={lieuNaissance}
+                                                onChange={e => handleField("lieuNaissance", e.target.value, setLieuNaissance)}
+                                                onBlur={e => handleField("lieuNaissance", e.target.value, setLieuNaissance)}
+                                                className={inputClass(!!fieldErrors.lieuNaissance)}
+                                                placeholder="Dakar"
+                                                maxLength={80}
+                                            />
                                         </div>
+
+                                        {/* NATIONALITÉ */}
                                         <div>
                                             <label className={labelClass()} style={{ color: "#1a237e" }}>Nationalité</label>
-                                            <input type="text" value={nationalite} onChange={e => setNationalite(e.target.value)} className={inputClass()} placeholder="Sénégalaise" />
+                                            <FieldError message={fieldErrors.nationalite} />
+                                            <input
+                                                type="text"
+                                                value={nationalite}
+                                                onChange={e => handleField("nationalite", e.target.value, setNationalite)}
+                                                onBlur={e => handleField("nationalite", e.target.value, setNationalite)}
+                                                className={inputClass(!!fieldErrors.nationalite)}
+                                                placeholder="Sénégalaise"
+                                                maxLength={50}
+                                            />
                                         </div>
+
+                                        {/* TÉLÉPHONE */}
                                         <div>
-                                            <label className={labelClass()} style={{ color: "#1a237e" }}>Téléphone <span className="text-[#c62828]">*</span></label>
-                                            <input type="tel" value={telephone} onChange={e => { setTelephone(e.target.value); setValidationError("") }} className={inputClass()} placeholder="70 123 45 67" />
+                                            <label className={labelClass()} style={{ color: "#1a237e" }}>
+                                                Téléphone <span className="text-[#c62828]">*</span>
+                                            </label>
+                                            <FieldError message={fieldErrors.telephone} />
+                                            <input
+                                                type="tel"
+                                                inputMode="tel"
+                                                value={telephone}
+                                                onChange={e => handleField("telephone", e.target.value, setTelephone)}
+                                                onBlur={e => handleField("telephone", e.target.value, setTelephone)}
+                                                className={inputClass(!!fieldErrors.telephone)}
+                                                placeholder="+221 70 123 45 67"
+                                                maxLength={25}
+                                            />
                                         </div>
+
+                                        {/* EMAIL */}
                                         <div>
-                                            <label className={labelClass()} style={{ color: "#1a237e" }}>E-mail <span className="text-[#c62828]">*</span></label>
-                                            <input type="email" value={email} onChange={e => { setEmail(e.target.value); setValidationError("") }} className={inputClass()} placeholder="vous@exemple.com" />
+                                            <label className={labelClass()} style={{ color: "#1a237e" }}>
+                                                E-mail <span className="text-[#c62828]">*</span>
+                                            </label>
+                                            <FieldError message={fieldErrors.email} />
+                                            <input
+                                                type="email"
+                                                value={email}
+                                                onChange={e => handleField("email", e.target.value, setEmail)}
+                                                onBlur={e => handleField("email", e.target.value, setEmail)}
+                                                className={inputClass(!!fieldErrors.email)}
+                                                placeholder="vous@exemple.com"
+                                                maxLength={120}
+                                            />
                                         </div>
+
+                                        {/* ANNÉES D'EXPÉRIENCE */}
                                         <div>
-                                            <label className={labelClass()} style={{ color: "#1a237e" }}>Années d&apos;expérience <span className="text-[#c62828]">*</span></label>
-                                            <input type="number" min="0" value={anneesExperience} onChange={e => { setAnneesExperience(e.target.value); setValidationError("") }} className={inputClass()} placeholder="ex: 3" />
-                                            <p className="text-[11px] text-gray-400 mt-1">Années de mise en œuvre de la norme demandée</p>
+                                            <label className={labelClass()} style={{ color: "#1a237e" }}>
+                                                Années d&apos;expérience <span className="text-[#c62828]">*</span>
+                                            </label>
+                                            <FieldError message={fieldErrors.anneesExperience} />
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                max="70"
+                                                step="1"
+                                                value={anneesExperience}
+                                                onChange={e => handleField("anneesExperience", e.target.value, setAnneesExperience)}
+                                                onBlur={e => handleField("anneesExperience", e.target.value, setAnneesExperience)}
+                                                className={inputClass(!!fieldErrors.anneesExperience)}
+                                                placeholder="ex: 3"
+                                            />
+                                            <p className="text-[11px] text-gray-400 mt-1">
+                                                Années de mise en œuvre de la norme demandée
+                                            </p>
                                         </div>
+
+                                        {/* ADRESSE */}
                                         <div className="sm:col-span-2">
                                             <label className={labelClass()} style={{ color: "#1a237e" }}>Adresse</label>
+                                            <FieldError message={fieldErrors.adresse} />
                                             <textarea
                                                 value={adresse}
-                                                onChange={e => setAdresse(e.target.value)}
-                                                className={inputClass() + " resize-none"}
+                                                onChange={e => handleField("adresse", e.target.value, setAdresse)}
+                                                onBlur={e => handleField("adresse", e.target.value, setAdresse)}
+                                                className={inputClass(!!fieldErrors.adresse) + " resize-none"}
                                                 rows={2}
                                                 placeholder="Rue, Ville, Pays"
+                                                maxLength={200}
                                             />
                                         </div>
                                     </div>
@@ -494,38 +771,38 @@ export default function DemandeCertificationPage() {
                                             </div>
                                         )}
                                         <div className="space-y-2">
-                                        <p className="text-xs text-gray-400 mb-4">Sélectionnez la certification que vous souhaitez obtenir.</p>
-                                        {CERTIFICATIONS.map((cert) => {
-                                            const selected = certification === cert;
-                                            const color = cert.includes("17025") ? "#1a237e" : cert.includes("9001") ? "#2e7d32" : "#b45309";
-                                            return (
-                                                <label
-                                                    key={cert}
-                                                    className="flex items-center gap-4 p-3.5 rounded-xl border cursor-pointer transition-all"
-                                                    style={{
-                                                        borderColor: selected ? color : "#e0e0e0",
-                                                        backgroundColor: selected ? `${color}10` : "#f4f6f9",
-                                                    }}
-                                                >
-                                                    <input
-                                                        type="radio"
-                                                        name="certification"
-                                                        value={cert}
-                                                        checked={selected}
-                                                        onChange={() => { setCertification(cert); setValidationError("") }}
-                                                        className="w-4 h-4 shrink-0"
-                                                    />
-                                                    <div className="flex items-center gap-2 flex-1 min-w-0">
-                                                        {selected && (
-                                                            <span className="w-2 h-2 rotate-45 shrink-0" style={{ backgroundColor: "#c62828", display: "inline-block" }} />
-                                                        )}
-                                                        <span className="text-sm font-semibold" style={{ color: selected ? color : "#555" }}>
-                                                            {cert}
-                                                        </span>
-                                                    </div>
-                                                </label>
-                                            );
-                                        })}
+                                            <p className="text-xs text-gray-400 mb-4">Sélectionnez la certification que vous souhaitez obtenir.</p>
+                                            {CERTIFICATIONS.map((cert) => {
+                                                const selected = certification === cert;
+                                                const color = cert.includes("17025") ? "#1a237e" : cert.includes("9001") ? "#2e7d32" : "#b45309";
+                                                return (
+                                                    <label
+                                                        key={cert}
+                                                        className="flex items-center gap-4 p-3.5 rounded-xl border cursor-pointer transition-all"
+                                                        style={{
+                                                            borderColor: selected ? color : "#e0e0e0",
+                                                            backgroundColor: selected ? `${color}10` : "#f4f6f9",
+                                                        }}
+                                                    >
+                                                        <input
+                                                            type="radio"
+                                                            name="certification"
+                                                            value={cert}
+                                                            checked={selected}
+                                                            onChange={() => { setCertification(cert); setValidationError("") }}
+                                                            className="w-4 h-4 shrink-0"
+                                                        />
+                                                        <div className="flex items-center gap-2 flex-1 min-w-0">
+                                                            {selected && (
+                                                                <span className="w-2 h-2 rotate-45 shrink-0" style={{ backgroundColor: "#c62828", display: "inline-block" }} />
+                                                            )}
+                                                            <span className="text-sm font-semibold" style={{ color: selected ? color : "#555" }}>
+                                                                {cert}
+                                                            </span>
+                                                        </div>
+                                                    </label>
+                                                );
+                                            })}
                                         </div>
                                     </div>
                                 )}
@@ -834,10 +1111,12 @@ export default function DemandeCertificationPage() {
                                                 <label className={labelClass()} style={{ color: "#1a237e" }}>
                                                     Précisez vos besoins <span className="text-[#c62828]">*</span>
                                                 </label>
+                                                <FieldError message={fieldErrors.amenagementDetails} />
                                                 <textarea
                                                     value={amenagementDetails}
-                                                    onChange={e => { setAmenagementDetails(e.target.value); setValidationError("") }}
-                                                    className={inputClass() + " resize-none"}
+                                                    onChange={e => handleField("amenagementDetails", e.target.value, setAmenagementDetails)}
+                                                    onBlur={e => handleField("amenagementDetails", e.target.value, setAmenagementDetails)}
+                                                    className={inputClass(!!fieldErrors.amenagementDetails) + " resize-none"}
                                                     rows={3}
                                                     placeholder="Décrivez vos besoins spécifiques…"
                                                 />
