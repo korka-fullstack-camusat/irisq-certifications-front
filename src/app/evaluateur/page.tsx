@@ -6,7 +6,7 @@ import {
   Search, File as FileIcon, X, Eye, Loader2,
   CheckCircle2, Filter, ChevronLeft, ChevronRight
 } from "lucide-react";
-import { fetchForms, fetchResponses, API_URL } from "@/lib/api";
+import { fetchForms, fetchResponses, getCertFormId, setCertFormId, API_URL } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -47,17 +47,18 @@ export default function EvaluatorPage() {
   useEffect(() => {
     const loadDashboardData = async () => {
       try {
-        const formsData = await fetchForms();
-        if (formsData.length > 0) {
-          const formId = formsData[0]._id;
-          const allResponses = await fetchResponses(formId);
-          const approvedResponses = allResponses.filter((r: any) => r.status === 'approved');
-          // Sort by most recent first
-          approvedResponses.sort((a: any, b: any) =>
-            new Date(b.submitted_at).getTime() - new Date(a.submitted_at).getTime()
-          );
-          setResponses(approvedResponses);
+        let formId = getCertFormId();
+        if (!formId) {
+          const formsData = await fetchForms();
+          if (!formsData.length) { setIsLoading(false); return; }
+          formId = formsData[0]._id;
+          setCertFormId(formId!);
         }
+        const allResponses = await fetchResponses(formId!);
+        const approved = allResponses
+          .filter((r: any) => r.status === "approved")
+          .sort((a: any, b: any) => new Date(b.submitted_at).getTime() - new Date(a.submitted_at).getTime());
+        setResponses(approved);
       } catch (error) {
         console.error("Failed to load evaluation data:", error);
       } finally {

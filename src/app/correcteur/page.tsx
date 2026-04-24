@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { fetchResponses, updateExamGrade, fetchForms, API_URL } from "@/lib/api";
+import { fetchResponses, updateExamGrade, fetchForms, getCertFormId, setCertFormId, API_URL } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -37,16 +37,19 @@ export default function CorrecteurPage() {
   const loadData = async () => {
     setIsLoading(true);
     try {
-      const forms = await fetchForms();
-      const certForm = forms.find((f: any) => f.title === "Fiche de demande - IRISQ CERTIFICATION");
-      if (certForm) {
-        const allResponses = await fetchResponses(certForm._id);
-        const filtered = allResponses.filter((r: any) => r.status === "approved");
-        filtered.sort((a: any, b: any) =>
-          new Date(b.submitted_at).getTime() - new Date(a.submitted_at).getTime()
-        );
-        setResponses(filtered);
+      let formId = getCertFormId();
+      if (!formId) {
+        const forms = await fetchForms();
+        const certForm = forms.find((f: any) => f.title === "Fiche de demande - IRISQ CERTIFICATION");
+        if (!certForm) { setIsLoading(false); return; }
+        formId = certForm._id;
+        setCertFormId(formId!);
       }
+      const allResponses = await fetchResponses(formId!);
+      const filtered = allResponses
+        .filter((r: any) => r.status === "approved")
+        .sort((a: any, b: any) => new Date(b.submitted_at).getTime() - new Date(a.submitted_at).getTime());
+      setResponses(filtered);
     } catch (error) {
       console.error("Failed to load data:", error);
     } finally {

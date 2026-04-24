@@ -7,7 +7,7 @@ import {
     AlertTriangle, ShieldAlert, CheckCircle2, UserCheck, XCircle, Clock,
     Edit3, ShieldCheck, Camera
 } from "lucide-react";
-import { fetchForms, fetchResponses, updateExamGrade, fetchExams, API_URL } from "@/lib/api";
+import { fetchForms, fetchResponses, updateExamGrade, fetchExams, getCertFormId, setCertFormId, API_URL } from "@/lib/api";
 import { FilePreviewModal } from "@/components/FilePreviewModal";
 
 export default function CorrectionsPage() {
@@ -28,19 +28,26 @@ export default function CorrectionsPage() {
     useEffect(() => {
         const loadCorrectionsData = async () => {
             try {
-                const allExams = await fetchExams();
-                setExams(allExams);
-
-                const formsData = await fetchForms();
-                if (formsData.length > 0) {
-                    const formId = formsData[0]._id;
-                    const allResponses = await fetchResponses(formId);
-
-                    const submittedResponses = allResponses.filter((r: any) =>
-                        r.status === 'approved' && (r.exam_answers || r.exam_document !== undefined)
+                const getResponses = async () => {
+                    let formId = getCertFormId();
+                    if (!formId) {
+                        const formsData = await fetchForms();
+                        if (!formsData.length) return [];
+                        formId = formsData[0]._id;
+                        setCertFormId(formId!);
+                    }
+                    const allResponses = await fetchResponses(formId!);
+                    return allResponses.filter((r: any) =>
+                        r.status === "approved" && (r.exam_answers || r.exam_document !== undefined)
                     );
-                    setResponses(submittedResponses);
-                }
+                };
+
+                const [allExams, submittedResponses] = await Promise.all([
+                    fetchExams(),
+                    getResponses(),
+                ]);
+                setExams(allExams);
+                setResponses(submittedResponses);
             } catch (error) {
                 console.error("Failed to load corrections data:", error);
             } finally {

@@ -1,5 +1,25 @@
 export const API_URL = (process.env.NEXT_PUBLIC_API_URL || "https://irisq-certifications-api.onrender.com/api")
-// Helper: nettoie le path pour construire l'URL correctement sans slash final
+
+// ─── Shared cache helpers ────────────────────────────────────────────────────
+const CERT_FORM_ID_KEY = "irisq_form_id";
+const AUDIT_ACTION_TYPES_KEY = "irisq_audit_action_types";
+
+export function getCertFormId(): string | null {
+    return typeof window !== "undefined" ? localStorage.getItem(CERT_FORM_ID_KEY) : null;
+}
+export function setCertFormId(id: string): void {
+    if (typeof window !== "undefined") localStorage.setItem(CERT_FORM_ID_KEY, id);
+}
+export function getCachedActionTypes(): { value: string; label: string }[] | null {
+    try {
+        const raw = typeof window !== "undefined" ? localStorage.getItem(AUDIT_ACTION_TYPES_KEY) : null;
+        return raw ? JSON.parse(raw) : null;
+    } catch { return null; }
+}
+export function setCachedActionTypes(types: { value: string; label: string }[]): void {
+    if (typeof window !== "undefined") localStorage.setItem(AUDIT_ACTION_TYPES_KEY, JSON.stringify(types));
+}
+// ────────────────────────────────────────────────────────────────────────────
 
 async function apiFetch(input: RequestInfo | URL, init?: RequestInit) {
     const headers = new Headers(init?.headers || {});
@@ -58,7 +78,28 @@ export async function submitResponse(formId: string, data: any) {
         body: JSON.stringify(data),
         redirect: "follow",
     });
-    if (!res.ok) throw new Error("Failed to submit response");
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        const detail = err.detail;
+        if (detail && typeof detail === "object" && detail.code) {
+            const e: any = new Error(detail.message || "Failed to submit response");
+            e.code = detail.code;
+            throw e;
+        }
+        throw new Error(typeof detail === "string" ? detail : "Failed to submit response");
+    }
+    return res.json();
+}
+
+export interface EligibilityResult {
+    eligible: boolean;
+    code?: "ALREADY_APPLIED" | "APPLICATION_REJECTED";
+    message?: string;
+}
+
+export async function checkSessionEligibility(sessionId: string, email: string): Promise<EligibilityResult> {
+    const res = await apiFetch(url(`sessions/${sessionId}/eligibility?email=${encodeURIComponent(email)}`), { redirect: "follow" });
+    if (!res.ok) throw new Error("Failed to check eligibility");
     return res.json();
 }
 
@@ -386,6 +427,74 @@ export async function requestDocumentResubmit(
         const errorData = await res.json().catch(() => ({}));
         throw new Error(errorData.detail || "Failed to request document resubmit");
     }
+    return res.json();
+}
+
+// ──────────────────────────────────────────────────────────────
+// Audit logs (admin / RH only)
+// ──────────────────────────────────────────────────────────────
+
+export interface AuditLog {
+    _id: string;
+    timestamp: string;
+    user_email: string;
+    user_role: string;
+    user_name: string;
+    action: string;
+    action_label: string;
+    resource_type: string;
+    resource_id: string;
+    resource_label: string;
+    details: Record<string, unknown>;
+}
+
+export interface AuditLogsResponse {
+    total: number;
+    page: number;
+    limit: number;
+    pages: number;
+    logs: AuditLog[];
+}
+
+export interface AuditLogsFilters {
+    page?: number;
+    limit?: number;
+    action?: string;
+    actions?: string;
+    user_email?: string;
+    resource_type?: string;
+    date_from?: string;
+    date_to?: string;
+}
+
+export async function fetchAuditLogs(filters?: AuditLogsFilters): Promise<AuditLogsResponse> {
+    const p = new URLSearchParams();
+    if (filters?.page) p.set("page", String(filters.page));
+    if (filters?.limit) p.set("limit", String(filters.limit));
+    if (filters?.actions) p.set("actions", filters.actions);
+    else if (filters?.action) p.set("action", filters.action);
+    if (filters?.user_email) p.set("user_email", filters.user_email);
+    if (filters?.resource_type) p.set("resource_type", filters.resource_type);
+    if (filters?.date_from) p.set("date_from", filters.date_from);
+    if (filters?.date_to) p.set("date_to", filters.date_to);
+    const qs = p.toString() ? `?${p.toString()}` : "";
+    const res = await apiFetch(url(`audit-logs${qs}`), { redirect: "follow" });
+    if (!res.ok) throw new Error("Failed to fetch audit logs");
+    return res.json();
+}
+
+export async function deleteAuditLog(logId: string): Promise<{ status: string; id: string }> {
+    const res = await apiFetch(url(`audit-logs/${logId}`), { method: "DELETE", redirect: "follow" });
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || "Failed to delete audit log");
+    }
+    return res.json();
+}
+
+export async function fetchAuditActionTypes(): Promise<{ value: string; label: string }[]> {
+    const res = await apiFetch(url("audit-logs/actions"), { redirect: "follow" });
+    if (!res.ok) throw new Error("Failed to fetch action types");
     return res.json();
 }
 

@@ -118,7 +118,7 @@ export default function Home() {
             <button
               type="button"
               onClick={() => setShowModal(true)}
-              className="w-full sm:flex-1 flex items-center justify-center gap-2 rounded-xl px-6 py-3.5 text-base font-bold shadow-lg transition-all duration-200 cursor-not-allowed"
+              className="w-full sm:flex-1 flex items-center justify-center gap-2 rounded-xl px-6 py-3.5 text-base font-bold shadow-lg transition-all duration-200 cursor-not-allowed whitespace-nowrap"
               style={{
                 backgroundColor: "#9e9e9e",
                 color: "#ffffff",
@@ -132,14 +132,14 @@ export default function Home() {
 
             <Link
               href="/login"
-              className="w-full sm:flex-1 flex items-center justify-center gap-2 rounded-xl px-6 py-3.5 text-base font-bold text-white shadow-lg hover:-translate-y-0.5 transition-all duration-200"
+              className="w-full sm:flex-1 flex items-center justify-center gap-2 rounded-xl px-6 py-3.5 text-base font-bold text-white shadow-lg hover:-translate-y-0.5 transition-all duration-200 whitespace-nowrap"
               style={{
                 backgroundColor: "#1a237e",
                 boxShadow: "0 8px 24px rgba(26, 35, 126, 0.3)",
               }}
             >
               <LogIn className="h-5 w-5" />
-              Se connecter
+              Espace Gestionnaire
             </Link>
           </motion.div>
         </div>

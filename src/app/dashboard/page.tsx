@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import {
@@ -75,8 +75,12 @@ function formatRelative(iso?: string) {
 export default function DashboardOverviewPage() {
   const { user, isLoading } = useAuth();
 
+  const SELECTED_SESSION_KEY = "irisq_dashboard_session";
+
   const [sessions, setSessions] = useState<Session[]>([]);
-  const [selectedId, setSelectedId] = useState<string>("");
+  const [selectedId, setSelectedId] = useState<string>(() =>
+    typeof window !== "undefined" ? localStorage.getItem(SELECTED_SESSION_KEY) || "" : ""
+  );
   const [rows, setRows] = useState<CandidatureRow[]>([]);
   const [loadingSessions, setLoadingSessions] = useState(true);
   const [loadingRows, setLoadingRows] = useState(false);
@@ -84,23 +88,43 @@ export default function DashboardOverviewPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    (async () => {
-      try {
-        setLoadingSessions(true);
-        const list = await fetchSessions();
-        setSessions(list);
-        const firstActive = list.find(s => s.status === "active") || list[0];
-        if (firstActive) setSelectedId(firstActive._id);
-      } catch (e) {
-        setError(e instanceof Error ? e.message : "Erreur");
-      } finally {
-        setLoadingSessions(false);
+    const cachedId = typeof window !== "undefined" ? localStorage.getItem(SELECTED_SESSION_KEY) || "" : "";
+
+    // Fetch sessions + responses for cached session in parallel
+    const sessionsPromise = fetchSessions().then(list => {
+      setSessions(list);
+      // Validate cached session is still in the list; fall back to first active
+      const valid = cachedId && list.some((s: Session) => s._id === cachedId);
+      if (!valid) {
+        const firstActive = list.find((s: Session) => s.status === "active") || list[0];
+        if (firstActive) {
+          setSelectedId(firstActive._id);
+          localStorage.setItem(SELECTED_SESSION_KEY, firstActive._id);
+        }
       }
-    })();
+      return list;
+    }).catch(e => {
+      setError(e instanceof Error ? e.message : "Erreur");
+      return [];
+    }).finally(() => setLoadingSessions(false));
+
+    // If we have a cached session, start fetching its rows immediately
+    const rowsPromise = cachedId
+      ? fetchSessionResponses(cachedId)
+          .then(data => { setRows(data); })
+          .catch(() => {})
+      : Promise.resolve();
+
+    setLoadingRows(!!cachedId);
+    Promise.all([sessionsPromise, rowsPromise]).finally(() => setLoadingRows(false));
   }, []);
 
+  // Fetch rows whenever selected session changes (after initial load)
+  const isFirstMount = useRef(true);
   useEffect(() => {
+    if (isFirstMount.current) { isFirstMount.current = false; return; }
     if (!selectedId) { setRows([]); return; }
+    localStorage.setItem(SELECTED_SESSION_KEY, selectedId);
     (async () => {
       try {
         setLoadingRows(true);

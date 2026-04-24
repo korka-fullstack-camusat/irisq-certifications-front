@@ -12,6 +12,7 @@ import {
     MapPin,
     ShieldCheck,
     Trophy,
+    History,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import Image from "next/image";
@@ -32,6 +33,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
         { name: "Candidature présentiel", href: "/dashboard/candidatures?mode=onsite",  icon: MapPin,          mode: "onsite"  as string | null },
         { name: "Candidatures validées",  href: "/dashboard/candidatures-validees",     icon: ShieldCheck,     mode: null      as string | null },
         { name: "Candidats certifiés",    href: "/dashboard/candidats-certifies",       icon: Trophy,          mode: null      as string | null },
+        { name: "Historiques",            href: "/dashboard/historique",                icon: History,         mode: null      as string | null },
     ];
 
     const handleLogout = () => {
@@ -183,9 +185,6 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
 
                 {/* Navigation */}
                 <div className="flex-1 overflow-y-auto p-4">
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 px-3 mb-3">
-                        Navigation
-                    </p>
                     <nav className="space-y-0.5">
                         {navItems.map((item) => {
                             const isActive = isItemActive(item);

@@ -9,7 +9,7 @@ import {
     Award, FileText, Shield, Wrench, Monitor, MapPin, GraduationCap
 } from "lucide-react";
 import Image from "next/image";
-import { fetchForms, createForm, submitResponse, uploadFiles, fetchSessions, type Session } from "@/lib/api";
+import { fetchForms, createForm, submitResponse, uploadFiles, fetchSessions, checkSessionEligibility, type Session } from "@/lib/api";
 
 const CERTIFICATIONS = [
     "Junior Implementor ISO/IEC17025:2017",
@@ -145,13 +145,19 @@ function FieldError({ message }: { message?: string }) {
     );
 }
 
+const FORM_ID_CACHE_KEY = "irisq_form_id";
+
 export default function DemandeCertificationPage() {
     const router = useRouter();
-    const [formId, setFormId] = useState<string | null>(null);
-    const [isLoadingInit, setIsLoadingInit] = useState(true);
+    const [formId, setFormId] = useState<string | null>(() => {
+        if (typeof window !== "undefined") return localStorage.getItem(FORM_ID_CACHE_KEY);
+        return null;
+    });
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isSuccess, setIsSuccess] = useState(false);
     const [isError, setIsError] = useState(false);
+
+    const [sessionBlock, setSessionBlock] = useState<{ code: "ALREADY_APPLIED" | "APPLICATION_REJECTED"; message: string } | null>(null);
     const [step, setStep] = useState(1);
 
     const [nom, setNom] = useState("");
@@ -227,23 +233,19 @@ export default function DemandeCertificationPage() {
     };
 
     useEffect(() => {
-        (async () => {
-            try {
-                const sess = await fetchSessions();
-                setSessions(sess.filter(s => s.status === "active"));
-            } catch {
-                // sessions are optional — ignore failures so the form stays usable
-            }
-        })();
-    }, []);
+        const sessionsPromise = fetchSessions()
+            .then(sess => setSessions(sess.filter((s: any) => s.status === "active")))
+            .catch(() => {});
 
-    useEffect(() => {
-        (async () => {
+        const cachedId = typeof window !== "undefined" ? localStorage.getItem(FORM_ID_CACHE_KEY) : null;
+
+        const formsPromise = cachedId ? Promise.resolve() : (async () => {
             try {
                 const forms = await fetchForms();
                 const existing = forms.find((f: any) => f.title === FORM_TITLE);
+                let id: string;
                 if (existing) {
-                    setFormId(existing._id);
+                    id = existing._id;
                 } else {
                     const newForm = await createForm({
                         title: FORM_TITLE,
@@ -257,14 +259,16 @@ export default function DemandeCertificationPage() {
                             { id: "docs", type: "file_upload", label: "Pièces justificatives", required: true },
                         ],
                     });
-                    setFormId(newForm._id || newForm.id);
+                    id = newForm._id || newForm.id;
                 }
+                localStorage.setItem(FORM_ID_CACHE_KEY, id);
+                setFormId(id);
             } catch {
                 setIsError(true);
-            } finally {
-                setIsLoadingInit(false);
             }
         })();
+
+        Promise.all([sessionsPromise, formsPromise]);
     }, []);
 
     const handleCvChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -311,6 +315,16 @@ export default function DemandeCertificationPage() {
 
         setIsSubmitting(true);
         try {
+            // Pre-check eligibility before expensive file uploads
+            if (sessionId && email) {
+                const eligibility = await checkSessionEligibility(sessionId, email);
+                if (!eligibility.eligible && eligibility.code) {
+                    setSessionBlock({ code: eligibility.code as "ALREADY_APPLIED" | "APPLICATION_REJECTED", message: eligibility.message || "" });
+                    setIsSubmitting(false);
+                    return;
+                }
+            }
+
             // Upload CV
             const cvFd = new FormData();
             cvFd.append("files", cvFile);
@@ -384,7 +398,11 @@ export default function DemandeCertificationPage() {
             router.replace("/");
         } catch (error: any) {
             console.error("Submission error Details:", error);
-            alert(`Une erreur est survenue lors de l'envoi : ${error.message}`);
+            if (error.code === "ALREADY_APPLIED" || error.code === "APPLICATION_REJECTED") {
+                setSessionBlock({ code: error.code, message: error.message });
+            } else {
+                setValidationError(`Une erreur est survenue lors de l'envoi : ${error.message}`);
+            }
         } finally {
             setIsSubmitting(false);
         }
@@ -415,22 +433,26 @@ export default function DemandeCertificationPage() {
         return true;
     };
 
-    const handleNext = () => {
-        if (validateStep(step)) {
-            setValidationError("");
-            setStep(s => Math.min(STEPS.length, s + 1));
-        } else {
+    const handleNext = async () => {
+        if (!validateStep(step)) {
             setValidationError("Veuillez corriger les erreurs ci-dessus avant de continuer.");
+            return;
         }
+        // Pre-check eligibility at step 2 (session + email both known)
+        if (step === 2 && sessionId && email) {
+            try {
+                const result = await checkSessionEligibility(sessionId, email);
+                if (!result.eligible && result.code) {
+                    setSessionBlock({ code: result.code as "ALREADY_APPLIED" | "APPLICATION_REJECTED", message: result.message || "" });
+                    return;
+                }
+            } catch {
+                // eligibility check failure is non-blocking — backend will catch it at submit
+            }
+        }
+        setValidationError("");
+        setStep(s => Math.min(STEPS.length, s + 1));
     };
-
-    // ── Loading ──
-    if (isLoadingInit) return (
-        <div className="min-h-screen flex flex-col items-center justify-center" style={{ backgroundColor: "#f4f6f9" }}>
-            <Loader2 className="h-8 w-8 animate-spin mb-4" style={{ color: "#2e7d32" }} />
-            <p className="text-sm text-gray-400 font-medium">Initialisation du formulaire…</p>
-        </div>
-    );
 
     // ── Error ──
     if (isError) return (
@@ -483,6 +505,86 @@ export default function DemandeCertificationPage() {
             </motion.div>
         </div>
     );
+
+    // ── Session block (already applied / rejected) ──
+    if (sessionBlock) {
+        const isRejected = sessionBlock.code === "APPLICATION_REJECTED";
+        return (
+            <div className="min-h-screen flex items-center justify-center p-4" style={{ backgroundColor: "#f4f6f9" }}>
+                <motion.div
+                    initial={{ opacity: 0, scale: 0.94 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden"
+                    style={{ border: `2px solid ${isRejected ? "#fecaca" : "#c5cae9"}` }}
+                >
+                    {/* Header */}
+                    <div
+                        className="px-6 py-4 flex items-center gap-3"
+                        style={{ backgroundColor: isRejected ? "#c62828" : "#1a237e" }}
+                    >
+                        <AlertCircle className="h-5 w-5 text-white/80 shrink-0" />
+                        <span className="text-sm font-bold uppercase tracking-widest text-white">
+                            {isRejected ? "Candidature rejetée" : "Déjà postulé"}
+                        </span>
+                    </div>
+
+                    {/* Séparateur losange */}
+                    <div className="flex items-center gap-3 px-6 pt-5">
+                        <div className="flex-1 h-px bg-gray-100" />
+                        <span
+                            className="w-2 h-2 rotate-45 inline-block"
+                            style={{ backgroundColor: isRejected ? "#c62828" : "#1a237e" }}
+                        />
+                        <div className="flex-1 h-px bg-gray-100" />
+                    </div>
+
+                    {/* Body */}
+                    <div className="px-6 py-6 text-center">
+                        <div
+                            className="h-16 w-16 rounded-full flex items-center justify-center mx-auto mb-5"
+                            style={{ backgroundColor: isRejected ? "#fce4ec" : "#e8eaf6" }}
+                        >
+                            <AlertCircle
+                                className="h-8 w-8"
+                                style={{ color: isRejected ? "#c62828" : "#1a237e" }}
+                            />
+                        </div>
+
+                        <p
+                            className="text-base font-bold mb-3 leading-snug"
+                            style={{ color: isRejected ? "#c62828" : "#1a237e" }}
+                        >
+                            {isRejected
+                                ? "Candidature non éligible"
+                                : "Candidature déjà enregistrée"}
+                        </p>
+
+                        <p className="text-sm text-gray-500 leading-relaxed mb-6">
+                            {sessionBlock.message}
+                        </p>
+
+                        {/* Séparateur */}
+                        <div className="flex items-center gap-3 mb-6">
+                            <div className="flex-1 h-px bg-gray-100" />
+                            <span className="w-2 h-2 rotate-45 inline-block" style={{ backgroundColor: "#c62828" }} />
+                            <div className="flex-1 h-px bg-gray-100" />
+                        </div>
+
+                        <button
+                            onClick={() => window.location.replace("/")}
+                            className="w-full py-3 rounded-xl text-sm font-bold text-white transition-all hover:-translate-y-0.5"
+                            style={{
+                                backgroundColor: isRejected ? "#c62828" : "#1a237e",
+                                boxShadow: `0 6px 16px ${isRejected ? "rgba(198,40,40,0.25)" : "rgba(26,35,126,0.25)"}`,
+                            }}
+                        >
+                            Retour à l&apos;accueil
+                        </button>
+                    </div>
+                </motion.div>
+            </div>
+        );
+    }
 
     const progress = ((step - 1) / (STEPS.length - 1)) * 100;
 
