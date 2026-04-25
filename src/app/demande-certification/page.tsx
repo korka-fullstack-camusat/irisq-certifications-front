@@ -6,10 +6,11 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
     CheckCircle2, Loader2, Upload, X, File as FileIcon,
     AlertCircle, ChevronRight, ChevronLeft, User, Phone,
-    Award, FileText, Shield, Wrench, Monitor, MapPin, GraduationCap
+    Award, FileText, Shield, Wrench, Monitor, MapPin, GraduationCap,
+    Info
 } from "lucide-react";
 import Image from "next/image";
-import { fetchForms, createForm, submitResponse, uploadFiles, fetchSessions, checkSessionEligibility, type Session } from "@/lib/api";
+import { fetchForms, createForm, submitResponse, uploadFiles, fetchSessions, checkSessionEligibility, checkEmailEligibility, type Session } from "@/lib/api";
 
 const CERTIFICATIONS = [
     "Junior Implementor ISO/IEC17025:2017",
@@ -21,7 +22,22 @@ const CERTIFICATIONS = [
     "Junior Implementor ISO 14001:2015",
     "Implementor ISO 14001:2015",
     "Lead Implementor ISO 14001:2015",
+    "Junior Implementor ISO 45001:2018",
+    "Implementor ISO 45001:2018",
+    "Lead Implementor ISO 45001:2018",
 ];
+
+// ── Filtering logic based on years of experience ────────────────────────────
+// < 2 ans  → Junior only
+// 2 – 5 ans → Implementor only
+// > 5 ans  → all
+function getEligibleCertifications(yearsStr: string): string[] {
+    const n = Number(yearsStr);
+    if (!Number.isFinite(n) || n < 0 || yearsStr.trim() === "") return CERTIFICATIONS;
+    if (n < 2) return CERTIFICATIONS.filter(c => c.startsWith("Junior"));
+    if (n < 5) return CERTIFICATIONS.filter(c => c.startsWith("Junior") || c.startsWith("Implementor"));
+    return CERTIFICATIONS; // n >= 5
+}
 
 const FORM_TITLE = "Fiche de demande - IRISQ CERTIFICATION";
 
@@ -88,7 +104,7 @@ const validators = {
         return "";
     },
     nationalite: (v: string): string => {
-        if (!v.trim()) return ""; // champ optionnel
+        if (!v.trim()) return "La nationalité est obligatoire.";
         if (!NAME_REGEX.test(v)) return "La nationalité ne doit contenir que des lettres.";
         if (v.trim().length > 50) return "Trop long (50 caractères maximum).";
         return "";
@@ -158,6 +174,12 @@ export default function DemandeCertificationPage() {
     const [isError, setIsError] = useState(false);
 
     const [sessionBlock, setSessionBlock] = useState<{ code: "ALREADY_APPLIED" | "APPLICATION_REJECTED"; message: string } | null>(null);
+
+    const [isLoadingSessions, setIsLoadingSessions] = useState(true);
+    // Spinner while the email eligibility check is in-flight
+    const [isCheckingEmail, setIsCheckingEmail] = useState(false);
+    // Modal "critères d'expérience"
+    const [showExperienceModal, setShowExperienceModal] = useState(false);
     const [step, setStep] = useState(1);
 
     const [nom, setNom] = useState("");
@@ -176,8 +198,8 @@ export default function DemandeCertificationPage() {
     const [examType, setExamType] = useState<"direct" | "after_formation" | "">("");
     const [cvFile, setCvFile] = useState<File | null>(null);
     const [pieceIdentite, setPieceIdentite] = useState<File | null>(null);
-    const [justificatifExp, setJustificatifExp] = useState<File | null>(null);
-    const [diplomes, setDiplomes] = useState<File | null>(null);
+    const [justificatifExp, setJustificatifExp] = useState<File[]>([]);
+    const [diplomes, setDiplomes] = useState<File[]>([]);
     const [attestationFormation, setAttestationFormation] = useState<File | null>(null);
     const [amenagement, setAmenagement] = useState<"Oui" | "Non" | "">("");
     const [amenagementDetails, setAmenagementDetails] = useState("");
@@ -200,6 +222,36 @@ export default function DemandeCertificationPage() {
         setValidationError("");
     };
 
+    // Fired on email field blur — checks across all active sessions.
+    // If the email is already linked to an application, the full-page
+    // sessionBlock screen appears immediately (no need to continue the form).
+    const handleEmailBlur = async (value: string) => {
+        handleField("email", value, setEmail);
+        if (validators.email(value)) return; // don't check invalid format
+        setIsCheckingEmail(true);
+        try {
+            const result = await checkEmailEligibility(value);
+            if (!result.eligible && result.code) {
+                setSessionBlock({
+                    code: result.code as "ALREADY_APPLIED" | "APPLICATION_REJECTED",
+                    message: result.message || "",
+                });
+            }
+        } catch {
+            // Network failure is non-blocking — backend guards at submit
+        } finally {
+            setIsCheckingEmail(false);
+        }
+    };
+
+    // When years change, reset certification if it falls outside the new eligible list
+    const handleAnneesChange = (value: string) => {
+        handleField("anneesExperience", value, setAnneesExperience);
+        if (certification && !getEligibleCertifications(value).includes(certification)) {
+            setCertification("");
+        }
+    };
+
     // Validation complète d'une étape : renseigne fieldErrors pour tous les
     // champs concernés et renvoie true si tous sont OK.
     const validateStepFields = (s: number): boolean => {
@@ -220,7 +272,6 @@ export default function DemandeCertificationPage() {
             check("nationalite", nationalite);
             check("telephone", telephone);
             check("email", email);
-            check("anneesExperience", anneesExperience);
             check("adresse", adresse);
         }
 
@@ -235,7 +286,8 @@ export default function DemandeCertificationPage() {
     useEffect(() => {
         const sessionsPromise = fetchSessions()
             .then(sess => setSessions(sess.filter((s: any) => s.status === "active")))
-            .catch(() => {});
+            .catch(() => {})
+            .finally(() => setIsLoadingSessions(false));
 
         const cachedId = typeof window !== "undefined" ? localStorage.getItem(FORM_ID_CACHE_KEY) : null;
 
@@ -279,8 +331,18 @@ export default function DemandeCertificationPage() {
 
     const removeCv = () => setCvFile(null);
     const removePieceIdentite = () => setPieceIdentite(null);
-    const removeJustificatifExp = () => setJustificatifExp(null);
-    const removeDiplomes = () => setDiplomes(null);
+    const removeJustificatifExp = (index: number) => setJustificatifExp(prev => prev.filter((_, i) => i !== index));
+    const addJustificatifsExp = (files: FileList) => {
+        const arr = Array.from(files); // converti immédiatement avant tout effacement du input
+        setJustificatifExp(prev => [...prev, ...arr]);
+        setValidationError("");
+    };
+    const removeDiplome = (index: number) => setDiplomes(prev => prev.filter((_, i) => i !== index));
+    const addDiplomes = (files: FileList) => {
+        const arr = Array.from(files); // converti immédiatement avant tout effacement du input
+        setDiplomes(prev => [...prev, ...arr]);
+        setValidationError("");
+    };
     const removeAttestation = () => setAttestationFormation(null);
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -334,15 +396,15 @@ export default function DemandeCertificationPage() {
             // Upload others
             let otherUrls: string[] = [];
             let pieceUrl = "";
-            let justifxUrl = "";
-            let diplomesUrl = "";
+            let justifxUrls: string[] = [];
+            let diplomesUrls: string[] = [];
             let attestationUrl = "";
 
-            if (pieceIdentite || justificatifExp || diplomes || attestationFormation) {
+            if (pieceIdentite || justificatifExp.length > 0 || diplomes.length > 0 || attestationFormation) {
                 const otherFd = new FormData();
                 if (pieceIdentite) otherFd.append("files", pieceIdentite);
-                if (justificatifExp) otherFd.append("files", justificatifExp);
-                if (diplomes) otherFd.append("files", diplomes);
+                justificatifExp.forEach(f => otherFd.append("files", f));
+                diplomes.forEach(f => otherFd.append("files", f));
                 if (attestationFormation) otherFd.append("files", attestationFormation);
 
                 const otherUpload = await uploadFiles(otherFd);
@@ -351,8 +413,16 @@ export default function DemandeCertificationPage() {
                 // Maps urls back based on what was included (maintaining order)
                 let urlIndex = 0;
                 if (pieceIdentite) { pieceUrl = urls[urlIndex++]; otherUrls.push(pieceUrl); }
-                if (justificatifExp) { justifxUrl = urls[urlIndex++]; otherUrls.push(justifxUrl); }
-                if (diplomes) { diplomesUrl = urls[urlIndex++]; otherUrls.push(diplomesUrl); }
+                if (justificatifExp.length > 0) {
+                    justifxUrls = urls.slice(urlIndex, urlIndex + justificatifExp.length);
+                    urlIndex += justificatifExp.length;
+                    otherUrls.push(...justifxUrls);
+                }
+                if (diplomes.length > 0) {
+                    diplomesUrls = urls.slice(urlIndex, urlIndex + diplomes.length);
+                    urlIndex += diplomes.length;
+                    otherUrls.push(...diplomesUrls);
+                }
                 if (attestationFormation) { attestationUrl = urls[urlIndex++]; otherUrls.push(attestationUrl); }
             }
 
@@ -378,14 +448,14 @@ export default function DemandeCertificationPage() {
                     Adresse: adresse,
                     Téléphone: telephone,
                     Email: email,
-                    "Expérience (années)": anneesExperience,
+                    "Années d'expérience sur la norme": anneesExperience,
                     "Certification souhaitée": certification,
                     "Mode d'examen": examModeLabel,
                     "Type d'examen": examTypeLabel,
                     "CV": [cvUrl],
                     "Pièce d'identité": pieceUrl ? [pieceUrl] : [],
-                    "Justificatif d'expérience": justifxUrl ? [justifxUrl] : [],
-                    "Diplômes": diplomesUrl ? [diplomesUrl] : [],
+                    "Justificatif d'expérience": justifxUrls,
+                    "Diplômes": diplomesUrls,
                     "Attestation de formation": attestationUrl ? [attestationUrl] : [],
                     "Autres documents": otherUrls,
                     "Pièces justificatives": allFileUrls,
@@ -410,14 +480,14 @@ export default function DemandeCertificationPage() {
 
     const validateStep = (s: number) => {
         if (s === 1) {
-            // Tous les champs de l'étape doivent être valides (revérification + errors)
-            const fieldsOk = validateStepFields(1);
-            return fieldsOk;
+            return validateStepFields(1);
         }
-        if (s === 2) return certification !== "" && (sessions.length === 0 || sessionId !== "");
+        if (s === 2) return !validators.anneesExperience(anneesExperience) && certification !== "" && (sessions.length === 0 || sessionId !== "");
         if (s === 3) return examMode !== "" && examType !== "";
         if (s === 4) {
-            const baseOk = cvFile !== null && pieceIdentite !== null && justificatifExp !== null && diplomes !== null;
+            const isJunior = certification.startsWith("Junior");
+            const justifOk = isJunior || justificatifExp.length > 0;
+            const baseOk = cvFile !== null && pieceIdentite !== null && justifOk && diplomes.length > 0;
             // Attestation de formation obligatoire pour un examen direct.
             if (examType === "direct" && !attestationFormation) return false;
             return baseOk;
@@ -431,6 +501,25 @@ export default function DemandeCertificationPage() {
         }
         if (s === 6) return declarationActive;
         return true;
+    };
+
+    const handleStepClick = (targetStep: number) => {
+        if (targetStep === step) return;
+        if (targetStep < step) {
+            // Going back is always free
+            setStep(targetStep);
+            setValidationError("");
+            return;
+        }
+        // Going forward: validate every step between current and target
+        for (let s = step; s < targetStep; s++) {
+            if (!validateStep(s)) {
+                setValidationError("Veuillez compléter toutes les informations requises avant de passer à cette étape.");
+                return;
+            }
+        }
+        setValidationError("");
+        setStep(targetStep);
     };
 
     const handleNext = async () => {
@@ -592,6 +681,7 @@ export default function DemandeCertificationPage() {
     const todayIso = new Date().toISOString().split("T")[0];
 
     return (
+        <>
         <div className="min-h-screen py-10 px-4 sm:px-6" style={{ backgroundColor: "#f4f6f9" }}>
             <div className="max-w-2xl mx-auto space-y-6">
 
@@ -635,16 +725,22 @@ export default function DemandeCertificationPage() {
                             transition={{ duration: 0.4 }}
                         />
                     </div>
-                    {/* Icônes des étapes */}
+                    {/* Icônes des étapes — cliquables */}
                     <div className="flex items-center justify-between">
                         {STEPS.map((s) => {
                             const Icon = s.icon;
                             const done = step > s.id;
                             const active = step === s.id;
                             return (
-                                <div key={s.id} className="flex flex-col items-center gap-1">
+                                <button
+                                    key={s.id}
+                                    type="button"
+                                    onClick={() => handleStepClick(s.id)}
+                                    className="flex flex-col items-center gap-1 group focus:outline-none"
+                                    title={`Aller à l'étape ${s.id} — ${s.label}`}
+                                >
                                     <div
-                                        className="w-8 h-8 rounded-full flex items-center justify-center transition-all"
+                                        className="w-8 h-8 rounded-full flex items-center justify-center transition-all group-hover:scale-110"
                                         style={{
                                             backgroundColor: done ? "#2e7d32" : active ? "#1a237e" : "#f4f6f9",
                                             color: done || active ? "#fff" : "#9ca3af",
@@ -654,12 +750,12 @@ export default function DemandeCertificationPage() {
                                         {done ? <CheckCircle2 className="h-4 w-4" /> : <Icon className="h-3.5 w-3.5" />}
                                     </div>
                                     <span
-                                        className="text-[9px] font-bold uppercase tracking-wider hidden sm:block"
+                                        className="text-[9px] font-bold uppercase tracking-wider hidden sm:block transition-colors"
                                         style={{ color: active ? "#1a237e" : done ? "#2e7d32" : "#9ca3af" }}
                                     >
                                         {s.label}
                                     </span>
-                                </div>
+                                </button>
                             );
                         })}
                     </div>
@@ -703,7 +799,7 @@ export default function DemandeCertificationPage() {
                                                 onChange={e => handleField("nom", e.target.value, setNom)}
                                                 onBlur={e => handleField("nom", e.target.value, setNom)}
                                                 className={inputClass(!!fieldErrors.nom)}
-                                                placeholder="Dupont"
+                                                placeholder="Entrez votre nom"
                                                 maxLength={50}
                                             />
                                         </div>
@@ -720,7 +816,7 @@ export default function DemandeCertificationPage() {
                                                 onChange={e => handleField("prenom", e.target.value, setPrenom)}
                                                 onBlur={e => handleField("prenom", e.target.value, setPrenom)}
                                                 className={inputClass(!!fieldErrors.prenom)}
-                                                placeholder="Jean"
+                                                placeholder="Entrez votre prénom"
                                                 maxLength={50}
                                             />
                                         </div>
@@ -751,14 +847,16 @@ export default function DemandeCertificationPage() {
                                                 onChange={e => handleField("lieuNaissance", e.target.value, setLieuNaissance)}
                                                 onBlur={e => handleField("lieuNaissance", e.target.value, setLieuNaissance)}
                                                 className={inputClass(!!fieldErrors.lieuNaissance)}
-                                                placeholder="Dakar"
+                                                placeholder="Entrez votre lieu de naissance"
                                                 maxLength={80}
                                             />
                                         </div>
 
                                         {/* NATIONALITÉ */}
                                         <div>
-                                            <label className={labelClass()} style={{ color: "#1a237e" }}>Nationalité</label>
+                                            <label className={labelClass()} style={{ color: "#1a237e" }}>
+                                                Nationalité <span className="text-[#c62828]">*</span>
+                                            </label>
                                             <FieldError message={fieldErrors.nationalite} />
                                             <input
                                                 type="text"
@@ -766,7 +864,7 @@ export default function DemandeCertificationPage() {
                                                 onChange={e => handleField("nationalite", e.target.value, setNationalite)}
                                                 onBlur={e => handleField("nationalite", e.target.value, setNationalite)}
                                                 className={inputClass(!!fieldErrors.nationalite)}
-                                                placeholder="Sénégalaise"
+                                                placeholder="Entrez votre nationalité"
                                                 maxLength={50}
                                             />
                                         </div>
@@ -784,7 +882,7 @@ export default function DemandeCertificationPage() {
                                                 onChange={e => handleField("telephone", e.target.value, setTelephone)}
                                                 onBlur={e => handleField("telephone", e.target.value, setTelephone)}
                                                 className={inputClass(!!fieldErrors.telephone)}
-                                                placeholder="+221 70 123 45 67"
+                                                placeholder="Entrez votre numéro de téléphone"
                                                 maxLength={25}
                                             />
                                         </div>
@@ -795,60 +893,50 @@ export default function DemandeCertificationPage() {
                                                 E-mail <span className="text-[#c62828]">*</span>
                                             </label>
                                             <FieldError message={fieldErrors.email} />
-                                            <input
-                                                type="email"
-                                                value={email}
-                                                onChange={e => handleField("email", e.target.value, setEmail)}
-                                                onBlur={e => handleField("email", e.target.value, setEmail)}
-                                                className={inputClass(!!fieldErrors.email)}
-                                                placeholder="vous@exemple.com"
-                                                maxLength={120}
-                                            />
-                                        </div>
-
-                                        {/* ANNÉES D'EXPÉRIENCE */}
-                                        <div>
-                                            <label className={labelClass()} style={{ color: "#1a237e" }}>
-                                                Années d&apos;expérience <span className="text-[#c62828]">*</span>
-                                            </label>
-                                            <FieldError message={fieldErrors.anneesExperience} />
-                                            <input
-                                                type="number"
-                                                min="0"
-                                                max="70"
-                                                step="1"
-                                                value={anneesExperience}
-                                                onChange={e => handleField("anneesExperience", e.target.value, setAnneesExperience)}
-                                                onBlur={e => handleField("anneesExperience", e.target.value, setAnneesExperience)}
-                                                className={inputClass(!!fieldErrors.anneesExperience)}
-                                                placeholder="ex: 3"
-                                            />
-                                            <p className="text-[11px] text-gray-400 mt-1">
-                                                Années de mise en œuvre de la norme demandée
-                                            </p>
+                                            <div className="relative">
+                                                <input
+                                                    type="email"
+                                                    value={email}
+                                                    onChange={e => handleField("email", e.target.value, setEmail)}
+                                                    onBlur={e => handleEmailBlur(e.target.value)}
+                                                    className={inputClass(!!fieldErrors.email)}
+                                                    placeholder="Entrez votre adresse e-mail"
+                                                    maxLength={120}
+                                                />
+                                                {isCheckingEmail && (
+                                                    <span className="absolute right-3 top-1/2 -translate-y-1/2">
+                                                        <Loader2 className="h-4 w-4 animate-spin text-gray-400" />
+                                                    </span>
+                                                )}
+                                            </div>
                                         </div>
 
                                         {/* ADRESSE */}
-                                        <div className="sm:col-span-2">
+                                        <div>
                                             <label className={labelClass()} style={{ color: "#1a237e" }}>Adresse</label>
                                             <FieldError message={fieldErrors.adresse} />
-                                            <textarea
+                                            <input
+                                                type="text"
                                                 value={adresse}
                                                 onChange={e => handleField("adresse", e.target.value, setAdresse)}
                                                 onBlur={e => handleField("adresse", e.target.value, setAdresse)}
-                                                className={inputClass(!!fieldErrors.adresse) + " resize-none"}
-                                                rows={2}
-                                                placeholder="Rue, Ville, Pays"
+                                                className={inputClass(!!fieldErrors.adresse)}
+                                                placeholder="Entrez votre adresse"
                                                 maxLength={200}
                                             />
                                         </div>
                                     </div>
                                 )}
 
-                                {/* ÉTAPE 2 — Certification */}
-                                {step === 2 && (
-                                    <div className="space-y-5">
-                                        {sessions.length > 0 && (
+                                {/* ÉTAPE 2 — Expérience + Certification */}
+                                {step === 2 && (() => {
+                                    const eligible = getEligibleCertifications(anneesExperience);
+                                    const yearsNum = Number(anneesExperience);
+                                    const hasYears = anneesExperience.trim() !== "" && Number.isFinite(yearsNum) && yearsNum >= 0;
+                                    return (
+                                        <div className="space-y-6">
+
+                                            {/* ── Session — toujours visible ── */}
                                             <div>
                                                 <label className={labelClass()} style={{ color: "#1a237e" }}>
                                                     Session <span className="text-[#c62828]">*</span>
@@ -856,58 +944,126 @@ export default function DemandeCertificationPage() {
                                                 <p className="text-[11px] text-gray-400 mb-2">
                                                     Sélectionnez la session pour laquelle vous souhaitez postuler.
                                                 </p>
-                                                <select
-                                                    value={sessionId}
-                                                    onChange={e => { setSessionId(e.target.value); setValidationError(""); }}
-                                                    className={inputClass()}
-                                                >
-                                                    <option value="">— Choisir une session —</option>
-                                                    {sessions.map(s => (
-                                                        <option key={s._id} value={s._id}>
-                                                            {s.name}
-                                                            {s.start_date ? ` — ${s.start_date}` : ""}
-                                                            {s.end_date ? ` → ${s.end_date}` : ""}
-                                                        </option>
-                                                    ))}
-                                                </select>
-                                            </div>
-                                        )}
-                                        <div className="space-y-2">
-                                            <p className="text-xs text-gray-400 mb-4">Sélectionnez la certification que vous souhaitez obtenir.</p>
-                                            {CERTIFICATIONS.map((cert) => {
-                                                const selected = certification === cert;
-                                                const color = cert.includes("17025") ? "#1a237e" : cert.includes("9001") ? "#2e7d32" : "#b45309";
-                                                return (
-                                                    <label
-                                                        key={cert}
-                                                        className="flex items-center gap-4 p-3.5 rounded-xl border cursor-pointer transition-all"
-                                                        style={{
-                                                            borderColor: selected ? color : "#e0e0e0",
-                                                            backgroundColor: selected ? `${color}10` : "#f4f6f9",
-                                                        }}
+                                                {isLoadingSessions ? (
+                                                    <div className={inputClass() + " flex items-center gap-2 text-gray-400"}>
+                                                        <Loader2 className="h-4 w-4 animate-spin shrink-0" />
+                                                        <span className="text-sm">Chargement des sessions…</span>
+                                                    </div>
+                                                ) : sessions.length === 0 ? (
+                                                    <div
+                                                        className="w-full rounded-xl px-4 py-3 text-sm border flex items-center gap-2"
+                                                        style={{ backgroundColor: "#fff8e1", borderColor: "#ffe0b2", color: "#b45309" }}
                                                     >
-                                                        <input
-                                                            type="radio"
-                                                            name="certification"
-                                                            value={cert}
-                                                            checked={selected}
-                                                            onChange={() => { setCertification(cert); setValidationError("") }}
-                                                            className="w-4 h-4 shrink-0"
-                                                        />
-                                                        <div className="flex items-center gap-2 flex-1 min-w-0">
-                                                            {selected && (
-                                                                <span className="w-2 h-2 rotate-45 shrink-0" style={{ backgroundColor: "#c62828", display: "inline-block" }} />
-                                                            )}
-                                                            <span className="text-sm font-semibold" style={{ color: selected ? color : "#555" }}>
-                                                                {cert}
-                                                            </span>
-                                                        </div>
+                                                        <AlertCircle className="h-4 w-4 shrink-0" />
+                                                        Aucune session active disponible pour le moment.
+                                                    </div>
+                                                ) : (
+                                                    <select
+                                                        value={sessionId}
+                                                        onChange={e => { setSessionId(e.target.value); setValidationError(""); }}
+                                                        className={inputClass(!sessionId && sessions.length > 0 ? false : false)}
+                                                    >
+                                                        <option value="">— Choisir une session —</option>
+                                                        {sessions.map(s => (
+                                                            <option key={s._id} value={s._id}>
+                                                                {s.name}
+                                                                {s.start_date ? ` — ${s.start_date}` : ""}
+                                                                {s.end_date ? ` → ${s.end_date}` : ""}
+                                                            </option>
+                                                        ))}
+                                                    </select>
+                                                )}
+                                            </div>
+
+                                            {/* ── Années d'expérience sur la norme ── */}
+                                            <div>
+                                                <div className="flex items-center gap-2 mb-1.5">
+                                                    <label className={labelClass()} style={{ color: "#1a237e" }}>
+                                                        Années d&apos;expérience sur la norme <span className="text-[#c62828]">*</span>
                                                     </label>
-                                                );
-                                            })}
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setShowExperienceModal(true)}
+                                                        title="Voir les critères d'éligibilité"
+                                                        className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold border transition-colors hover:bg-gray-50"
+                                                        style={{ color: "#555", borderColor: "#e0e0e0" }}
+                                                    >
+                                                        <Info className="h-3.5 w-3.5 text-gray-400" />
+                                                        Critères
+                                                    </button>
+                                                </div>
+                                                <FieldError message={fieldErrors.anneesExperience} />
+                                                <input
+                                                    type="number"
+                                                    min="0"
+                                                    max="70"
+                                                    step="1"
+                                                    value={anneesExperience}
+                                                    onChange={e => handleAnneesChange(e.target.value)}
+                                                    onBlur={e => handleAnneesChange(e.target.value)}
+                                                    className={inputClass(!!fieldErrors.anneesExperience)}
+                                                    placeholder="Entrez le nombre d'années"
+                                                />
+                                            </div>
+
+                                            {/* ── Certification filtrée ── */}
+                                            <div>
+                                                <label className={labelClass()} style={{ color: "#1a237e" }}>
+                                                    Certification souhaitée <span className="text-[#c62828]">*</span>
+                                                </label>
+                                                <p className="text-xs text-gray-400 mb-3">
+                                                    {hasYears
+                                                        ? "Certifications disponibles selon votre expérience :"
+                                                        : "Saisissez d'abord vos années d'expérience pour voir les certifications disponibles."}
+                                                </p>
+                                                <AnimatePresence mode="wait">
+                                                    <motion.div
+                                                        key={eligible.join(",")}
+                                                        initial={{ opacity: 0, y: 6 }}
+                                                        animate={{ opacity: 1, y: 0 }}
+                                                        exit={{ opacity: 0 }}
+                                                        transition={{ duration: 0.2 }}
+                                                        className="space-y-2"
+                                                    >
+                                                        {(hasYears ? eligible : CERTIFICATIONS).map((cert) => {
+                                                            const selected = certification === cert;
+                                                            const color = cert.includes("17025") ? "#1a237e" : cert.includes("9001") ? "#2e7d32" : cert.includes("45001") ? "#7b1fa2" : "#b45309";
+                                                            const isDisabled = hasYears && !eligible.includes(cert);
+                                                            return (
+                                                                <label
+                                                                    key={cert}
+                                                                    className={`flex items-center gap-4 p-3.5 rounded-xl border transition-all ${isDisabled ? "opacity-30 cursor-not-allowed" : "cursor-pointer"}`}
+                                                                    style={{
+                                                                        borderColor: selected ? color : "#e0e0e0",
+                                                                        backgroundColor: selected ? `${color}10` : "#f4f6f9",
+                                                                    }}
+                                                                >
+                                                                    <input
+                                                                        type="radio"
+                                                                        name="certification"
+                                                                        value={cert}
+                                                                        checked={selected}
+                                                                        disabled={isDisabled}
+                                                                        onChange={() => { if (!isDisabled) { setCertification(cert); setValidationError(""); } }}
+                                                                        className="w-4 h-4 shrink-0"
+                                                                    />
+                                                                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                                                                        {selected && (
+                                                                            <span className="w-2 h-2 rotate-45 shrink-0" style={{ backgroundColor: "#c62828", display: "inline-block" }} />
+                                                                        )}
+                                                                        <span className="text-sm font-semibold" style={{ color: selected ? color : isDisabled ? "#bbb" : "#555" }}>
+                                                                            {cert}
+                                                                        </span>
+                                                                    </div>
+                                                                </label>
+                                                            );
+                                                        })}
+                                                    </motion.div>
+                                                </AnimatePresence>
+                                            </div>
                                         </div>
-                                    </div>
-                                )}
+                                    );
+                                })()}
 
                                 {/* ÉTAPE 3 — Choix de l'examen (mode + type) */}
                                 {step === 3 && (
@@ -1089,50 +1245,100 @@ export default function DemandeCertificationPage() {
                                             )}
                                         </div>
 
-                                        {/* Zone de dépôt Justificatif Expérience */}
-                                        <div className="mb-6">
-                                            <p className="text-sm font-bold text-[#1a237e] mb-2">3. Justificatif d'expérience (Système Management / Labo) <span className="text-[#c62828]">*</span></p>
-                                            {!justificatifExp ? (
-                                                <label className="flex flex-col items-center justify-center border-2 border-dashed rounded-xl p-4 cursor-pointer transition-colors hover:border-[#2e7d32]" style={{ borderColor: "#c5cae9", backgroundColor: "#f4f6f9" }}>
-                                                    <Upload className="h-6 w-6 mb-2 text-gray-400" />
-                                                    <span className="text-sm font-bold text-gray-600">Déposez votre Justificatif d'expérience</span>
-                                                    <input type="file" className="hidden" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" onChange={(e) => { if (e.target.files) setJustificatifExp(e.target.files[0]); setValidationError(""); }} />
-                                                </label>
-                                            ) : (
-                                                <div className="flex items-center justify-between p-3 bg-white border rounded-xl shadow-sm" style={{ borderColor: "#e0e0e0" }}>
-                                                    <div className="flex items-center gap-3 overflow-hidden">
-                                                        <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: "#e8eaf6" }}>
-                                                            <FileIcon className="h-4 w-4" style={{ color: "#1a237e" }} />
-                                                        </div>
-                                                        <div className="min-w-0">
-                                                            <p className="text-xs font-bold text-gray-700 truncate">{justificatifExp.name}</p>
-                                                        </div>
+                                        {/* Zone de dépôt Justificatif Expérience — masqué pour les Junior */}
+                                        {!certification.startsWith("Junior") && (
+                                            <div className="mb-6">
+                                                <p className="text-sm font-bold text-[#1a237e] mb-2">
+                                                    3. Justificatif d&apos;expérience (Système Management / Labo) <span className="text-[#c62828]">*</span>
+                                                    <span className="ml-2 text-[10px] font-semibold text-gray-400 normal-case tracking-normal">
+                                                        (plusieurs fichiers acceptés)
+                                                    </span>
+                                                </p>
+                                                {justificatifExp.length === 0 ? (
+                                                    /* Drop zone — aucun fichier sélectionné */
+                                                    <label className="flex flex-col items-center justify-center border-2 border-dashed rounded-xl p-6 cursor-pointer transition-colors hover:border-[#2e7d32]" style={{ borderColor: "#c5cae9", backgroundColor: "#f4f6f9" }}>
+                                                        <Upload className="h-7 w-7 mb-2 text-gray-400" />
+                                                        <span className="text-sm font-bold text-gray-600">Déposez votre Justificatif d&apos;expérience</span>
+                                                        <span className="text-[10px] text-gray-400 mt-1">PDF, DOCX, JPG, PNG</span>
+                                                        <input type="file" multiple className="hidden" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                                                            onChange={e => { if (e.target.files && e.target.files.length > 0) addJustificatifsExp(e.target.files); e.target.value = ""; }} />
+                                                    </label>
+                                                ) : (
+                                                    /* Fichiers sélectionnés : liste + bouton compact */
+                                                    <div className="space-y-2">
+                                                        {justificatifExp.map((f, i) => (
+                                                            <div key={i} className="flex items-center justify-between p-3 bg-white border rounded-xl shadow-sm" style={{ borderColor: "#e0e0e0" }}>
+                                                                <div className="flex items-center gap-3 overflow-hidden">
+                                                                    <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: "#e8eaf6" }}>
+                                                                        <FileIcon className="h-4 w-4" style={{ color: "#1a237e" }} />
+                                                                    </div>
+                                                                    <div className="min-w-0">
+                                                                        <p className="text-xs font-bold text-gray-700 truncate">{f.name}</p>
+                                                                        <p className="text-[10px] text-gray-400">{(f.size / 1024 / 1024).toFixed(2)} MB</p>
+                                                                    </div>
+                                                                </div>
+                                                                <button type="button" onClick={() => removeJustificatifExp(i)} className="p-1.5 rounded-lg hover:bg-red-50 transition-colors shrink-0">
+                                                                    <X className="h-4 w-4" style={{ color: "#c62828" }} />
+                                                                </button>
+                                                            </div>
+                                                        ))}
+                                                        {/* Bouton compact pour ajouter d'autres */}
+                                                        <label className="flex items-center gap-2 px-4 py-2.5 border-2 border-dashed rounded-xl cursor-pointer transition-colors hover:border-[#2e7d32]" style={{ borderColor: "#c5cae9", backgroundColor: "#f4f6f9" }}>
+                                                            <Upload className="h-4 w-4 text-gray-400 shrink-0" />
+                                                            <span className="text-xs font-bold text-gray-500">Ajouter d&apos;autres fichiers</span>
+                                                            <span className="ml-auto text-[10px] text-gray-400">PDF, DOCX, JPG, PNG</span>
+                                                            <input type="file" multiple className="hidden" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                                                                onChange={e => { if (e.target.files && e.target.files.length > 0) addJustificatifsExp(e.target.files); e.target.value = ""; }} />
+                                                        </label>
                                                     </div>
-                                                    <button type="button" onClick={removeJustificatifExp} className="p-1.5 rounded-lg hover:bg-red-50 transition-colors"><X className="h-4 w-4" style={{ color: "#c62828" }} /></button>
-                                                </div>
-                                            )}
-                                        </div>
+                                                )}
+                                            </div>
+                                        )}
 
-                                        {/* Zone de dépôt Diplômes */}
+                                        {/* Zone de dépôt Diplômes — plusieurs fichiers */}
                                         <div className="mb-6">
-                                            <p className="text-sm font-bold text-[#1a237e] mb-2">4. Copies des diplômes / attestations <span className="text-[#c62828]">*</span></p>
-                                            {!diplomes ? (
-                                                <label className="flex flex-col items-center justify-center border-2 border-dashed rounded-xl p-4 cursor-pointer transition-colors hover:border-[#2e7d32]" style={{ borderColor: "#c5cae9", backgroundColor: "#f4f6f9" }}>
-                                                    <Upload className="h-6 w-6 mb-2 text-gray-400" />
-                                                    <span className="text-sm font-bold text-gray-600">Déposez vos Diplômes</span>
-                                                    <input type="file" className="hidden" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" onChange={(e) => { if (e.target.files) setDiplomes(e.target.files[0]); setValidationError(""); }} />
+                                            <p className="text-sm font-bold text-[#1a237e] mb-2">
+                                                4. Copies des diplômes / attestations <span className="text-[#c62828]">*</span>
+                                                <span className="ml-2 text-[10px] font-semibold text-gray-400 normal-case tracking-normal">
+                                                    (plusieurs fichiers acceptés)
+                                                </span>
+                                            </p>
+                                            {diplomes.length === 0 ? (
+                                                /* Drop zone — aucun fichier sélectionné */
+                                                <label className="flex flex-col items-center justify-center border-2 border-dashed rounded-xl p-6 cursor-pointer transition-colors hover:border-[#2e7d32]" style={{ borderColor: "#c5cae9", backgroundColor: "#f4f6f9" }}>
+                                                    <Upload className="h-7 w-7 mb-2 text-gray-400" />
+                                                    <span className="text-sm font-bold text-gray-600">Déposez vos Diplômes ici</span>
+                                                    <span className="text-[10px] text-gray-400 mt-1">PDF, DOCX, JPG, PNG</span>
+                                                    <input type="file" multiple className="hidden" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                                                        onChange={e => { if (e.target.files && e.target.files.length > 0) addDiplomes(e.target.files); e.target.value = ""; }} />
                                                 </label>
                                             ) : (
-                                                <div className="flex items-center justify-between p-3 bg-white border rounded-xl shadow-sm" style={{ borderColor: "#e0e0e0" }}>
-                                                    <div className="flex items-center gap-3 overflow-hidden">
-                                                        <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: "#e8eaf6" }}>
-                                                            <FileIcon className="h-4 w-4" style={{ color: "#1a237e" }} />
+                                                /* Fichiers sélectionnés : liste + bouton compact */
+                                                <div className="space-y-2">
+                                                    {diplomes.map((f, i) => (
+                                                        <div key={i} className="flex items-center justify-between p-3 bg-white border rounded-xl shadow-sm" style={{ borderColor: "#e0e0e0" }}>
+                                                            <div className="flex items-center gap-3 overflow-hidden">
+                                                                <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: "#e8eaf6" }}>
+                                                                    <FileIcon className="h-4 w-4" style={{ color: "#1a237e" }} />
+                                                                </div>
+                                                                <div className="min-w-0">
+                                                                    <p className="text-xs font-bold text-gray-700 truncate">{f.name}</p>
+                                                                    <p className="text-[10px] text-gray-400">{(f.size / 1024 / 1024).toFixed(2)} MB</p>
+                                                                </div>
+                                                            </div>
+                                                            <button type="button" onClick={() => removeDiplome(i)} className="p-1.5 rounded-lg hover:bg-red-50 transition-colors shrink-0">
+                                                                <X className="h-4 w-4" style={{ color: "#c62828" }} />
+                                                            </button>
                                                         </div>
-                                                        <div className="min-w-0">
-                                                            <p className="text-xs font-bold text-gray-700 truncate">{diplomes.name}</p>
-                                                        </div>
-                                                    </div>
-                                                    <button type="button" onClick={removeDiplomes} className="p-1.5 rounded-lg hover:bg-red-50 transition-colors"><X className="h-4 w-4" style={{ color: "#c62828" }} /></button>
+                                                    ))}
+                                                    {/* Bouton compact pour ajouter d'autres */}
+                                                    <label className="flex items-center gap-2 px-4 py-2.5 border-2 border-dashed rounded-xl cursor-pointer transition-colors hover:border-[#2e7d32]" style={{ borderColor: "#c5cae9", backgroundColor: "#f4f6f9" }}>
+                                                        <Upload className="h-4 w-4 text-gray-400 shrink-0" />
+                                                        <span className="text-xs font-bold text-gray-500">Ajouter d&apos;autres fichiers</span>
+                                                        <span className="ml-auto text-[10px] text-gray-400">PDF, DOCX, JPG, PNG</span>
+                                                        <input type="file" multiple className="hidden" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                                                            onChange={e => { if (e.target.files && e.target.files.length > 0) addDiplomes(e.target.files); e.target.value = ""; }} />
+                                                    </label>
                                                 </div>
                                             )}
                                         </div>
@@ -1183,9 +1389,14 @@ export default function DemandeCertificationPage() {
                                 {/* ÉTAPE 5 — Aménagement */}
                                 {step === 5 && (
                                     <div className="space-y-5">
-                                        <p className="text-sm text-gray-500 leading-relaxed">
-                                            Avez-vous des besoins d'aménagement spécifique relatifs à l'accessibilité, l'éclairage, la température ou l'aération de la salle d'examen ?
-                                        </p>
+                                        <div>
+                                            <label className={labelClass()} style={{ color: "#1a237e" }}>
+                                                Aménagement spécifique <span className="text-[#c62828]">*</span>
+                                            </label>
+                                            <p className="text-sm text-gray-500 leading-relaxed mt-1">
+                                                Avez-vous des besoins d&apos;aménagement spécifique relatifs à l&apos;accessibilité, l&apos;éclairage, la température ou l&apos;aération de la salle d&apos;examen ?
+                                            </p>
+                                        </div>
                                         <div className="flex gap-4">
                                             {(["Oui", "Non"] as const).map(val => (
                                                 <label
@@ -1220,7 +1431,7 @@ export default function DemandeCertificationPage() {
                                                     onBlur={e => handleField("amenagementDetails", e.target.value, setAmenagementDetails)}
                                                     className={inputClass(!!fieldErrors.amenagementDetails) + " resize-none"}
                                                     rows={3}
-                                                    placeholder="Décrivez vos besoins spécifiques…"
+                                                    placeholder="Entrez vos besoins spécifiques"
                                                 />
                                             </motion.div>
                                         )}
@@ -1230,6 +1441,9 @@ export default function DemandeCertificationPage() {
                                 {/* ÉTAPE 6 — Déclaration */}
                                 {step === 6 && (
                                     <div className="space-y-5">
+                                        <label className={labelClass()} style={{ color: "#1a237e" }}>
+                                            Déclaration sur l&apos;honneur <span className="text-[#c62828]">*</span>
+                                        </label>
                                         <label
                                             className="flex items-start gap-4 p-4 rounded-xl border cursor-pointer transition-all"
                                             style={{
@@ -1261,8 +1475,8 @@ export default function DemandeCertificationPage() {
                                                 ["Email", email],
                                                 ["CV", cvFile ? "Uploadé" : "Manquant"],
                                                 ["Pièce Identité", pieceIdentite ? "Uploadé" : "Manquant"],
-                                                ["Justificatif Expérience", justificatifExp ? "Uploadé" : "Manquant"],
-                                                ["Diplômes", diplomes ? "Uploadé" : "Manquant"],
+                                                ...(!certification.startsWith("Junior") ? [["Justificatif Expérience", justificatifExp.length > 0 ? `${justificatifExp.length} fichier(s) uploadé(s)` : "Manquant"]] : []),
+                                                ["Diplômes", diplomes.length > 0 ? `${diplomes.length} fichier(s) uploadé(s)` : "Manquant"],
                                                 ["Attestation formation", attestationFormation ? "Uploadé" : (examType === "direct" ? "Manquant" : "Non fourni")],
                                             ].map(([k, v]) => (
                                                 <div key={k} className="flex justify-between text-xs">
@@ -1301,11 +1515,13 @@ export default function DemandeCertificationPage() {
                                 <button
                                     type="button"
                                     onClick={handleNext}
-                                    className="flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-bold text-white transition-all hover:-translate-y-0.5"
+                                    disabled={isCheckingEmail}
+                                    className="flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-bold text-white transition-all hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
                                     style={{ backgroundColor: "#1a237e", boxShadow: "0 6px 16px rgba(26,35,126,0.22)" }}
                                 >
+                                    {isCheckingEmail ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
                                     Suivant
-                                    <ChevronRight className="h-4 w-4" />
+                                    {!isCheckingEmail && <ChevronRight className="h-4 w-4" />}
                                 </button>
                             ) : (
                                 <button
@@ -1338,5 +1554,70 @@ export default function DemandeCertificationPage() {
                 </form>
             </div>
         </div>
+
+        {/* ── Modal — Critères d'expérience ────────────────────────────── */}
+        <AnimatePresence>
+            {showExperienceModal && (
+                <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="fixed inset-0 z-50 flex items-center justify-center p-4"
+                    style={{ backgroundColor: "rgba(0,0,0,0.45)" }}
+                    onClick={() => setShowExperienceModal(false)}
+                >
+                    <motion.div
+                        initial={{ opacity: 0, y: 12 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: 12 }}
+                        transition={{ duration: 0.2 }}
+                        className="bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-hidden"
+                        onClick={e => e.stopPropagation()}
+                    >
+                        {/* Header */}
+                        <div className="flex items-center justify-between px-5 py-4 border-b" style={{ borderColor: "#e8eaf6" }}>
+                            <h2 className="text-sm font-bold" style={{ color: "#1a237e" }}>
+                                Critères d&apos;éligibilité
+                            </h2>
+                            <button type="button" onClick={() => setShowExperienceModal(false)} className="p-1 rounded-lg hover:bg-gray-100 transition-colors">
+                                <X className="h-4 w-4 text-gray-400" />
+                            </button>
+                        </div>
+
+                        {/* Rows */}
+                        <div className="px-5 py-4 space-y-3">
+                            {[
+                                { range: "< 2 ans",   level: "Junior Implementor",          color: "#b45309" },
+                                { range: "2 – 4 ans", level: "Junior + Implementor",         color: "#2e7d32" },
+                                { range: "≥ 5 ans",   level: "Toutes les certifications",    color: "#1a237e" },
+                            ].map(row => (
+                                <div key={row.range} className="flex items-center gap-3">
+                                    <span
+                                        className="text-[11px] font-bold px-2.5 py-1 rounded-lg shrink-0"
+                                        style={{ backgroundColor: `${row.color}15`, color: row.color }}
+                                    >
+                                        {row.range}
+                                    </span>
+                                    <span className="text-sm text-gray-600">{row.level}</span>
+                                </div>
+                            ))}
+                        </div>
+
+                        {/* Footer */}
+                        <div className="px-5 pb-4">
+                            <button
+                                type="button"
+                                onClick={() => setShowExperienceModal(false)}
+                                className="w-full py-2.5 rounded-xl text-sm font-bold text-white transition-all hover:opacity-90"
+                                style={{ backgroundColor: "#1a237e" }}
+                            >
+                                Fermer
+                            </button>
+                        </div>
+                    </motion.div>
+                </motion.div>
+            )}
+        </AnimatePresence>
+        </>
     );
 }

@@ -608,7 +608,7 @@ export default function HistoriquePage() {
                                         <ActionBadge action={log.action} label={log.action_label} />
 
                                         {/* Status pill if present */}
-                                        {d.new_status && (
+                                        {!!d.new_status && (
                                             <StatusPill status={String(d.new_status)} />
                                         )}
 

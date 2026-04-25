@@ -32,20 +32,20 @@ import { useAuth } from "@/lib/auth";
 import { FilePreviewModal } from "@/components/FilePreviewModal";
 
 const DOC_KEYS = [
-    { key: "CV", label: "Curriculum Vitae" },
-    { key: "Pièce d'identité", label: "Pièce d'identité" },
+    { key: "CV",                        label: "Curriculum Vitae" },
+    { key: "Pièce d'identité",          label: "Pièce d'identité" },
     { key: "Justificatif d'expérience", label: "Justificatif d'expérience" },
-    { key: "Diplômes", label: "Diplômes / attestations" },
+    { key: "Diplômes",                  label: "Diplôme" },
+    { key: "Attestation de formation",  label: "Attestation de formation" },
 ];
 
-function extractUrl(value: unknown): string | null {
-    if (!value) return null;
-    if (typeof value === "string") return value;
-    if (Array.isArray(value) && value.length > 0) {
-        const first = value[0];
-        if (typeof first === "string") return first;
+function extractUrls(value: unknown): string[] {
+    if (!value) return [];
+    if (typeof value === "string" && value.length > 0) return [value];
+    if (Array.isArray(value)) {
+        return value.filter((v): v is string => typeof v === "string" && v.length > 0);
     }
-    return null;
+    return [];
 }
 
 function CandidatureDossierInner() {
@@ -105,16 +105,30 @@ function CandidatureDossierInner() {
     const availableDocs = useMemo(() => {
         if (!response) return [];
         const answers = response.answers || {};
-        return DOC_KEYS.map(d => {
-            const url = extractUrl(answers[d.key]);
-            return { ...d, url };
-        }).filter(d => d.url);
+        const docs: { validationKey: string; renderKey: string; label: string; url: string }[] = [];
+        for (const d of DOC_KEYS) {
+            const urls = extractUrls(answers[d.key]);
+            if (urls.length === 0) continue;
+            if (urls.length === 1) {
+                docs.push({ validationKey: d.key, renderKey: d.key, label: d.label, url: urls[0] });
+            } else {
+                urls.forEach((url, i) => {
+                    docs.push({
+                        validationKey: d.key,
+                        renderKey: `${d.key}_${i}`,
+                        label: `${d.label} ${i + 1}`,
+                        url,
+                    });
+                });
+            }
+        }
+        return docs;
     }, [response]);
 
     const allValid =
         availableDocs.length > 0 &&
-        availableDocs.every(d => validation[d.key]?.valid === true) &&
-        !availableDocs.some(d => validation[d.key]?.resubmit_requested);
+        availableDocs.every(d => validation[d.validationKey]?.valid === true) &&
+        !availableDocs.some(d => validation[d.validationKey]?.resubmit_requested);
 
     async function toggleValid(docKey: string, nextValid: boolean) {
         if (!response) return;
@@ -301,13 +315,13 @@ function CandidatureDossierInner() {
                 ) : (
                     <div className="space-y-3">
                         {availableDocs.map(doc => {
-                            const v = validation[doc.key] || {};
+                            const v = validation[doc.validationKey] || {};
                             const isValid = v.valid === true;
                             const hasIssue = !!v.resubmit_requested;
                             const justResubmitted = !hasIssue && !isValid && !!v.resubmitted_at;
                             return (
                                 <div
-                                    key={doc.key}
+                                    key={doc.renderKey}
                                     className="rounded-xl border p-4"
                                     style={{
                                         borderColor: hasIssue ? "#fecaca" : justResubmitted ? "#fcd34d" : isValid ? "#c8e6c9" : "#e5e7eb",
@@ -397,7 +411,7 @@ function CandidatureDossierInner() {
                                                             className="w-4 h-4"
                                                             checked={isValid}
                                                             disabled={hasIssue || saving}
-                                                            onChange={e => toggleValid(doc.key, e.target.checked)}
+                                                            onChange={e => toggleValid(doc.validationKey, e.target.checked)}
                                                         />
                                                         <span className="text-xs font-bold">
                                                             {isValid ? "Valide" : "Valider"}
@@ -405,7 +419,7 @@ function CandidatureDossierInner() {
                                                     </label>
                                                     <button
                                                         onClick={() => {
-                                                            setResubmitTarget(doc.key);
+                                                            setResubmitTarget(doc.validationKey);
                                                             setResubmitMessage("");
                                                         }}
                                                         className="inline-flex items-center gap-1 px-3 py-2 rounded-lg border text-xs font-bold"

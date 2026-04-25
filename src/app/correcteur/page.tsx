@@ -1,13 +1,13 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { fetchResponses, updateExamGrade, fetchForms, getCertFormId, setCertFormId, API_URL } from "@/lib/api";
+import { fetchResponses, updateExamGrade, fetchForms, getCertFormId, setCertFormId, API_URL, signCorrections } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Loader2, Search, FileText, CheckCircle, AlertTriangle,
   X, Save, FilePenLine, FileCheck, MessageSquare,
-  ChevronLeft, ChevronRight, Eye
+  ChevronLeft, ChevronRight, Eye, PenLine, PartyPopper
 } from "lucide-react";
 import { FilePreviewModal } from "@/components/FilePreviewModal";
 
@@ -24,6 +24,8 @@ export default function CorrecteurPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [previewFile, setPreviewFile] = useState<{ url: string; title?: string } | null>(null);
+  const [isSigning, setIsSigning] = useState(false);
+  const [signed, setSigned] = useState(false);
 
   const { user, logout, isLoading: isAuthLoading } = useAuth();
   const correctorEmail = user?.email || "";
@@ -97,6 +99,23 @@ export default function CorrecteurPage() {
     }
   };
 
+  const myResponses = responses.filter(
+    (r: any) => r.assigned_examiner_email?.toLowerCase() === correctorEmail.toLowerCase()
+  );
+  const allGraded = myResponses.length > 0 && myResponses.every((r: any) => !!r.exam_grade);
+
+  const handleSign = async () => {
+    setIsSigning(true);
+    try {
+      await signCorrections();
+      setSigned(true);
+    } catch (err: any) {
+      alert(err.message || "Erreur lors de la signature");
+    } finally {
+      setIsSigning(false);
+    }
+  };
+
   const openGradingModal = (response: any) => {
     setSelectedResponse(response);
     setGrade(response.exam_grade || "");
@@ -148,6 +167,33 @@ export default function CorrecteurPage() {
           Déconnexion
         </button>
       </div>
+
+      {/* ── Bannière signature ── */}
+      {signed ? (
+        <div className="flex items-center gap-3 px-5 py-4 rounded-2xl text-white font-bold shadow-lg" style={{ backgroundColor: "#2e7d32" }}>
+          <PartyPopper className="h-5 w-5 shrink-0" />
+          <span>Corrections signées avec succès — l'évaluateur a été notifié.</span>
+        </div>
+      ) : allGraded && (
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 px-5 py-4 rounded-2xl border-2 shadow-sm" style={{ backgroundColor: "#e8f5e9", borderColor: "#2e7d32" }}>
+          <div className="flex items-center gap-3">
+            <CheckCircle className="h-6 w-6 shrink-0" style={{ color: "#2e7d32" }} />
+            <div>
+              <p className="font-bold" style={{ color: "#1b5e20" }}>Toutes les copies sont corrigées</p>
+              <p className="text-sm" style={{ color: "#388e3c" }}>Signez pour notifier l'évaluateur que vous avez terminé.</p>
+            </div>
+          </div>
+          <button
+            onClick={handleSign}
+            disabled={isSigning}
+            className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold text-white transition-all hover:-translate-y-0.5 disabled:opacity-60 shrink-0"
+            style={{ backgroundColor: "#2e7d32", boxShadow: "0 6px 16px rgba(46,125,50,0.3)" }}
+          >
+            {isSigning ? <Loader2 className="h-4 w-4 animate-spin" /> : <PenLine className="h-4 w-4" />}
+            Signer les corrections
+          </button>
+        </div>
+      )}
 
       {/* ── Search ── */}
       <div className="bg-white p-4 rounded-xl shadow-sm border flex items-center gap-3" style={{ borderColor: "#c5cae9" }}>

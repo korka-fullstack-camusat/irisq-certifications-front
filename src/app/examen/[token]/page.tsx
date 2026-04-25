@@ -41,8 +41,8 @@ export default function AntiCheatPortal() {
     const [isLoading, setIsLoading] = useState(true);
     const [isSubmitting, setIsSubmitting] = useState(false);
 
-    // Timer State (2 hours)
-    const [timeLeft, setTimeLeft] = useState(2 * 60 * 60);
+    // Timer State — initialisé depuis examData.duration_minutes (défaut 120 min)
+    const [timeLeft, setTimeLeft] = useState(120 * 60);
 
     // ID Verification State
     const [isIdVerified, setIsIdVerified] = useState(false);
@@ -90,9 +90,15 @@ export default function AntiCheatPortal() {
                 const exams = await examsRes.json();
 
                 if (exams.length > 0) {
-                    setExamData(exams[0]);
+                    const exam = exams[0];
+                    setExamData(exam);
+                    // Initialise le timer depuis la durée de l'examen (défaut 120 min)
+                    const durationSec = (exam.duration_minutes && exam.duration_minutes > 0)
+                        ? exam.duration_minutes * 60
+                        : 120 * 60;
+                    setTimeLeft(durationSec);
                     const initialAnswers: Record<string, string> = {};
-                    exams[0].parsed_questions.forEach((q: any) => {
+                    exam.parsed_questions.forEach((q: any) => {
                         initialAnswers[q.id] = "";
                     });
                     setAnswers(initialAnswers);
@@ -459,6 +465,13 @@ export default function AntiCheatPortal() {
                     <div className="p-8 border-b text-center" style={{ borderColor: "#e0e0e0" }}>
                         <h1 className="text-2xl font-black mb-2" style={{ color: "#1a237e" }}>Examen: {examData.title}</h1>
                         <p className="text-gray-500 font-medium">Certification {examData.certification}</p>
+                        {examData.duration_minutes && (
+                            <div className="inline-flex items-center gap-2 mt-3 px-4 py-2 rounded-xl text-sm font-bold"
+                                style={{ backgroundColor: "#e8eaf6", color: "#1a237e" }}>
+                                <Clock className="h-4 w-4" />
+                                Durée de l&apos;épreuve : {examData.duration_minutes} minutes
+                            </div>
+                        )}
                     </div>
                     <div className="p-8 bg-gray-50/50">
                         <div className="bg-rose-50 border border-rose-200 rounded-xl p-5 mb-8">

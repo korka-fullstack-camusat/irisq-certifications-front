@@ -1,81 +1,107 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   FilePlus, Trash2, Download, Search, Loader2,
-  FileText, AlertCircle, Send, X, Plus, Upload, Eye
+  FileText, Send, X, Plus, Upload, Eye,
+  Clock, CalendarDays, Filter, CheckCircle2,
+  ChevronLeft, ChevronRight, AlertCircle,
 } from "lucide-react";
-import { fetchExams, createExam, deleteExam, uploadFiles, publishExam } from "@/lib/api";
+import {
+  fetchExams, createExam, deleteExam, uploadFiles, publishExam,
+  fetchCertifications,
+} from "@/lib/api";
+
+const SESSION_ID_KEY   = "irisq_evaluateur_session";
+const SESSION_NAME_KEY = "irisq_evaluateur_session_name";
+const EXAMS_PER_PAGE   = 8;
 import { FilePreviewModal } from "@/components/FilePreviewModal";
 
-const CERTIFICATIONS = [
-  "Junior Implementor ISO/IEC17025:2017",
-  "Implementor ISO/IEC17025:2017",
-  "Lead Implementor ISO/IEC17025:2017",
-  "Junior Implementor ISO 9001:2015",
-  "Implementor ISO 9001:2015",
-  "Lead Implementor ISO 9001:2015",
-  "Junior Implementor ISO 14001:2015",
-  "Implementor ISO 14001:2015",
-  "Lead Implementor ISO 14001:2015",
-];
-
 export default function ExamensPage() {
-  const [exams, setExams]               = useState<any[]>([]);
-  const [isLoading, setIsLoading]       = useState(true);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [publishingId, setPublishingId] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery]   = useState("");
-  const [showModal, setShowModal]       = useState(false);
-  const [uploadError, setUploadError]   = useState<string | null>(null);
-  const [previewFile, setPreviewFile]   = useState<{ url: string; title?: string } | null>(null);
+  // ── Session (lecture seule depuis localStorage) ──
+  const [selectedSessionId]  = useState<string>(
+    () => (typeof window !== "undefined" ? localStorage.getItem(SESSION_ID_KEY) || "" : "")
+  );
+  const [sessionName]        = useState<string>(
+    () => (typeof window !== "undefined" ? localStorage.getItem(SESSION_NAME_KEY) || "" : "")
+  );
+
+  // ── Certifications ──
+  const [certifications, setCertifications]   = useState<string[]>([]);
+
+  // ── Exams ──
+  const [exams, setExams]                     = useState<any[]>([]);
+  const [isLoading, setIsLoading]             = useState(false);
+  const [isSubmitting, setIsSubmitting]       = useState(false);
+  const [publishingId, setPublishingId]       = useState<string | null>(null);
+  const [searchQuery, setSearchQuery]         = useState("");
+  const [showModal, setShowModal]             = useState(false);
+  const [showFilterDropdown, setShowFilterDropdown] = useState(false);
+  const [activeCertFilter, setActiveCertFilter]     = useState<string | null>(null);
+  const [currentPage, setCurrentPage]               = useState(1);
+  const [uploadError, setUploadError]         = useState<string | null>(null);
+  const [previewFile, setPreviewFile]         = useState<{ url: string; title?: string } | null>(null);
 
   const [newExam, setNewExam] = useState({
-    certification: CERTIFICATIONS[0],
+    certification: "",
     title: "",
+    duration_minutes: "" as string | number,
   });
   const [file, setFile] = useState<File | null>(null);
 
-  useEffect(() => { loadExams(); }, []);
+  // ── Chargement initial ──
+  useEffect(() => {
+    fetchCertifications()
+      .then(list => {
+        setCertifications(list);
+        if (list.length > 0) setNewExam(prev => ({ ...prev, certification: list[0] }));
+      })
+      .catch(() => {});
+  }, []);
+
+  // ── Load exams when session changes ──
+  useEffect(() => {
+    loadExams();
+  }, [selectedSessionId]);
 
   const loadExams = async () => {
     setIsLoading(true);
     try {
-      const data = await fetchExams();
+      const data = await fetchExams(selectedSessionId ? { session_id: selectedSessionId } : undefined);
       setExams(data);
-    } catch (error) {
-      console.error("Failed to load exams:", error);
+    } catch {
+      /* ignore */
     } finally {
       setIsLoading(false);
     }
   };
 
   const handleSubmit = async () => {
-    if (!file || !newExam.title) return;
+    if (!file || !newExam.title || !newExam.certification) return;
     setIsSubmitting(true);
     setUploadError(null);
-
     try {
-      // 1. Upload du fichier
       const formData = new FormData();
       formData.append("files", file);
       const uploadResult = await uploadFiles(formData);
       const docUrl = uploadResult.file_urls[0];
 
-      // 2. Création de l'examen
+      const duration = newExam.duration_minutes !== ""
+        ? Number(newExam.duration_minutes)
+        : null;
+
       await createExam({
         certification: newExam.certification,
         title: newExam.title,
         document_url: docUrl,
+        duration_minutes: duration,
+        session_id: selectedSessionId || null,
       });
 
-      // 3. Reset & refresh
       closeModal();
       await loadExams();
-
     } catch (error: any) {
-      console.error("Failed to create exam:", error);
       setUploadError(error?.message || "Erreur lors de la création de l'examen.");
     } finally {
       setIsSubmitting(false);
@@ -87,8 +113,7 @@ export default function ExamensPage() {
     try {
       await deleteExam(id);
       setExams(prev => prev.filter(e => e._id !== id));
-    } catch (error) {
-      console.error("Failed to delete exam:", error);
+    } catch {
       alert("Erreur lors de la suppression.");
     }
   };
@@ -102,8 +127,7 @@ export default function ExamensPage() {
     try {
       const result = await publishExam(id);
       alert(`Succès ! ${result.notified_candidates_count} candidat(s) ont reçu le lien.`);
-    } catch (error) {
-      console.error("Failed to publish exam:", error);
+    } catch {
       alert("Erreur lors de la publication de l'examen.");
     } finally {
       setPublishingId(null);
@@ -115,37 +139,32 @@ export default function ExamensPage() {
     setShowModal(false);
     setFile(null);
     setUploadError(null);
-    setNewExam({ certification: CERTIFICATIONS[0], title: "" });
+    setNewExam(prev => ({ ...prev, title: "", duration_minutes: "" }));
   };
 
-  const filteredExams = exams.filter(e =>
-    e.certification.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    e.title.toLowerCase().includes(searchQuery.toLowerCase())
+  const filteredExams = useMemo(() => exams.filter(e => {
+    const matchesSearch = !searchQuery ||
+      e.certification.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      e.title.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesCert = !activeCertFilter || e.certification === activeCertFilter;
+    return matchesSearch && matchesCert;
+  }), [exams, searchQuery, activeCertFilter]);
+
+  const totalPages      = Math.ceil(filteredExams.length / EXAMS_PER_PAGE);
+  const paginatedExams  = filteredExams.slice(
+    (currentPage - 1) * EXAMS_PER_PAGE, currentPage * EXAMS_PER_PAGE
   );
 
   return (
     <div className="space-y-8 p-6 sm:p-8 bg-[#f4f6f9] min-h-screen">
 
       {/* ── Header ── */}
-      <div>
-        <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight" style={{ color: "#1a237e" }}>
-          Gestion des Examens
-        </h1>
-        <p className="text-gray-400 text-sm mt-1">Créez et publiez les sujets d'examen par certification.</p>
-      </div>
-
-      {/* ── Search + Nouvel Examen ── */}
-      <div className="bg-white rounded-2xl p-4 border shadow-sm flex items-center gap-3" style={{ borderColor: "#e0e0e0" }}>
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-          <input
-            type="text"
-            placeholder="Rechercher un examen ou une certification…"
-            value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
-            className="w-full pl-9 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 transition-all"
-            style={{ "--tw-ring-color": "#1a237e33" } as React.CSSProperties}
-          />
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight" style={{ color: "#1a237e" }}>
+            Gestion des Examens
+          </h1>
+          <p className="text-gray-400 text-sm mt-1">Créez et publiez les sujets d&apos;examen par certification.</p>
         </div>
         <button
           onClick={() => setShowModal(true)}
@@ -159,7 +178,136 @@ export default function ExamensPage() {
         </button>
       </div>
 
-      {/* ── Exams list ── */}
+      {/* Session active en sous-titre discret si disponible */}
+      {sessionName && (
+        <div className="flex items-center gap-2 -mt-4">
+          <CalendarDays className="h-3.5 w-3.5" style={{ color: "#1a237e" }} />
+          <span className="text-xs font-semibold text-gray-500">{sessionName}</span>
+        </div>
+      )}
+
+      {/* ── Search + Filtre ── */}
+      <div className="flex items-center gap-3">
+        {/* Barre de recherche */}
+        <div className="flex-1 bg-white rounded-xl border shadow-sm flex items-center gap-3 px-4 py-3" style={{ borderColor: "#e0e0e0" }}>
+          <Search className="h-4 w-4 text-gray-400 shrink-0" />
+          <input
+            type="text"
+            placeholder="Rechercher un examen ou une certification…"
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            className="flex-1 bg-transparent border-none focus:ring-0 text-sm text-gray-700 placeholder-gray-400"
+          />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery("")}
+              className="p-1 hover:bg-gray-100 rounded-full text-gray-400 hover:text-gray-600 transition-colors shrink-0"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
+
+        {/* Bouton ouvrir modal filtre */}
+        <button
+          onClick={() => setShowFilterDropdown(true)}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-lg font-bold text-sm border shadow-sm transition-colors shrink-0 ${
+            activeCertFilter
+              ? "bg-[#1a237e] text-white border-[#1a237e]"
+              : "bg-white text-[#1a237e] border-[#c5cae9] hover:bg-[#e8eaf6]"
+          }`}
+        >
+          <Filter className="h-4 w-4" />
+          <span className="hidden sm:inline">{activeCertFilter ? "Filtré" : "Filtrer"}</span>
+        </button>
+      </div>
+
+      {/* Chip filtre actif */}
+      {activeCertFilter && (
+        <div className="flex items-center gap-2 -mt-4">
+          <span className="text-xs text-gray-500 font-medium">Filtre actif :</span>
+          <span className="inline-flex items-center gap-2 bg-[#e8eaf6] text-[#1a237e] text-xs font-bold px-3 py-1.5 rounded-full border border-[#c5cae9]">
+            {activeCertFilter}
+            <button onClick={() => setActiveCertFilter(null)} className="hover:text-rose-500 transition-colors">
+              <X className="h-3 w-3" />
+            </button>
+          </span>
+        </div>
+      )}
+
+      {/* ── MODAL Filtre par certification ── */}
+      <AnimatePresence>
+        {showFilterDropdown && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+            onClick={() => setShowFilterDropdown(false)}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 12 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 12 }}
+              transition={{ duration: 0.2 }}
+              onClick={e => e.stopPropagation()}
+              className="bg-white rounded-2xl w-full max-w-sm overflow-hidden shadow-xl"
+              style={{ border: "1px solid #c5cae9" }}
+            >
+              {/* Header modal */}
+              <div className="px-6 py-4 flex items-center justify-between" style={{ backgroundColor: "#1a237e" }}>
+                <div className="flex items-center gap-3">
+                  <div className="h-7 w-7 rounded-lg flex items-center justify-center" style={{ backgroundColor: "rgba(255,255,255,0.15)" }}>
+                    <Filter className="h-4 w-4 text-white" />
+                  </div>
+                  <h2 className="text-sm font-bold uppercase tracking-widest text-white">Filtrer par certification</h2>
+                </div>
+                <button onClick={() => setShowFilterDropdown(false)} className="text-white/70 hover:text-white transition-colors">
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+
+              {/* Liste */}
+              <div className="p-3 max-h-96 overflow-y-auto space-y-1">
+                <button
+                  onClick={() => { setActiveCertFilter(null); setShowFilterDropdown(false); }}
+                  className={`w-full text-left px-4 py-3 rounded-xl text-sm font-semibold transition-colors flex items-center justify-between ${
+                    !activeCertFilter
+                      ? "bg-[#e8eaf6] text-[#1a237e]"
+                      : "text-gray-600 hover:bg-gray-50"
+                  }`}
+                >
+                  Toutes les certifications
+                  {!activeCertFilter && <CheckCircle2 className="h-4 w-4 text-[#1a237e] shrink-0" />}
+                </button>
+                {certifications.map(cert => (
+                  <button
+                    key={cert}
+                    onClick={() => { setActiveCertFilter(cert); setShowFilterDropdown(false); }}
+                    className={`w-full text-left px-4 py-3 rounded-xl text-sm font-semibold transition-colors flex items-center justify-between gap-2 ${
+                      activeCertFilter === cert
+                        ? "bg-[#e8eaf6] text-[#1a237e]"
+                        : "text-gray-600 hover:bg-gray-50"
+                    }`}
+                  >
+                    <span className="leading-snug">{cert}</span>
+                    {activeCertFilter === cert && <CheckCircle2 className="h-4 w-4 text-[#1a237e] shrink-0" />}
+                  </button>
+                ))}
+              </div>
+
+              {/* Footer */}
+              <div className="px-4 py-3 border-t border-gray-100 bg-[#f4f6f9] flex justify-end">
+                <button
+                  onClick={() => setShowFilterDropdown(false)}
+                  className="px-4 py-2 bg-white border border-gray-200 text-gray-600 rounded-xl text-sm font-semibold hover:bg-gray-50 transition-colors"
+                >
+                  Fermer
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* ── Exam list ── */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -180,11 +328,11 @@ export default function ExamensPage() {
           <div className="p-16 text-center text-gray-400">
             <AlertCircle className="h-12 w-12 mx-auto mb-4 opacity-20" />
             <p className="text-sm font-medium">Aucun examen trouvé.</p>
-            <p className="text-xs mt-1">Créez-en un avec le bouton "Nouvel Examen".</p>
+            <p className="text-xs mt-1">Créez-en un avec le bouton &quot;Nouvel Examen&quot;.</p>
           </div>
         ) : (
           <div className="divide-y divide-gray-50">
-            {filteredExams.map((exam, idx) => (
+            {paginatedExams.map((exam, idx) => (
               <motion.div
                 key={exam._id}
                 initial={{ opacity: 0 }}
@@ -199,9 +347,18 @@ export default function ExamensPage() {
                   <div>
                     <h3 className="font-bold text-gray-800 text-sm group-hover:text-[#1a237e] transition-colors">{exam.title}</h3>
                     <p className="text-xs text-gray-400 mt-0.5">{exam.certification}</p>
-                    <p className="text-[10px] text-gray-300 mt-1 uppercase tracking-wider">
-                      Créé le {new Date(exam.created_at).toLocaleDateString("fr-FR")}
-                    </p>
+                    <div className="flex items-center gap-3 mt-1">
+                      <p className="text-[10px] text-gray-300 uppercase tracking-wider">
+                        Créé le {new Date(exam.created_at).toLocaleDateString("fr-FR")}
+                      </p>
+                      {exam.duration_minutes && (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full"
+                          style={{ backgroundColor: "#e8eaf6", color: "#1a237e" }}>
+                          <Clock className="h-3 w-3" />
+                          {exam.duration_minutes} min
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
 
@@ -244,6 +401,41 @@ export default function ExamensPage() {
             ))}
           </div>
         )}
+
+        {/* ── Pagination ── */}
+        {totalPages > 1 && (
+          <div className="px-6 py-4 border-t flex items-center justify-between bg-[#f8f9fa]"
+            style={{ borderColor: "#e8eaf6" }}>
+            <p className="text-xs text-gray-500 font-medium">
+              Page <span className="font-bold text-[#1a237e]">{currentPage}</span> sur{" "}
+              <span className="font-bold">{totalPages}</span>
+              {" "}· {filteredExams.length} examen{filteredExams.length !== 1 ? "s" : ""}
+            </p>
+            <div className="flex items-center gap-2">
+              <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}
+                className="p-2 rounded-lg border border-gray-200 text-[#1a237e] hover:bg-[#e8eaf6] disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+              {Array.from({ length: totalPages }, (_, i) => i + 1)
+                .filter(p => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 1)
+                .reduce<(number | string)[]>((acc, p, idx, arr) => {
+                  if (idx > 0 && typeof arr[idx-1] === "number" && (p as number) - (arr[idx-1] as number) > 1) acc.push("...");
+                  acc.push(p); return acc;
+                }, [])
+                .map((p, idx) =>
+                  p === "..." ? <span key={`e-${idx}`} className="text-gray-400 text-sm px-1">…</span>
+                  : <button key={p} onClick={() => setCurrentPage(p as number)}
+                      className={`w-8 h-8 rounded-lg text-sm font-bold transition-colors ${
+                        currentPage === p ? "bg-[#1a237e] text-white" : "border border-gray-200 text-gray-600 hover:bg-[#e8eaf6]"
+                      }`}>{p}</button>
+                )}
+              <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}
+                className="p-2 rounded-lg border border-gray-200 text-[#1a237e] hover:bg-[#e8eaf6] disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        )}
       </motion.div>
 
       {/* ── MODAL Nouvel Examen ── */}
@@ -283,13 +475,16 @@ export default function ExamensPage() {
                   <div className="flex items-start gap-3 p-4 rounded-xl border text-sm"
                     style={{ background: "#fef2f2", borderColor: "#fecaca", color: "#c62828" }}>
                     <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
-                    <div>
-                      <p className="font-semibold mb-0.5">Erreur</p>
-                      <p className="text-xs opacity-80">{uploadError}</p>
-                      <p className="text-xs mt-2 opacity-70">
-                        Vérifiez la console et assurez-vous que votre endpoint <code className="bg-red-100 px-1 rounded">/api/upload/</code> retourne <code className="bg-red-100 px-1 rounded">{"{ file_urls: [\"...\"] }"}</code>
-                      </p>
-                    </div>
+                    <p className="font-semibold">{uploadError}</p>
+                  </div>
+                )}
+
+                {/* Session (rappel) */}
+                {sessionName && (
+                  <div className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold"
+                    style={{ backgroundColor: "#e8eaf6", color: "#1a237e" }}>
+                    <CalendarDays className="h-3.5 w-3.5 shrink-0" />
+                    Session : {sessionName}
                   </div>
                 )}
 
@@ -298,20 +493,26 @@ export default function ExamensPage() {
                   <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">
                     Certification <span className="text-rose-500">*</span>
                   </label>
-                  <select
-                    value={newExam.certification}
-                    onChange={e => setNewExam({ ...newExam, certification: e.target.value })}
-                    className="w-full px-4 py-2.5 bg-[#f4f6f9] border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 transition-all cursor-pointer"
-                    style={{ "--tw-ring-color": "#1a237e33" } as React.CSSProperties}
-                  >
-                    {CERTIFICATIONS.map(cert => <option key={cert} value={cert}>{cert}</option>)}
-                  </select>
+                  {certifications.length === 0 ? (
+                    <div className="flex items-center gap-2 text-sm text-gray-400">
+                      <Loader2 className="h-4 w-4 animate-spin" /> Chargement…
+                    </div>
+                  ) : (
+                    <select
+                      value={newExam.certification}
+                      onChange={e => setNewExam({ ...newExam, certification: e.target.value })}
+                      className="w-full px-4 py-2.5 bg-[#f4f6f9] border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 transition-all cursor-pointer"
+                      style={{ "--tw-ring-color": "#1a237e33" } as React.CSSProperties}
+                    >
+                      {certifications.map(cert => <option key={cert} value={cert}>{cert}</option>)}
+                    </select>
+                  )}
                 </div>
 
                 {/* Titre */}
                 <div>
                   <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">
-                    Titre de l'examen <span className="text-rose-500">*</span>
+                    Titre de l&apos;examen <span className="text-rose-500">*</span>
                   </label>
                   <input
                     type="text"
@@ -321,6 +522,28 @@ export default function ExamensPage() {
                     className="w-full px-4 py-2.5 bg-[#f4f6f9] border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 transition-all"
                     style={{ "--tw-ring-color": "#1a237e33" } as React.CSSProperties}
                   />
+                </div>
+
+                {/* Durée */}
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">
+                    Durée de l&apos;épreuve (minutes) <span className="text-rose-500">*</span>
+                  </label>
+                  <div className="relative">
+                    <Clock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                    <input
+                      type="number"
+                      min="1"
+                      max="480"
+                      step="1"
+                      placeholder="ex : 90"
+                      value={newExam.duration_minutes}
+                      onChange={e => setNewExam({ ...newExam, duration_minutes: e.target.value })}
+                      className="w-full pl-9 pr-16 py-2.5 bg-[#f4f6f9] border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 transition-all"
+                      style={{ "--tw-ring-color": "#1a237e33" } as React.CSSProperties}
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400 font-semibold">min</span>
+                  </div>
                 </div>
 
                 {/* Upload */}
@@ -380,15 +603,15 @@ export default function ExamensPage() {
                 </button>
                 <button
                   onClick={handleSubmit}
-                  disabled={isSubmitting || !file || !newExam.title}
-                  className="inline-flex items-center gap-2 px-5 py-2 text-white rounded-xl text-sm font-bold transition-colors disabled:cursor-not-allowed"
-                  style={{ backgroundColor: isSubmitting || !file || !newExam.title ? "#9e9e9e" : "#1a237e" }}
-                  onMouseEnter={e => { if (!isSubmitting && file && newExam.title) e.currentTarget.style.backgroundColor = "#283593"; }}
-                  onMouseLeave={e => { if (!isSubmitting && file && newExam.title) e.currentTarget.style.backgroundColor = "#1a237e"; }}
+                  disabled={isSubmitting || !file || !newExam.title || !newExam.certification || !newExam.duration_minutes}
+                  className="inline-flex items-center gap-2 px-5 py-2 text-white rounded-xl text-sm font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+                  style={{ backgroundColor: "#1a237e" }}
+                  onMouseEnter={e => { if (!isSubmitting) e.currentTarget.style.backgroundColor = "#283593"; }}
+                  onMouseLeave={e => { if (!isSubmitting) e.currentTarget.style.backgroundColor = "#1a237e"; }}
                 >
                   {isSubmitting
                     ? <><Loader2 className="h-4 w-4 animate-spin" /> Création en cours…</>
-                    : <><FilePlus className="h-4 w-4" /> Créer l'examen</>
+                    : <><FilePlus className="h-4 w-4" /> Créer l&apos;examen</>
                   }
                 </button>
               </div>

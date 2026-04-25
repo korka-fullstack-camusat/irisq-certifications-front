@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { ClipboardList, File as FileIcon, LogOut, X, CheckCircle2 } from "lucide-react";
+import { ClipboardList, File as FileIcon, LogOut, X, CheckCircle2, LayoutDashboard, UserCog } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import Image from "next/image";
 
@@ -13,9 +13,11 @@ export default function EvaluatorLayout({ children }: { children: React.ReactNod
     const [showLogoutModal, setShowLogoutModal] = useState(false);
 
     const navItems = [
-        { name: "Candidatures", href: "/evaluateur", icon: ClipboardList },
-        { name: "Examens par Certification", href: "/evaluateur/examens", icon: FileIcon },
-        { name: "Resultats Candidats", href: "/evaluateur/corrections", icon: CheckCircle2 },
+        { name: "Tableau de bord",       href: "/evaluateur/dashboard",    icon: LayoutDashboard },
+        { name: "Gestion Examens",       href: "/evaluateur/examens",      icon: FileIcon },
+        { name: "Candidatures validées", href: "/evaluateur",              icon: ClipboardList },
+        { name: "Gestion Correcteurs",  href: "/evaluateur/correcteurs",  icon: UserCog },
+        { name: "Résultats Candidats",  href: "/evaluateur/corrections",  icon: CheckCircle2 },
     ];
 
     const handleLogout = () => {

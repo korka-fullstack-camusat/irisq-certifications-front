@@ -103,6 +103,17 @@ export async function checkSessionEligibility(sessionId: string, email: string):
     return res.json();
 }
 
+/**
+ * Check if an email already has an active or rejected candidature across ALL
+ * currently-open sessions. Called as soon as the candidate finishes typing
+ * their email (on blur), before they even pick a session.
+ */
+export async function checkEmailEligibility(email: string): Promise<EligibilityResult> {
+    const res = await fetch(url(`responses/check-email?email=${encodeURIComponent(email.trim())}`), { redirect: "follow" });
+    if (!res.ok) throw new Error("Failed to check email eligibility");
+    return res.json();
+}
+
 export async function updateResponseStatus(responseId: string, status: string, reason?: string) {
     const payload: Record<string, unknown> = { status };
     if (reason) payload.reason = reason;
@@ -186,16 +197,30 @@ export async function updateExamGrade(responseId: string, data: { exam_grade: st
     return res.json();
 }
 
-export async function fetchExams(certification?: string) {
-    const path = certification
-        ? `exams?certification=${encodeURIComponent(certification)}`
-        : "exams";
-    const res = await apiFetch(url(path), { redirect: "follow" });
+export async function fetchExams(opts?: { certification?: string; session_id?: string }) {
+    const p = new URLSearchParams();
+    if (opts?.certification) p.set("certification", opts.certification);
+    if (opts?.session_id)    p.set("session_id", opts.session_id);
+    const qs = p.toString();
+    const res = await apiFetch(url(qs ? `exams?${qs}` : "exams"), { redirect: "follow" });
     if (!res.ok) throw new Error("Failed to fetch exams");
     return res.json();
 }
 
-export async function createExam(data: any) {
+export async function fetchCertifications(): Promise<string[]> {
+    const res = await apiFetch(url("certifications"), { redirect: "follow" });
+    if (!res.ok) throw new Error("Failed to fetch certifications");
+    const data = await res.json();
+    return data.certifications as string[];
+}
+
+export async function createExam(data: {
+    certification: string;
+    title: string;
+    document_url: string;
+    duration_minutes?: number | null;
+    session_id?: string | null;
+}) {
     const res = await apiFetch(url("exams"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -495,6 +520,117 @@ export async function deleteAuditLog(logId: string): Promise<{ status: string; i
 export async function fetchAuditActionTypes(): Promise<{ value: string; label: string }[]> {
     const res = await apiFetch(url("audit-logs/actions"), { redirect: "follow" });
     if (!res.ok) throw new Error("Failed to fetch action types");
+    return res.json();
+}
+
+// ──────────────────────────────────────────────────────────────
+// Correcteurs (evaluateur only)
+// ──────────────────────────────────────────────────────────────
+
+export interface Correcteur {
+    id: string;
+    email: string;
+    full_name?: string | null;
+    role: string;
+    is_active: boolean;
+    created_at?: string;
+}
+
+export async function fetchCorrecteurs(): Promise<Correcteur[]> {
+    const res = await apiFetch(url("correcteurs"), { redirect: "follow" });
+    if (!res.ok) throw new Error("Failed to fetch correcteurs");
+    return res.json();
+}
+
+export async function createCorrecteur(data: {
+    email: string;
+    password: string;
+    full_name?: string;
+}): Promise<Correcteur> {
+    const res = await apiFetch(url("correcteurs"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...data, role: "CORRECTEUR" }),
+        redirect: "follow",
+    });
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || "Failed to create correcteur");
+    }
+    return res.json();
+}
+
+export interface UnassignedResponse {
+    id: string;
+    public_id?: string;
+    name?: string;
+    profile?: string;
+    session_id?: string;
+    exam_mode?: string;
+}
+
+export async function fetchUnassignedResponses(): Promise<UnassignedResponse[]> {
+    const res = await apiFetch(url("correcteurs/unassigned-responses"), { redirect: "follow" });
+    if (!res.ok) throw new Error("Failed to fetch unassigned responses");
+    return res.json();
+}
+
+export async function bulkAssignCorrecteur(
+    correcteur_email: string,
+    response_ids: string[],
+): Promise<{ assigned: number }> {
+    const res = await apiFetch(url("correcteurs/assign-bulk"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ correcteur_email, response_ids }),
+        redirect: "follow",
+    });
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || "Failed to assign");
+    }
+    return res.json();
+}
+
+export async function deleteCorrecteur(id: string): Promise<{ id: string; deleted: boolean }> {
+    const res = await apiFetch(url(`correcteurs/${id}`), {
+        method: "DELETE",
+        redirect: "follow",
+    });
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || "Failed to delete correcteur");
+    }
+    return res.json();
+}
+
+export async function signCorrections(): Promise<{ signed: boolean; signed_at: string; count: number }> {
+    const res = await apiFetch(url("correcteur/sign"), { method: "POST", redirect: "follow" });
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || "Erreur lors de la signature");
+    }
+    return res.json();
+}
+
+export async function relancerCorrecteur(id: string): Promise<{ sent: boolean; pending_count: number }> {
+    const res = await apiFetch(url(`correcteurs/${id}/relancer`), { method: "POST", redirect: "follow" });
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || "Erreur lors de la relance");
+    }
+    return res.json();
+}
+
+export async function toggleCorrecteurStatus(id: string): Promise<{ id: string; is_active: boolean }> {
+    const res = await apiFetch(url(`correcteurs/${id}/toggle`), {
+        method: "PATCH",
+        redirect: "follow",
+    });
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || "Failed to toggle correcteur status");
+    }
     return res.json();
 }
 
