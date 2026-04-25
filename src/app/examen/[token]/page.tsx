@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import Image from "next/image";
 import { ShieldAlert, Maximize, Clock, FileText, CheckCircle2, AlertTriangle, Upload, Loader2, Play, Monitor } from "lucide-react";
 import { API_URL, uploadFiles, submitExamWithAntiCheat } from "@/lib/api";
+import RichTextEditor from "@/components/RichTextEditor";
 
 export default function AntiCheatPortal() {
     const params = useParams();
@@ -630,16 +631,15 @@ export default function AntiCheatPortal() {
                         {/* Answer Area */}
                         <div className="flex-1 p-6 bg-gray-50 overflow-y-auto space-y-8">
                             {(!examData.parsed_questions || examData.parsed_questions.length === 0) ? (
-                                <div className="h-full flex flex-col">
-                                    <h3 className="text-sm font-bold text-gray-700 mb-2 flex items-center gap-2">
-                                        Votre Copie <span className="text-xs font-normal text-gray-500">(Rédigez vos réponses ici)</span>
+                                <div className="h-full flex flex-col gap-2">
+                                    <h3 className="text-sm font-bold text-gray-700 flex items-center gap-2">
+                                        Votre Copie <span className="text-xs font-normal text-gray-500">(Rédigez vos réponses ci-dessous)</span>
                                     </h3>
-                                    <textarea
-                                        className="w-full flex-1 bg-white border border-gray-200 text-gray-900 p-5 rounded-xl focus:outline-none focus:ring-2 resize-none shadow-sm text-sm leading-relaxed"
-                                        style={{ "--tw-ring-color": "#1a237e33" } as React.CSSProperties}
-                                        placeholder="Veuillez saisir les réponses aux questions du sujet ici. Vous pouvez structurer votre copie selon l'ordre du document..."
+                                    <RichTextEditor
                                         value={answers["general_text"] || ""}
-                                        onChange={(e) => setAnswers({ ...answers, ["general_text"]: e.target.value })}
+                                        onChange={(html) => setAnswers({ ...answers, general_text: html })}
+                                        placeholder="Veuillez saisir les réponses aux questions du sujet ici. Vous pouvez formater votre texte, créer des tableaux, des listes…"
+                                        minHeight="300px"
                                     />
                                 </div>
                             ) : (
@@ -663,12 +663,11 @@ export default function AntiCheatPortal() {
                                                 ))}
                                             </div>
                                         ) : (
-                                            <textarea
-                                                className="w-full bg-gray-50 border border-gray-200 text-gray-900 px-4 py-3 rounded-xl focus:outline-none focus:ring-2 min-h-[120px]"
-                                                style={{ "--tw-ring-color": "#1a237e33" } as React.CSSProperties}
-                                                placeholder="Saisissez votre réponse ici..."
+                                            <RichTextEditor
                                                 value={answers[q.id] || ""}
-                                                onChange={(e) => setAnswers({ ...answers, [q.id]: e.target.value })}
+                                                onChange={(html) => setAnswers({ ...answers, [q.id]: html })}
+                                                placeholder="Rédigez votre réponse ici — texte, tableaux, listes…"
+                                                minHeight="140px"
                                             />
                                         )}
                                     </div>
@@ -687,7 +686,7 @@ export default function AntiCheatPortal() {
                         </p>
                         <div className="bg-emerald-50 text-emerald-800 p-4 rounded-xl border border-emerald-100 mb-6 flex items-center justify-between">
                             <span className="font-bold text-sm">Réponses saisies</span>
-                            <span className="font-black text-lg">{Object.values(answers).filter(v => v !== "").length} / {examData.parsed_questions?.length || 0}</span>
+                            <span className="font-black text-lg">{Object.values(answers).filter(v => v !== "" && v !== "<p></p>").length} / {examData.parsed_questions?.length || 0}</span>
                         </div>
                         <button
                             onClick={submitExam}

@@ -46,7 +46,7 @@ export default function CandidateLayout({ children }: { children: React.ReactNod
 
 function Shell({ children }: { children: React.ReactNode }) {
     const pathname = usePathname();
-    const { dossier, logout } = useCandidate();
+    const { dossier, logout, examActive } = useCandidate();
     const [showLogoutModal, setShowLogoutModal] = useState(false);
 
     const initials = (dossier?.name || dossier?.public_id || "??").substring(0, 2).toUpperCase();
@@ -58,7 +58,7 @@ function Shell({ children }: { children: React.ReactNode }) {
     };
 
     return (
-        <div className="flex min-h-screen font-sans" style={{ backgroundColor: "#f4f6f9" }}>
+        <div className={`flex min-h-screen font-sans${examActive ? " overflow-hidden" : ""}`} style={{ backgroundColor: "#f4f6f9" }}>
             <AnimatePresence>
                 {showLogoutModal && (
                     <>
@@ -138,9 +138,9 @@ function Shell({ children }: { children: React.ReactNode }) {
                 )}
             </AnimatePresence>
 
-            {/* Sidebar desktop */}
+            {/* Sidebar desktop — masquée pendant l'examen */}
             <aside
-                className="fixed top-0 left-0 h-screen w-64 hidden md:flex flex-col z-20 shadow-lg"
+                className={`fixed top-0 left-0 h-screen w-64 hidden md:flex flex-col z-20 shadow-lg transition-transform duration-300 ${examActive ? "-translate-x-full pointer-events-none" : "translate-x-0"}`}
                 style={{ backgroundColor: "#ffffff", borderRight: "2px solid #e8eaf6" }}
             >
                 <div
@@ -234,9 +234,9 @@ function Shell({ children }: { children: React.ReactNode }) {
                 </div>
             </aside>
 
-            <main className="flex-1 flex flex-col min-w-0 md:pl-64">
+            <main className={`flex-1 flex flex-col min-w-0 transition-all duration-300 ${examActive ? "md:pl-0" : "md:pl-64"}`}>
                 <header
-                    className="fixed top-0 left-0 right-0 h-16 flex items-center justify-between px-4 md:hidden z-40 shadow-sm"
+                    className={`fixed top-0 left-0 right-0 h-16 flex items-center justify-between px-4 md:hidden z-40 shadow-sm transition-transform duration-300 ${examActive ? "-translate-y-full pointer-events-none" : "translate-y-0"}`}
                     style={{ backgroundColor: "#ffffff", borderBottom: "3px solid #2e7d32" }}
                 >
                     <Link href="/candidat" className="flex items-center gap-2">
@@ -261,8 +261,9 @@ function Shell({ children }: { children: React.ReactNode }) {
                 </div>
             </main>
 
+            {/* Nav mobile — masquée pendant l'examen */}
             <nav
-                className="md:hidden fixed bottom-0 left-0 right-0 z-40 flex items-center justify-around px-4 pb-safe"
+                className={`md:hidden fixed bottom-0 left-0 right-0 z-40 flex items-center justify-around px-4 pb-safe transition-transform duration-300 ${examActive ? "translate-y-full pointer-events-none" : "translate-y-0"}`}
                 style={{ backgroundColor: "#ffffff", borderTop: "2px solid #e8eaf6" }}
             >
                 {navItems.map((item) => {

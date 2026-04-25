@@ -6,9 +6,9 @@ import {
     Search, X, Eye, Loader2, ClipboardList,
     ShieldAlert, ShieldCheck, CheckCircle2, UserCheck,
     Edit3, Camera, FileText, AlertTriangle,
-    ChevronLeft, ChevronRight,
+    ChevronLeft, ChevronRight, Lock, Clock,
 } from "lucide-react";
-import { fetchSessions, fetchSessionResponses, API_URL } from "@/lib/api";
+import { fetchSessions, fetchSessionResponses, unblockExam, API_URL } from "@/lib/api";
 import { FilePreviewModal } from "@/components/FilePreviewModal";
 
 const ITEMS_PER_PAGE = 10;
@@ -22,7 +22,7 @@ function resolveUrl(url: string) {
 }
 
 function generateId(r: any) {
-    return r.public_id || r.candidate_id || `CAND-${r._id.slice(-6).toUpperCase()}`;
+    return r.candidate_id || `CAND-${r._id.slice(-6).toUpperCase()}`;
 }
 
 // ─── Page ────────────────────────────────────────────────────────────────────
@@ -34,6 +34,7 @@ export default function CorrectionsPage() {
     const [currentPage, setCurrentPage] = useState(1);
     const [selected, setSelected]    = useState<any>(null);
     const [previewFile, setPreviewFile] = useState<{ url: string; title?: string } | null>(null);
+    const [isUnblocking, setIsUnblocking] = useState(false);
 
     // ── Chargement de toutes les sessions ──────────────────────────────────
     useEffect(() => {
@@ -47,7 +48,7 @@ export default function CorrectionsPage() {
                 const all: any[] = ([] as any[]).concat(...chunks);
                 const withExam = all.filter(
                     (r: any) => r.status === "approved" &&
-                        (r.exam_document || (r.exam_answers && r.exam_answers.length > 0))
+                        (r.exam_document || (r.exam_answers && r.exam_answers.length > 0) || r.exam_blocked)
                 );
                 // dédoublonner par _id
                 const seen = new Set<string>();
@@ -128,21 +129,31 @@ export default function CorrectionsPage() {
                             {paginated.map(r => {
                                 const hasAlerts = r.cheat_alerts && r.cheat_alerts.length > 0;
                                 const isGraded  = !!r.exam_grade;
+                                const isBlocked = !!r.exam_blocked;
                                 return (
-                                    <tr key={r._id} className="hover:bg-gray-50/60 transition-colors">
+                                    <tr key={r._id} className={`hover:bg-gray-50/60 transition-colors ${isBlocked ? "bg-rose-50/40" : ""}`}>
                                         <td className="px-5 py-3.5">
                                             <div className="flex items-center gap-2.5">
-                                                <div className="h-8 w-8 rounded-lg bg-[#e8eaf6] flex items-center justify-center text-[#1a237e] font-bold text-xs shrink-0">
+                                                <div className={`h-8 w-8 rounded-lg flex items-center justify-center font-bold text-xs shrink-0 ${isBlocked ? "bg-rose-100 text-rose-700" : "bg-[#e8eaf6] text-[#1a237e]"}`}>
                                                     {generateId(r).slice(-4)}
                                                 </div>
-                                                <span className="font-bold text-gray-900 text-xs font-mono">{generateId(r)}</span>
+                                                <div>
+                                                    <span className="font-bold text-gray-900 text-xs font-mono">{generateId(r)}</span>
+                                                    {isBlocked && (
+                                                        <p className="text-[10px] text-rose-600 font-bold uppercase tracking-wider mt-0.5">Accès bloqué</p>
+                                                    )}
+                                                </div>
                                             </div>
                                         </td>
                                         <td className="px-5 py-3.5 hidden sm:table-cell">
                                             <span className="text-xs font-semibold text-gray-600 bg-gray-100 px-2 py-1 rounded-lg">{r.profile || "—"}</span>
                                         </td>
                                         <td className="px-5 py-3.5">
-                                            {hasAlerts ? (
+                                            {isBlocked ? (
+                                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-rose-100 text-rose-700 border border-rose-300">
+                                                    <Lock className="h-3 w-3" /> Bloqué
+                                                </span>
+                                            ) : hasAlerts ? (
                                                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-rose-50 text-rose-700 border border-rose-200">
                                                     <ShieldAlert className="h-3 w-3" /> {r.cheat_alerts.length} alerte(s)
                                                 </span>
@@ -153,7 +164,11 @@ export default function CorrectionsPage() {
                                             )}
                                         </td>
                                         <td className="px-5 py-3.5">
-                                            {isGraded ? (
+                                            {isBlocked ? (
+                                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-gray-100 text-gray-500 border border-gray-200">
+                                                    <Clock className="h-3 w-3" /> Non soumis
+                                                </span>
+                                            ) : isGraded ? (
                                                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
                                                     <CheckCircle2 className="h-3 w-3" /> {r.exam_grade}
                                                 </span>
@@ -245,20 +260,27 @@ export default function CorrectionsPage() {
                                 className="bg-white rounded-2xl shadow-2xl w-full pointer-events-auto flex flex-col overflow-hidden"
                                 style={{ border: "2px solid #e8eaf6", maxWidth: "900px", maxHeight: "90vh" }}
                             >
-                                {/* ── Header ── */}
-                                <div className="px-6 py-4 flex items-center justify-between shrink-0" style={{ backgroundColor: "#1a237e" }}>
+                                    {/* ── Header ── */}
+                                <div
+                                    className="px-6 py-4 flex items-center justify-between shrink-0"
+                                    style={{ backgroundColor: selected.exam_blocked ? "#b71c1c" : "#1a237e" }}
+                                >
                                     <div className="flex items-center gap-3">
                                         <div className="bg-white/10 p-2 rounded-xl">
-                                            <ClipboardList className="h-4 w-4 text-white" />
+                                            {selected.exam_blocked
+                                                ? <Lock className="h-4 w-4 text-white" />
+                                                : <ClipboardList className="h-4 w-4 text-white" />
+                                            }
                                         </div>
                                         <div>
-                                            <h2 className="text-sm font-bold text-white uppercase tracking-wide">Résultat de correction</h2>
+                                            <h2 className="text-sm font-bold text-white uppercase tracking-wide">
+                                                {selected.exam_blocked ? "Candidat Bloqué" : "Résultat de correction"}
+                                            </h2>
                                             <p className="text-white/60 text-xs font-mono mt-0.5">{generateId(selected)}</p>
                                         </div>
                                     </div>
                                     <div className="flex items-center gap-2">
-                                        {/* Badge anti-triche dans le header */}
-                                        {selected.cheat_alerts?.length > 0 && (
+                                        {!selected.exam_blocked && selected.cheat_alerts?.length > 0 && (
                                             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-rose-500 text-white">
                                                 <ShieldAlert className="h-3.5 w-3.5" />
                                                 {selected.cheat_alerts.length} alerte(s)
@@ -270,7 +292,77 @@ export default function CorrectionsPage() {
                                     </div>
                                 </div>
 
-                                {/* ── Body scrollable ── */}
+                                {/* ══════════════════════════════════════════
+                                    VUE SIMPLIFIÉE — Candidat bloqué
+                                ══════════════════════════════════════════ */}
+                                {selected.exam_blocked ? (
+                                    <div className="flex-1 flex flex-col justify-between p-6">
+                                        {/* Motif */}
+                                        <div className="space-y-4">
+                                            <div className="flex items-start gap-4 bg-rose-50 border border-rose-200 rounded-2xl p-5">
+                                                <div className="h-10 w-10 rounded-xl bg-rose-100 flex items-center justify-center shrink-0">
+                                                    <AlertTriangle className="h-5 w-5 text-rose-600" />
+                                                </div>
+                                                <div>
+                                                    <p className="text-xs font-bold uppercase tracking-widest text-rose-500 mb-1">Motif de blocage</p>
+                                                    <p className="font-bold text-rose-800 text-sm">
+                                                        {selected.exam_blocked_reason || "Accès bloqué pendant l'examen"}
+                                                    </p>
+                                                    {selected.exam_blocked_at && (
+                                                        <p className="text-xs text-rose-400 mt-1.5 flex items-center gap-1">
+                                                            <Clock className="h-3 w-3" />
+                                                            {new Date(selected.exam_blocked_at).toLocaleString("fr-FR", {
+                                                                day: "2-digit", month: "long", year: "numeric",
+                                                                hour: "2-digit", minute: "2-digit",
+                                                            })}
+                                                        </p>
+                                                    )}
+                                                </div>
+                                            </div>
+                                            <p className="text-xs text-gray-400 text-center">
+                                                En débloquant cet accès, un email sera automatiquement envoyé au candidat pour l'informer.
+                                            </p>
+                                        </div>
+
+                                        {/* Boutons */}
+                                        <div className="flex gap-3 pt-6">
+                                            <button
+                                                onClick={() => setSelected(null)}
+                                                className="flex-1 py-3 rounded-xl text-sm font-bold border hover:bg-gray-50 transition-colors"
+                                                style={{ borderColor: "#e0e0e0", color: "#555" }}
+                                            >
+                                                Fermer
+                                            </button>
+                                            <button
+                                                disabled={isUnblocking}
+                                                onClick={async () => {
+                                                    setIsUnblocking(true);
+                                                    try {
+                                                        const updated = await unblockExam(selected._id);
+                                                        setResponses(prev => prev.filter(r => r._id !== updated._id));
+                                                        setSelected(null);
+                                                    } catch (e: any) {
+                                                        alert(e.message || "Erreur lors du déblocage.");
+                                                    } finally {
+                                                        setIsUnblocking(false);
+                                                    }
+                                                }}
+                                                className="flex-1 py-3 rounded-xl text-sm font-bold text-white transition-all disabled:opacity-60 flex items-center justify-center gap-2"
+                                                style={{ backgroundColor: "#2e7d32", boxShadow: "0 4px 12px rgba(46,125,50,0.25)" }}
+                                            >
+                                                {isUnblocking
+                                                    ? <><Loader2 className="h-4 w-4 animate-spin" />Déblocage…</>
+                                                    : <><ShieldCheck className="h-4 w-4" />Débloquer l'accès</>
+                                                }
+                                            </button>
+                                        </div>
+                                    </div>
+                                ) : (
+
+                                /* ══════════════════════════════════════════
+                                    VUE COMPLÈTE — Copie soumise
+                                ══════════════════════════════════════════ */
+                                <>
                                 <div className="flex-1 overflow-y-auto" style={{ backgroundColor: "#f4f6f9" }}>
                                     <div className="p-5 space-y-5">
 
@@ -411,6 +503,8 @@ export default function CorrectionsPage() {
                                         Fermer
                                     </button>
                                 </div>
+                                </>
+                                )}
                             </div>
                         </motion.div>
                     </>

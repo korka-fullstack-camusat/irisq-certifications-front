@@ -10,6 +10,8 @@ interface CandidateCtx {
     refresh: () => Promise<void>;
     logout: () => void;
     setDossier: (d: CandidateDossier) => void;
+    examActive: boolean;
+    setExamActive: (v: boolean) => void;
 }
 
 const Ctx = createContext<CandidateCtx | undefined>(undefined);
@@ -19,6 +21,7 @@ export function CandidateProvider({ children }: { children: React.ReactNode }) {
     const pathname = usePathname();
     const [dossier, setDossier] = useState<CandidateDossier | null>(null);
     const [loading, setLoading] = useState(true);
+    const [examActive, setExamActive] = useState(false);
 
     const refresh = useCallback(async () => {
         try {
@@ -52,7 +55,7 @@ export function CandidateProvider({ children }: { children: React.ReactNode }) {
     }, [pathname]);
 
     return (
-        <Ctx.Provider value={{ dossier, loading, refresh, logout, setDossier }}>
+        <Ctx.Provider value={{ dossier, loading, refresh, logout, setDossier, examActive, setExamActive }}>
             {children}
         </Ctx.Provider>
     );

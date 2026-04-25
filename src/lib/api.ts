@@ -186,15 +186,74 @@ export async function updateEvaluatorDocument(responseId: string, documentUrl: s
     return res.json();
 }
 
-export async function updateExamGrade(responseId: string, data: { exam_grade: string; exam_status: string; exam_comments?: string }) {
+export interface AnswerGrade {
+    question_id: string;
+    points_earned: number;
+    max_points: number;
+    comment?: string;
+}
+
+export async function updateExamGrade(
+    responseId: string,
+    data: {
+        exam_grade?: string;
+        exam_status: string;
+        exam_comments?: string;
+        answer_grades?: AnswerGrade[];
+    }
+) {
     const res = await apiFetch(url(`responses/${responseId}/grade`), {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
         redirect: "follow",
     });
-    if (!res.ok) throw new Error("Failed to update exam grade");
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || "Failed to update exam grade");
+    }
     return res.json();
+}
+
+export async function lockCorrection(responseId: string) {
+    const res = await apiFetch(url(`responses/${responseId}/lock-correction`), {
+        method: "POST",
+        redirect: "follow",
+    });
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || "Failed to lock correction");
+    }
+    return res.json();
+}
+
+export async function unblockExam(responseId: string) {
+    const res = await apiFetch(url(`responses/${responseId}/unblock-exam`), {
+        method: "POST",
+        redirect: "follow",
+    });
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || "Failed to unblock exam");
+    }
+    return res.json();
+}
+
+export async function reportExamBlocked(reason = "Rechargement de page pendant l'examen") {
+    const token = typeof window !== "undefined" ? localStorage.getItem("candidate_token") : null;
+    if (!token) return;
+    await fetch(url("candidate/report-blocked"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ reason }),
+    }).catch(() => {});
+}
+
+export async function fetchExamByCertification(certification: string) {
+    const res = await apiFetch(url(`exams?certification=${encodeURIComponent(certification)}`), { redirect: "follow" });
+    if (!res.ok) throw new Error("Failed to fetch exam");
+    const exams = await res.json();
+    return exams.length > 0 ? exams[0] : null;
 }
 
 export async function fetchExams(opts?: { certification?: string; session_id?: string }) {
@@ -716,6 +775,13 @@ export interface CandidateExam {
     start_time?: string;
     session_id?: string;
     created_at?: string;
+    parsed_questions?: Array<{
+        id: string;
+        part?: string;
+        text: string;
+        type: string;
+        options?: string[];
+    }>;
 }
 
 export interface CandidateLoginResult {
