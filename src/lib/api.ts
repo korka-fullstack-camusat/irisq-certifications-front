@@ -220,6 +220,7 @@ export async function createExam(data: {
     document_url: string;
     duration_minutes?: number | null;
     session_id?: string | null;
+    start_time?: string | null;
 }) {
     const res = await apiFetch(url("exams"), {
         method: "POST",
@@ -622,6 +623,30 @@ export async function relancerCorrecteur(id: string): Promise<{ sent: boolean; p
     return res.json();
 }
 
+// ──────────────────────────────────────────────────────────────
+// Partage de copies (evaluateur → plateforme externe)
+// ──────────────────────────────────────────────────────────────
+
+export interface ShareCopyResult {
+    response_id: string;
+    shared: boolean;
+    shared_at: string;
+}
+
+export async function shareExamCopy(responseId: string): Promise<ShareCopyResult> {
+    const res = await apiFetch(url(`responses/${responseId}/share-copy`), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ shared_at: new Date().toISOString() }),
+        redirect: "follow",
+    });
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || "Échec du partage de la copie");
+    }
+    return res.json();
+}
+
 export async function toggleCorrecteurStatus(id: string): Promise<{ id: string; is_active: boolean }> {
     const res = await apiFetch(url(`correcteurs/${id}/toggle`), {
         method: "PATCH",
@@ -675,9 +700,22 @@ export interface CandidateDossier {
     documents_validation?: Record<string, DocumentValidationEntry>;
     exam_status?: string;
     exam_grade?: string;
+    exam_mode?: string;
+    exam_type?: string;
     final_grade?: string;
     final_appreciation?: string;
     must_change_password?: boolean;
+    exam_token?: string;
+}
+
+export interface CandidateExam {
+    _id: string;
+    certification?: string;
+    title?: string;
+    duration_minutes?: number;
+    start_time?: string;
+    session_id?: string;
+    created_at?: string;
 }
 
 export interface CandidateLoginResult {
@@ -690,11 +728,15 @@ export async function candidateLogin(publicId: string, password: string): Promis
     const res = await fetch(url("candidate/login"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ public_id: publicId, password }),
+        body: JSON.stringify({ public_id: publicId.trim(), password }),
     });
     if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        throw new Error(err.detail || "Identifiants invalides");
+        if (Array.isArray(err.detail)) {
+            const msg = err.detail.map((d: any) => d.msg || JSON.stringify(d)).join(", ");
+            throw new Error(msg || "Identifiants invalides");
+        }
+        throw new Error(typeof err.detail === "string" ? err.detail : "Identifiants invalides");
     }
     return res.json();
 }
@@ -728,6 +770,12 @@ export async function candidateChangePassword(currentPassword: string, newPasswo
 export async function candidateMe(): Promise<CandidateDossier> {
     const res = await candidateFetch(url("candidate/me"));
     if (!res.ok) throw new Error("Session expirée");
+    return res.json();
+}
+
+export async function fetchCandidateExam(): Promise<CandidateExam | null> {
+    const res = await candidateFetch(url("candidate/exam"));
+    if (!res.ok) return null;
     return res.json();
 }
 

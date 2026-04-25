@@ -9,6 +9,7 @@ import {
     Upload,
     LogOut,
     X,
+    BookOpen,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import Image from "next/image";
@@ -16,12 +17,14 @@ import { CandidateProvider, useCandidate } from "@/lib/candidate-context";
 
 const AUTH_PATHS = new Set([
     "/candidat/login",
+    "/candidat/register",
     "/candidat/change-password",
     "/candidat/forgot-password",
 ]);
 
 const navItems = [
     { name: "Tableau de bord", href: "/candidat", icon: LayoutDashboard },
+    { name: "Mon Examen", href: "/candidat/examen", icon: BookOpen },
     { name: "Mes dossiers", href: "/candidat/dossiers", icon: FolderOpen },
     { name: "Mes corrections", href: "/candidat/documents", icon: Upload },
 ];

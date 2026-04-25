@@ -82,7 +82,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (role === "RH" && !currentPath.startsWith("/dashboard")) {
             router.push("/dashboard");
         } else if (role === "EVALUATEUR" && !currentPath.startsWith("/evaluateur")) {
-            router.push("/evaluateur");
+            router.push("/evaluateur/dashboard");
         } else if (role === "CORRECTEUR" && !currentPath.startsWith("/correcteur")) {
             router.push("/correcteur");
         }

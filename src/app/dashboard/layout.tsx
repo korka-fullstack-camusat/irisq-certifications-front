@@ -13,6 +13,7 @@ import {
     ShieldCheck,
     Trophy,
     History,
+    XCircle,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import Image from "next/image";
@@ -32,8 +33,9 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
         { name: "Candidature en ligne",   href: "/dashboard/candidatures?mode=online",  icon: Monitor,         mode: "online"  as string | null },
         { name: "Candidature présentiel", href: "/dashboard/candidatures?mode=onsite",  icon: MapPin,          mode: "onsite"  as string | null },
         { name: "Candidatures validées",  href: "/dashboard/candidatures-validees",     icon: ShieldCheck,     mode: null      as string | null },
-        { name: "Candidats certifiés",    href: "/dashboard/candidats-certifies",       icon: Trophy,          mode: null      as string | null },
-        { name: "Historiques",            href: "/dashboard/historique",                icon: History,         mode: null      as string | null },
+        { name: "Candidats certifiés",      href: "/dashboard/candidats-certifies",           icon: Trophy,    mode: null      as string | null },
+        { name: "Candidats non certifiés", href: "/dashboard/candidats-non-certifies",        icon: XCircle,   mode: null      as string | null },
+        { name: "Historiques",            href: "/dashboard/historique",                     icon: History,   mode: null      as string | null },
     ];
 
     const handleLogout = () => {

@@ -47,6 +47,7 @@ export default function ExamensPage() {
     certification: "",
     title: "",
     duration_minutes: "" as string | number,
+    start_time: "",
   });
   const [file, setFile] = useState<File | null>(null);
 
@@ -97,6 +98,7 @@ export default function ExamensPage() {
         document_url: docUrl,
         duration_minutes: duration,
         session_id: selectedSessionId || null,
+        start_time: newExam.start_time || null,
       });
 
       closeModal();
@@ -139,7 +141,7 @@ export default function ExamensPage() {
     setShowModal(false);
     setFile(null);
     setUploadError(null);
-    setNewExam(prev => ({ ...prev, title: "", duration_minutes: "" }));
+    setNewExam(prev => ({ ...prev, title: "", duration_minutes: "", start_time: "" }));
   };
 
   const filteredExams = useMemo(() => exams.filter(e => {
@@ -347,7 +349,7 @@ export default function ExamensPage() {
                   <div>
                     <h3 className="font-bold text-gray-800 text-sm group-hover:text-[#1a237e] transition-colors">{exam.title}</h3>
                     <p className="text-xs text-gray-400 mt-0.5">{exam.certification}</p>
-                    <div className="flex items-center gap-3 mt-1">
+                    <div className="flex items-center gap-3 mt-1 flex-wrap">
                       <p className="text-[10px] text-gray-300 uppercase tracking-wider">
                         Créé le {new Date(exam.created_at).toLocaleDateString("fr-FR")}
                       </p>
@@ -356,6 +358,13 @@ export default function ExamensPage() {
                           style={{ backgroundColor: "#e8eaf6", color: "#1a237e" }}>
                           <Clock className="h-3 w-3" />
                           {exam.duration_minutes} min
+                        </span>
+                      )}
+                      {exam.start_time && (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full"
+                          style={{ backgroundColor: "#fff8e1", color: "#b45309" }}>
+                          <CalendarDays className="h-3 w-3" />
+                          {new Date(exam.start_time).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" })}
                         </span>
                       )}
                     </div>
@@ -543,6 +552,23 @@ export default function ExamensPage() {
                       style={{ "--tw-ring-color": "#1a237e33" } as React.CSSProperties}
                     />
                     <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400 font-semibold">min</span>
+                  </div>
+                </div>
+
+                {/* Date et heure de début */}
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">
+                    Date et heure de début
+                  </label>
+                  <div className="relative">
+                    <CalendarDays className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                    <input
+                      type="datetime-local"
+                      value={newExam.start_time}
+                      onChange={e => setNewExam({ ...newExam, start_time: e.target.value })}
+                      className="w-full pl-9 py-2.5 bg-[#f4f6f9] border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 transition-all"
+                      style={{ "--tw-ring-color": "#1a237e33" } as React.CSSProperties}
+                    />
                   </div>
                 </div>
 
