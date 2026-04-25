@@ -18,6 +18,8 @@ import {
     BookOpen,
     PlayCircle,
     CalendarDays,
+    Send,
+    Trophy,
 } from "lucide-react";
 
 import { useCandidate } from "@/lib/candidate-context";
@@ -79,8 +81,15 @@ export default function CandidateDashboardPage() {
 
     const hasToken = !!dossier.exam_token;
     const alreadySubmitted = dossier.exam_status === "submitted" || dossier.exam_status === "graded";
+    const examGraded = dossier.exam_status === "graded";
     const examStarted = exam?.start_time ? new Date(exam.start_time).getTime() <= now : true;
-    const showExamNotification = exam && hasToken && !alreadySubmitted;
+    const examExpired =
+        !!exam?.start_time &&
+        !!exam?.duration_minutes &&
+        new Date(exam.start_time).getTime() + exam.duration_minutes * 60 * 1000 < now;
+    const showExamExpiredNotification = !!exam && hasToken && !alreadySubmitted && examExpired;
+    const showExamNotification = !!exam && hasToken && !alreadySubmitted && !examExpired;
+    const showExamDoneNotification = alreadySubmitted;
     const examIsUrgent = showExamNotification && examStarted;
 
     return (
@@ -139,7 +148,7 @@ export default function CandidateDashboardPage() {
                     </h2>
                 </div>
 
-                {issues.length === 0 && !showExamNotification ? (
+                {issues.length === 0 && !showExamNotification && !showExamDoneNotification && !showExamExpiredNotification ? (
                     <div className="p-8 text-center">
                         <CheckCircle2 className="h-8 w-8 mx-auto text-emerald-500" />
                         <p className="mt-2 text-sm text-gray-600">Aucune action requise pour le moment.</p>
@@ -147,7 +156,66 @@ export default function CandidateDashboardPage() {
                     </div>
                 ) : (
                     <ul className="divide-y divide-gray-50">
-                        {/* ── Notification examen ── */}
+                        {/* ── Notification examen expiré ── */}
+                        {showExamExpiredNotification && exam && (
+                            <li className="px-6 py-4 flex items-start gap-3 bg-rose-50/70">
+                                <div className="h-10 w-10 rounded-xl flex items-center justify-center shrink-0 bg-rose-100">
+                                    <AlertTriangle className="h-5 w-5 text-rose-700" />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                    <p className="text-[10px] font-bold uppercase tracking-widest text-rose-700">
+                                        Période d&apos;examen écoulée
+                                    </p>
+                                    <p className="font-bold text-gray-800">
+                                        {exam.title || exam.certification}
+                                    </p>
+                                    <p className="text-xs text-rose-600 mt-0.5">
+                                        Le délai imparti pour cette épreuve est dépassé. Veuillez contacter le responsable IRISQ.
+                                    </p>
+                                </div>
+                                <span className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-2 rounded-lg shrink-0 bg-rose-100 text-rose-700">
+                                    <AlertTriangle className="h-3 w-3" />
+                                    Expiré
+                                </span>
+                            </li>
+                        )}
+
+                        {/* ── Notification examen terminé (soumis / corrigé) ── */}
+                        {showExamDoneNotification && (
+                            <li className={`px-6 py-4 flex items-start gap-3 ${examGraded ? "bg-emerald-50" : "bg-blue-50/60"}`}>
+                                <div className={`h-10 w-10 rounded-xl flex items-center justify-center shrink-0 ${examGraded ? "bg-emerald-100" : "bg-blue-100"}`}>
+                                    {examGraded
+                                        ? <Trophy className="h-5 w-5 text-emerald-700" />
+                                        : <Send className="h-5 w-5 text-blue-700" />
+                                    }
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                    <p className={`text-[10px] font-bold uppercase tracking-widest ${examGraded ? "text-emerald-700" : "text-blue-700"}`}>
+                                        {examGraded ? "Résultats disponibles" : "Examen soumis — En cours de correction"}
+                                    </p>
+                                    <p className="font-bold text-gray-800">
+                                        {exam?.title || exam?.certification || dossier.answers?.["Certification souhaitée"] || "Épreuve technique"}
+                                    </p>
+                                    {examGraded && dossier.final_grade != null && (
+                                        <p className="text-xs text-emerald-700 mt-0.5 font-semibold">
+                                            Note finale : <span className="font-black">{dossier.final_grade}</span>
+                                            {dossier.final_appreciation && <span className="ml-1 font-normal italic">— {dossier.final_appreciation}</span>}
+                                        </p>
+                                    )}
+                                    {!examGraded && (
+                                        <p className="text-xs text-blue-600 mt-0.5">
+                                            Votre copie a bien été transmise au correcteur. Vous recevrez vos résultats par email.
+                                        </p>
+                                    )}
+                                </div>
+                                <span className={`inline-flex items-center gap-1.5 text-xs font-bold px-3 py-2 rounded-lg shrink-0 ${examGraded ? "bg-emerald-100 text-emerald-700" : "bg-blue-100 text-blue-700"}`}>
+                                    {examGraded ? <Trophy className="h-3 w-3" /> : <CheckCircle2 className="h-3 w-3" />}
+                                    {examGraded ? "Corrigé" : "Soumis"}
+                                </span>
+                            </li>
+                        )}
+
+                        {/* ── Notification examen disponible ── */}
                         {showExamNotification && exam && (
                             <li className={`px-6 py-4 flex items-start gap-3 ${examIsUrgent ? "bg-emerald-50" : "bg-amber-50/60"}`}>
                                 <div className={`h-10 w-10 rounded-xl flex items-center justify-center shrink-0 ${examIsUrgent ? "bg-emerald-100" : "bg-amber-100"}`}>

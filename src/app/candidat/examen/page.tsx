@@ -10,7 +10,7 @@ import {
     ChevronRight, Send, X, PhoneCall,
 } from "lucide-react";
 import { useCandidate } from "@/lib/candidate-context";
-import { fetchCandidateExam, uploadFiles, submitExamWithAntiCheat, reportExamBlocked, type CandidateExam } from "@/lib/api";
+import { fetchCandidateExam, uploadFiles, submitExamWithAntiCheat, reportExamBlocked, candidateMe, type CandidateExam } from "@/lib/api";
 import RichTextEditor from "@/components/RichTextEditor";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -90,6 +90,8 @@ export default function CandidatExamenPage() {
     const [mediaStream, setMediaStream] = useState<MediaStream | null>(null);
     const videoRef = useRef<HTMLVideoElement | null>(null);
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
+    // Indique qu'on a déjà envoyé le rapport de blocage au serveur pour cette session
+    const hasReportedBlock = useRef(false);
 
     const videoRefCallback = useCallback((node: HTMLVideoElement) => {
         videoRef.current = node;
@@ -102,15 +104,59 @@ export default function CandidatExamenPage() {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [currentPage, setCurrentPage] = useState(0);
     const [showSubmitModal, setShowSubmitModal] = useState(false);
+    const [showExpiredModal, setShowExpiredModal] = useState(false);
 
     // ── Detect refresh during exam ──────────────────────────────────────────
+    // On détecte le rechargement via sessionStorage. On ne signale PAS encore
+    // le blocage au serveur — il faut d'abord vérifier si l'évaluateur a déjà
+    // débloqué cet accès (exam_blocked === false) pour éviter le cycle de
+    // re-blocage : débloque → candidat recharge → reportExamBlocked → re-bloque.
     useEffect(() => {
         if (typeof sessionStorage !== "undefined" && sessionStorage.getItem(EXAM_SESSION_KEY) === "1") {
             setPhase("blocked");
-            // Notifier le backend du blocage (silencieux)
-            reportExamBlocked("Rechargement de page pendant l'examen");
         }
     }, []);
+
+    // ── Reconciliation blocage local / état serveur ─────────────────────────
+    // Règle : ne signaler le blocage au serveur QUE SI l'évaluateur n'a pas
+    // déjà débloqué cet accès (exam_blocked !== false).
+    useEffect(() => {
+        // Attendre que le dossier soit chargé et que la phase soit "blocked"
+        if (dossierLoading || phase !== "blocked") return;
+
+        if (dossier?.exam_blocked === false) {
+            // L'évaluateur a explicitement débloqué → on remet à zéro
+            sessionStorage.removeItem(EXAM_SESSION_KEY);
+            hasReportedBlock.current = false;
+            setPhase("info");
+        } else if (!hasReportedBlock.current) {
+            // Premier passage sans déblocage évaluateur → on signale
+            hasReportedBlock.current = true;
+            reportExamBlocked("Rechargement de page pendant l'examen");
+        }
+    }, [dossier, dossierLoading, phase]);
+
+    // ── Polling quand la phase est "blocked" ────────────────────────────────
+    // Interroge le serveur toutes les 8 s pour détecter en temps réel si
+    // l'évaluateur a débloqué l'accès, sans obliger le candidat à recharger.
+    useEffect(() => {
+        if (phase !== "blocked") return;
+
+        const intervalId = setInterval(async () => {
+            try {
+                const updated = await candidateMe();
+                if (updated.exam_blocked === false) {
+                    sessionStorage.removeItem(EXAM_SESSION_KEY);
+                    hasReportedBlock.current = false;
+                    setPhase("info");
+                }
+            } catch {
+                // Silencieux — on réessaiera au prochain tick
+            }
+        }, 8000);
+
+        return () => clearInterval(intervalId);
+    }, [phase]);
 
     // ── Masquer le sidebar pendant l'examen ────────────────────────────────
     useEffect(() => {
@@ -246,6 +292,12 @@ export default function CandidatExamenPage() {
     const startExam = async () => {
         if (!dossier?.exam_token || !exam) return;
 
+        // Période expirée → modal informatif, on n'enchaîne pas
+        if (examExpired) {
+            setShowExpiredModal(true);
+            return;
+        }
+
         let stream: MediaStream;
         try {
             stream = await navigator.mediaDevices.getUserMedia({ video: true });
@@ -379,22 +431,45 @@ export default function CandidatExamenPage() {
 
     // ── Bloqué après un refresh ─────────────────────────────────────────────
     if (phase === "blocked") {
+        // Render guard : si le serveur dit que l'accès est débloqué
+        // (exam_blocked === false), on ne montre PAS l'écran bloqué.
+        // La reconciliation va mettre à jour phase → "info" dans le prochain cycle.
+        if (!dossierLoading && dossier?.exam_blocked === false) {
+            return (
+                <div className="flex items-center justify-center py-20">
+                    <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+                </div>
+            );
+        }
+
         return (
             <div className="flex items-center justify-center min-h-[60vh]">
-                <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="bg-white rounded-2xl p-10 max-w-md w-full text-center border-t-4 border-rose-600 shadow-xl">
+                <motion.div
+                    initial={{ scale: 0.9, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    className="bg-white rounded-2xl p-10 max-w-md w-full text-center border-t-4 border-rose-600 shadow-xl"
+                >
                     <div className="h-16 w-16 bg-rose-50 text-rose-600 rounded-full flex items-center justify-center mx-auto mb-6">
                         <Lock className="h-8 w-8" />
                     </div>
                     <h2 className="text-2xl font-black mb-3 text-rose-700">Accès bloqué</h2>
                     <p className="text-gray-600 text-sm leading-relaxed mb-6">
-                        Votre session d'examen a été interrompue suite à un rechargement de page.<br />
-                        Pour des raisons de sécurité, l'accès à l'épreuve est désormais verrouillé.
+                        Votre session d&apos;examen a été interrompue suite à un rechargement de page.<br />
+                        Pour des raisons de sécurité, l&apos;accès à l&apos;épreuve est désormais verrouillé.
                     </p>
-                    <div className="bg-rose-50 border border-rose-200 rounded-xl p-4 flex items-start gap-3 text-left">
+
+                    {/* Message contactez le responsable */}
+                    <div className="bg-rose-50 border border-rose-200 rounded-xl p-4 flex items-start gap-3 text-left mb-4">
                         <PhoneCall className="h-5 w-5 text-rose-600 shrink-0 mt-0.5" />
                         <p className="text-xs text-rose-800 font-medium">
                             Veuillez contacter le responsable IRISQ pour débloquer votre accès et obtenir une nouvelle session.
                         </p>
+                    </div>
+
+                    {/* Indicateur de surveillance automatique */}
+                    <div className="flex items-center justify-center gap-2 text-xs text-gray-400">
+                        <Loader2 className="h-3.5 w-3.5 animate-spin text-gray-400" />
+                        <span>Vérification automatique en cours… Cette page se mettra à jour dès que votre accès sera rétabli.</span>
                     </div>
                 </motion.div>
             </div>
@@ -437,92 +512,150 @@ export default function CandidatExamenPage() {
         );
     }
 
-    const hasToken = !!dossier?.exam_token;
-    const startTime = exam.start_time;
+    const hasToken   = !!dossier?.exam_token;
+    const startTime  = exam.start_time;
+
+    // L'examen a-t-il commencé ?
     const examStarted = !startTime || new Date(startTime).getTime() <= now;
+
+    // La période d'examen est-elle expirée ?
+    // Expirée = start_time + duration_minutes < maintenant
+    const examExpired =
+        !!startTime &&
+        !!exam.duration_minutes &&
+        new Date(startTime).getTime() + exam.duration_minutes * 60 * 1000 < now;
+
     const canStart = hasToken && examStarted;
 
     // ── Page INFO ────────────────────────────────────────────────────────────
     if (phase === "info") {
         return (
-            <div className="space-y-6">
-                <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="bg-white rounded-2xl overflow-hidden border border-gray-100 shadow-sm">
-                    <div className="px-6 py-4 flex items-center gap-3" style={{ backgroundColor: "#1a237e" }}>
-                        <div className="h-9 w-9 rounded-xl flex items-center justify-center" style={{ backgroundColor: "rgba(255,255,255,0.15)" }}>
-                            <BookOpen className="h-5 w-5 text-white" />
-                        </div>
-                        <div>
-                            <p className="text-[10px] font-bold tracking-[0.2em] text-white/60 uppercase">Épreuve Technique</p>
-                            <h1 className="text-base font-black text-white">{exam.title || "Examen"}</h1>
-                        </div>
-                    </div>
-
-                    <div className="p-6 space-y-4">
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                            <div className="flex items-center gap-3 p-3 rounded-xl" style={{ backgroundColor: "#f4f6f9" }}>
-                                <ShieldCheck className="h-5 w-5 shrink-0" style={{ color: "#1a237e" }} />
-                                <div>
-                                    <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Certification</p>
-                                    <p className="text-xs font-bold text-gray-800 leading-snug">{exam.certification}</p>
-                                </div>
+            <>
+                <div className="space-y-6">
+                    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="bg-white rounded-2xl overflow-hidden border border-gray-100 shadow-sm">
+                        <div className="px-6 py-4 flex items-center gap-3" style={{ backgroundColor: "#1a237e" }}>
+                            <div className="h-9 w-9 rounded-xl flex items-center justify-center" style={{ backgroundColor: "rgba(255,255,255,0.15)" }}>
+                                <BookOpen className="h-5 w-5 text-white" />
                             </div>
-                            {exam.duration_minutes && (
+                            <div>
+                                <p className="text-[10px] font-bold tracking-[0.2em] text-white/60 uppercase">Épreuve Technique</p>
+                                <h1 className="text-base font-black text-white">{exam.title || "Examen"}</h1>
+                            </div>
+                        </div>
+
+                        <div className="p-6 space-y-4">
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                                 <div className="flex items-center gap-3 p-3 rounded-xl" style={{ backgroundColor: "#f4f6f9" }}>
-                                    <Clock className="h-5 w-5 shrink-0" style={{ color: "#2e7d32" }} />
+                                    <ShieldCheck className="h-5 w-5 shrink-0" style={{ color: "#1a237e" }} />
                                     <div>
-                                        <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Durée</p>
-                                        <p className="text-xs font-bold text-gray-800">{exam.duration_minutes} minutes</p>
+                                        <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Certification</p>
+                                        <p className="text-xs font-bold text-gray-800 leading-snug">{exam.certification}</p>
                                     </div>
                                 </div>
-                            )}
-                            {startTime && (
-                                <div className="flex items-center gap-3 p-3 rounded-xl" style={{ backgroundColor: "#f4f6f9" }}>
-                                    <CalendarDays className="h-5 w-5 shrink-0" style={{ color: "#b45309" }} />
-                                    <div>
-                                        <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Début</p>
-                                        <p className="text-xs font-bold text-gray-800">{formatDateTime(startTime)}</p>
+                                {exam.duration_minutes && (
+                                    <div className="flex items-center gap-3 p-3 rounded-xl" style={{ backgroundColor: "#f4f6f9" }}>
+                                        <Clock className="h-5 w-5 shrink-0" style={{ color: "#2e7d32" }} />
+                                        <div>
+                                            <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Durée</p>
+                                            <p className="text-xs font-bold text-gray-800">{exam.duration_minutes} minutes</p>
+                                        </div>
                                     </div>
+                                )}
+                                {startTime && (
+                                    <div className="flex items-center gap-3 p-3 rounded-xl" style={{ backgroundColor: "#f4f6f9" }}>
+                                        <CalendarDays className="h-5 w-5 shrink-0" style={{ color: "#b45309" }} />
+                                        <div>
+                                            <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Début</p>
+                                            <p className="text-xs font-bold text-gray-800">{formatDateTime(startTime)}</p>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            {startTime && !examStarted && (
+                                <div className="border border-amber-200 rounded-xl p-5 text-center" style={{ backgroundColor: "#fffbeb" }}>
+                                    <p className="text-xs font-bold uppercase tracking-widest text-amber-600 mb-1">L&apos;examen commence dans</p>
+                                    <Countdown targetIso={startTime} />
                                 </div>
                             )}
-                        </div>
 
-                        {startTime && !examStarted && (
-                            <div className="border border-amber-200 rounded-xl p-5 text-center" style={{ backgroundColor: "#fffbeb" }}>
-                                <p className="text-xs font-bold uppercase tracking-widest text-amber-600 mb-1">L&apos;examen commence dans</p>
-                                <Countdown targetIso={startTime} />
+                            <div className="rounded-xl p-4" style={{ backgroundColor: "#fff1f2", borderLeft: "4px solid #e11d48" }}>
+                                <p className="text-xs font-bold uppercase tracking-widest mb-2" style={{ color: "#be123c" }}>Règles importantes</p>
+                                <ul className="text-xs space-y-1 pl-4 list-disc" style={{ color: "#9f1239" }}>
+                                    <li>L&apos;examen se déroule en plein écran obligatoirement.</li>
+                                    <li>Toute sortie du plein écran ou changement d&apos;onglet sera enregistré.</li>
+                                    <li>Le rechargement de la page entraîne le verrouillage immédiat de votre accès.</li>
+                                    <li>Le compte à rebours ne peut pas être mis en pause.</li>
+                                    <li>Assurez-vous d&apos;avoir une connexion internet stable avant de commencer.</li>
+                                </ul>
                             </div>
-                        )}
 
-                        <div className="rounded-xl p-4" style={{ backgroundColor: "#fff1f2", borderLeft: "4px solid #e11d48" }}>
-                            <p className="text-xs font-bold uppercase tracking-widest mb-2" style={{ color: "#be123c" }}>Règles importantes</p>
-                            <ul className="text-xs space-y-1 pl-4 list-disc" style={{ color: "#9f1239" }}>
-                                <li>L&apos;examen se déroule en plein écran obligatoirement.</li>
-                                <li>Toute sortie du plein écran ou changement d&apos;onglet sera enregistré.</li>
-                                <li>Le rechargement de la page entraîne le verrouillage immédiat de votre accès.</li>
-                                <li>Le compte à rebours ne peut pas être mis en pause.</li>
-                                <li>Assurez-vous d&apos;avoir une connexion internet stable avant de commencer.</li>
-                            </ul>
+                            {!hasToken && (
+                                <div className="flex items-start gap-3 p-4 rounded-xl border border-amber-200" style={{ backgroundColor: "#fffbeb" }}>
+                                    <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+                                    <p className="text-amber-700 text-xs">Votre accès à l&apos;examen n&apos;a pas encore été activé par l&apos;évaluateur.</p>
+                                </div>
+                            )}
+                            {hasToken && !examStarted && (
+                                <button disabled className="w-full inline-flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold text-white opacity-50 cursor-not-allowed" style={{ backgroundColor: "#1a237e" }}>
+                                    <Lock className="h-4 w-4" />Examen pas encore ouvert
+                                </button>
+                            )}
+                            {canStart && (
+                                <button onClick={startExam} className="w-full inline-flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold text-white transition-all hover:-translate-y-0.5" style={{ backgroundColor: "#2e7d32", boxShadow: "0 6px 16px rgba(46,125,50,0.3)" }}>
+                                    <PlayCircle className="h-4 w-4" />Commencer l&apos;examen
+                                </button>
+                            )}
                         </div>
+                    </motion.div>
+                </div>
 
-                        {!hasToken && (
-                            <div className="flex items-start gap-3 p-4 rounded-xl border border-amber-200" style={{ backgroundColor: "#fffbeb" }}>
-                                <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
-                                <p className="text-amber-700 text-xs">Votre accès à l&apos;examen n&apos;a pas encore été activé par l&apos;évaluateur.</p>
-                            </div>
-                        )}
-                        {hasToken && !examStarted && (
-                            <button disabled className="w-full inline-flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold text-white opacity-50 cursor-not-allowed" style={{ backgroundColor: "#1a237e" }}>
-                                <Lock className="h-4 w-4" />Examen pas encore ouvert
-                            </button>
-                        )}
-                        {canStart && (
-                            <button onClick={startExam} className="w-full inline-flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold text-white transition-all hover:-translate-y-0.5" style={{ backgroundColor: "#2e7d32", boxShadow: "0 6px 16px rgba(46,125,50,0.3)" }}>
-                                <PlayCircle className="h-4 w-4" />Commencer l&apos;examen
-                            </button>
-                        )}
-                    </div>
-                </motion.div>
-            </div>
+                {/* ── Modal période expirée ── */}
+                <AnimatePresence>
+                    {showExpiredModal && (
+                        <div className="fixed inset-0 z-[300] flex items-center justify-center p-4">
+                            <motion.div
+                                initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                                className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+                                onClick={() => setShowExpiredModal(false)}
+                            />
+                            <motion.div
+                                initial={{ scale: 0.9, opacity: 0, y: 16 }}
+                                animate={{ scale: 1, opacity: 1, y: 0 }}
+                                exit={{ scale: 0.9, opacity: 0, y: 16 }}
+                                className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden"
+                            >
+                                <div className="px-6 py-4 flex items-center justify-between border-t-4 border-rose-600" style={{ backgroundColor: "#fff1f2" }}>
+                                    <div className="flex items-center gap-2">
+                                        <AlertTriangle className="h-4 w-4 text-rose-600" />
+                                        <span className="text-sm font-bold uppercase tracking-widest text-rose-700">Période expirée</span>
+                                    </div>
+                                    <button onClick={() => setShowExpiredModal(false)} className="text-rose-400 hover:text-rose-700 transition-colors">
+                                        <X className="h-4 w-4" />
+                                    </button>
+                                </div>
+                                <div className="px-6 py-8 text-center">
+                                    <div className="h-16 w-16 bg-rose-50 rounded-full flex items-center justify-center mx-auto mb-5">
+                                        <AlertTriangle className="h-8 w-8 text-rose-600" />
+                                    </div>
+                                    <h3 className="font-black text-gray-800 text-lg mb-2">La période d&apos;examen est déjà écoulée</h3>
+                                    <p className="text-sm text-gray-500 leading-relaxed mb-6">
+                                        Le délai imparti pour cette épreuve est dépassé.<br />
+                                        Veuillez contacter le responsable IRISQ.
+                                    </p>
+                                    <button
+                                        onClick={() => setShowExpiredModal(false)}
+                                        className="w-full py-3 rounded-xl text-sm font-bold text-white"
+                                        style={{ backgroundColor: "#1a237e" }}
+                                    >
+                                        Fermer
+                                    </button>
+                                </div>
+                            </motion.div>
+                        </div>
+                    )}
+                </AnimatePresence>
+            </>
         );
     }
 
