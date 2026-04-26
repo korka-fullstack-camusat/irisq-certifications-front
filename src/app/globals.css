@@ -43,3 +43,13 @@ body {
   color: var(--foreground);
   font-family: var(--font-inter), sans-serif;
 }
+
+/* Supprime les flèches spinner sur tous les inputs number */
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  -moz-appearance: textfield;
+}

@@ -36,6 +36,68 @@ function url(path: string) {
     return `${API_URL}/${path.replace(/^\//, "")}`;
 }
 
+// ──────────────────────────────────────────────────────────────
+// Comité de Validation (COMITE role)
+// ──────────────────────────────────────────────────────────────
+
+export async function fetchComiteResponses(): Promise<any[]> {
+    const res = await apiFetch(url("comite/responses"), { redirect: "follow" });
+    if (!res.ok) throw new Error("Failed to fetch comite responses");
+    return res.json();
+}
+
+export async function submitJuryGrade(responseId: string, data: {
+    jury_grade: string;
+    jury_appreciation?: string;
+    jury_comments?: string;
+    jury_answer_grades?: any[];
+}): Promise<any> {
+    const res = await apiFetch(url(`comite/grade/${responseId}`), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+        redirect: "follow",
+    });
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || "Erreur lors de la soumission de la note jury");
+    }
+    return res.json();
+}
+
+export async function setFinalDecision(responseId: string, data: {
+    final_decision: "certified" | "rejected";
+    final_grade?: string;
+    final_appreciation?: string;
+    rejection_reason?: string;
+}): Promise<any> {
+    const res = await apiFetch(url(`comite/decide/${responseId}`), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+        redirect: "follow",
+    });
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || "Erreur lors de la décision finale");
+    }
+    return res.json();
+}
+
+export async function generateCertified(): Promise<{ generated: number; total_certified: number }> {
+    const res = await apiFetch(url("comite/generate-certified"), {
+        method: "POST",
+        redirect: "follow",
+    });
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || "Erreur lors de la génération");
+    }
+    return res.json();
+}
+
+// ──────────────────────────────────────────────────────────────
+
 export async function fetchForms() {
     const res = await apiFetch(url("forms"), { redirect: "follow" });
     if (!res.ok) throw new Error("Failed to fetch forms");
@@ -595,6 +657,7 @@ export interface Correcteur {
     role: string;
     is_active: boolean;
     created_at?: string;
+    correction_signed_at?: string | null;
 }
 
 export async function fetchCorrecteurs(): Promise<Correcteur[]> {

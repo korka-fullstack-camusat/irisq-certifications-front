@@ -1,13 +1,13 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   Loader2, CalendarDays, AlertCircle,
   CheckCircle2, Users, FileText, Award,
-  Bell, ChevronRight,
+  Bell, ChevronRight, PenLine, X,
 } from "lucide-react";
-import { fetchSessions, fetchSessionResponses, type Session } from "@/lib/api";
+import { fetchSessions, fetchSessionResponses, fetchCorrecteurs, type Session, type Correcteur } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import Link from "next/link";
 
@@ -54,6 +54,14 @@ export default function EvaluateurDashboardPage() {
   const [approved, setApproved]   = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
+  // ── Correcteurs (pour les notifications de signature) ──
+  const [correcteurs, setCorrecteurs]         = useState<Correcteur[]>([]);
+  const [dismissedSigns, setDismissedSigns]   = useState<Set<string>>(() => {
+    if (typeof window === "undefined") return new Set();
+    try { return new Set(JSON.parse(localStorage.getItem("irisq_dismissed_signs") || "[]")); }
+    catch { return new Set(); }
+  });
+
   // ── Chargement initial ──
   useEffect(() => {
     const cachedId = typeof window !== "undefined" ? localStorage.getItem(SESSION_ID_KEY) || "" : "";
@@ -69,6 +77,9 @@ export default function EvaluateurDashboardPage() {
         localStorage.setItem(SESSION_NAME_KEY, first.name);
       }
     }).catch(() => {}).finally(() => setIsLoadingSessions(false));
+
+    // Charger les correcteurs pour détecter les signatures
+    fetchCorrecteurs().then(setCorrecteurs).catch(() => {});
 
     if (cachedId) {
       setIsLoading(true);
@@ -101,6 +112,20 @@ export default function EvaluateurDashboardPage() {
         .sort((a: any, b: any) => new Date(b.submitted_at).getTime() - new Date(a.submitted_at).getTime())
     );
   }
+
+  // ── Notifications de signature correcteurs ──
+  const signedCorrecteurs = correcteurs.filter(
+    c => c.correction_signed_at && !dismissedSigns.has(c.id)
+  );
+
+  const dismissSign = (id: string) => {
+    setDismissedSigns(prev => {
+      const next = new Set(prev);
+      next.add(id);
+      localStorage.setItem("irisq_dismissed_signs", JSON.stringify([...next]));
+      return next;
+    });
+  };
 
   // ── Stats ──
   const noExaminer     = approved.filter(r => !r.assigned_examiner_email);
@@ -139,6 +164,65 @@ export default function EvaluateurDashboardPage() {
           Vue d&apos;ensemble des candidatures validées de la session en cours.
         </p>
       </div>
+
+      {/* ── Notifications : correcteurs ayant terminé leur correction ── */}
+      {signedCorrecteurs.length > 0 && (
+        <div className="space-y-2">
+          {signedCorrecteurs.map(c => (
+            <motion.div
+              key={c.id}
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              className="flex items-start gap-4 px-5 py-4 rounded-2xl border-2 shadow-md"
+              style={{ backgroundColor: "#f0fdf4", borderColor: "#86efac" }}
+            >
+              {/* Icône */}
+              <div className="shrink-0 h-10 w-10 rounded-xl flex items-center justify-center"
+                style={{ backgroundColor: "#dcfce7" }}>
+                <PenLine className="h-5 w-5" style={{ color: "#16a34a" }} />
+              </div>
+
+              {/* Texte */}
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-extrabold" style={{ color: "#14532d" }}>
+                  Correction terminée
+                </p>
+                <p className="text-sm text-green-800 mt-0.5">
+                  <span className="font-bold">{c.full_name || c.email}</span>
+                  {c.full_name && (
+                    <span className="text-green-600 font-normal"> ({c.email})</span>
+                  )}
+                  {" "}a déclaré avoir terminé de corriger toutes les copies qui lui sont assignées.
+                </p>
+                {c.correction_signed_at && (
+                  <p className="text-[11px] text-green-600 mt-1 font-medium">
+                    Signé le{" "}
+                    {new Date(c.correction_signed_at).toLocaleDateString("fr-FR", {
+                      day: "numeric", month: "long", year: "numeric",
+                      hour: "2-digit", minute: "2-digit",
+                    })}
+                  </p>
+                )}
+              </div>
+
+              {/* Lien + Fermer */}
+              <div className="flex items-center gap-2 shrink-0">
+                <Link href="/evaluateur/corrections"
+                  className="text-xs font-bold px-3 py-1.5 rounded-lg text-white hover:opacity-90 transition-opacity"
+                  style={{ backgroundColor: "#16a34a" }}>
+                  Voir les copies
+                </Link>
+                <button onClick={() => dismissSign(c.id)}
+                  title="Ignorer cette notification"
+                  className="p-1.5 rounded-lg text-green-400 hover:text-green-700 hover:bg-green-100 transition-colors">
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            </motion.div>
+          ))}
+        </div>
+      )}
 
       {/* ── Sélecteur de session (uniquement ici) ── */}
       <div className="bg-white rounded-2xl border shadow-sm p-4" style={{ borderColor: "#e8eaf6" }}>

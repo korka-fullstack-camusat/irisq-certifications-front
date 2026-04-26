@@ -85,6 +85,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             router.push("/evaluateur/dashboard");
         } else if (role === "CORRECTEUR" && !currentPath.startsWith("/correcteur")) {
             router.push("/correcteur");
+        } else if (role === "COMITE" && !currentPath.startsWith("/comite")) {
+            router.push("/comite");
         }
     };
 

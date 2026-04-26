@@ -196,10 +196,12 @@ export default function CandidateDashboardPage() {
                                     <p className="font-bold text-gray-800">
                                         {exam?.title || exam?.certification || dossier.answers?.["Certification souhaitée"] || "Épreuve technique"}
                                     </p>
-                                    {examGraded && dossier.final_grade != null && (
+                                    {examGraded && (dossier.final_grade != null || (dossier as any).exam_grade) && (
                                         <p className="text-xs text-emerald-700 mt-0.5 font-semibold">
-                                            Note finale : <span className="font-black">{dossier.final_grade}</span>
-                                            {dossier.final_appreciation && <span className="ml-1 font-normal italic">— {dossier.final_appreciation}</span>}
+                                            Note : <span className="font-black">{dossier.final_grade ?? (dossier as any).exam_grade}</span>
+                                            {(dossier.final_appreciation || (dossier as any).exam_appreciation) && (
+                                                <span className="ml-1 font-normal italic">— {dossier.final_appreciation ?? (dossier as any).exam_appreciation}</span>
+                                            )}
                                         </p>
                                     )}
                                     {!examGraded && (

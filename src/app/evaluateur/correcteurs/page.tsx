@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { UserCog, Plus, X, Eye, EyeOff, CheckCircle, AlertCircle, Loader2, Trash2, UserCheck, Search, Bell, PenLine } from "lucide-react";
+import { UserCog, Plus, X, Eye, EyeOff, CheckCircle, AlertCircle, Loader2, Trash2, UserCheck, Search, Bell, PenLine, ChevronLeft, ChevronRight } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
     fetchCorrecteurs,
@@ -421,6 +421,8 @@ function CreateModal({ onClose, onCreated }: CreateModalProps) {
     );
 }
 
+const ITEMS_PER_PAGE = 8;
+
 // ─── Page ────────────────────────────────────────────────────────────────────
 
 export default function CorrecteurPage() {
@@ -434,6 +436,7 @@ export default function CorrecteurPage() {
     const [assignTarget, setAssignTarget] = useState<Correcteur | null>(null);
     const [relancing, setRelancing] = useState<string | null>(null);
     const [search, setSearch] = useState("");
+    const [currentPage, setCurrentPage] = useState(1);
 
     const load = useCallback(async () => {
         setLoading(true);
@@ -497,6 +500,8 @@ export default function CorrecteurPage() {
         );
     });
 
+    const totalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE);
+    const paginated  = filtered.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
     const activeCount = correcteurs.filter(c => c.is_active).length;
 
     return (
@@ -540,7 +545,7 @@ export default function CorrecteurPage() {
                 <input
                     type="text"
                     value={search}
-                    onChange={e => setSearch(e.target.value)}
+                    onChange={e => { setSearch(e.target.value); setCurrentPage(1); }}
                     placeholder="Rechercher par nom ou email…"
                     className="w-full sm:w-80 px-4 py-2.5 rounded-xl border text-sm outline-none"
                     style={{ borderColor: "#e8eaf6", backgroundColor: "#fff" }}
@@ -584,11 +589,11 @@ export default function CorrecteurPage() {
                             </tr>
                         </thead>
                         <tbody>
-                            {filtered.map((c, i) => (
+                            {paginated.map((c, i) => (
                                 <tr
                                     key={c.id}
                                     style={{
-                                        borderBottom: i < filtered.length - 1 ? "1px solid #e8eaf6" : "none",
+                                        borderBottom: i < paginated.length - 1 ? "1px solid #e8eaf6" : "none",
                                         opacity: c.is_active ? 1 : 0.6,
                                     }}
                                 >
@@ -678,6 +683,49 @@ export default function CorrecteurPage() {
                             ))}
                         </tbody>
                     </table>
+
+                    {/* Pagination */}
+                    {totalPages > 1 && (
+                        <div className="px-5 py-3.5 border-t flex items-center justify-between bg-[#f4f6f9]" style={{ borderColor: "#e8eaf6" }}>
+                            <p className="text-xs text-gray-500">
+                                Page <span className="font-bold" style={{ color: "#1a237e" }}>{currentPage}</span> / {totalPages}
+                                {" "}· {filtered.length} correcteur{filtered.length > 1 ? "s" : ""}
+                            </p>
+                            <div className="flex items-center gap-1.5">
+                                <button
+                                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                                    disabled={currentPage === 1}
+                                    className="p-2 rounded-lg border border-gray-200 hover:bg-[#e8eaf6] disabled:opacity-40 transition-colors"
+                                    style={{ color: "#1a237e" }}
+                                >
+                                    <ChevronLeft className="h-4 w-4" />
+                                </button>
+                                {Array.from({ length: totalPages }, (_, i) => i + 1)
+                                    .filter(p => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 1)
+                                    .reduce<(number | string)[]>((acc, p, idx, arr) => {
+                                        if (idx > 0 && typeof arr[idx - 1] === "number" && (p as number) - (arr[idx - 1] as number) > 1) acc.push("...");
+                                        acc.push(p); return acc;
+                                    }, [])
+                                    .map((p, idx) => p === "..." ? (
+                                        <span key={`e-${idx}`} className="text-gray-400 text-sm px-1">…</span>
+                                    ) : (
+                                        <button key={p} onClick={() => setCurrentPage(p as number)}
+                                            className={`w-8 h-8 rounded-lg text-xs font-bold transition-colors ${currentPage === p ? "text-white" : "border border-gray-200 text-gray-600 hover:bg-[#e8eaf6]"}`}
+                                            style={currentPage === p ? { backgroundColor: "#1a237e" } : {}}>
+                                            {p}
+                                        </button>
+                                    ))}
+                                <button
+                                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                                    disabled={currentPage === totalPages}
+                                    className="p-2 rounded-lg border border-gray-200 hover:bg-[#e8eaf6] disabled:opacity-40 transition-colors"
+                                    style={{ color: "#1a237e" }}
+                                >
+                                    <ChevronRight className="h-4 w-4" />
+                                </button>
+                            </div>
+                        </div>
+                    )}
                 </div>
             )}
 
