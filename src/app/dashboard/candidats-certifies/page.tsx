@@ -281,7 +281,7 @@ function CandidatsCertifiesContent() {
                                     transition={{ delay: i * 0.02 }}
                                 >
                                     <Link
-                                        href={`/dashboard/candidatures-validees/${r._id}`}
+                                        href={`/dashboard/candidats-certifies/${r._id}`}
                                         className="group flex items-center gap-4 p-4 rounded-2xl bg-white border border-gray-100 shadow-sm hover:shadow-md hover:border-amber-200 transition-all"
                                     >
                                         <div

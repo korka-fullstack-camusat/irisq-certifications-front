@@ -1,16 +1,16 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
     Search, X, Eye, Loader2, FileText, CheckCircle2,
     ChevronLeft, ChevronRight, AlertTriangle, Pencil,
     Lock, Trophy, XCircle, Save, Plus, Trash2, Sparkles,
-    ShieldCheck, Clock,
+    ShieldCheck, Clock, SlidersHorizontal,
 } from "lucide-react";
 import {
     fetchComiteResponses, submitJuryGrade,
-    setFinalDecision, generateCertified, API_URL,
+    setFinalDecision as apiSetFinalDecision, generateCertified, API_URL,
 } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 
@@ -23,7 +23,7 @@ const APPRECIATIONS = [
     { label: "Passable",     value: "Passable",     color: "#e65100", bg: "#fff3e0" },
     { label: "Satisfaisant", value: "Satisfaisant", color: "#1565c0", bg: "#e3f2fd" },
     { label: "Bien",         value: "Bien",         color: "#2e7d32", bg: "#e8f5e9" },
-    { label: "Très bien",    value: "Très bien",    color: "#4a148c", bg: "#f3e5f5" },
+    { label: "Très bien",    value: "Très bien",    color: "#1a237e", bg: "#e8eaf6" },
 ];
 
 const REJECTION_REASONS = [
@@ -73,14 +73,36 @@ function formatDate(iso: string) {
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
+const PREDEFINED_FORMATIONS = [
+    "Implementor ISO/IEC17025:2017",
+    "Lead Implementor ISO/IEC17025:2017",
+    "Junior Implementor ISO 9001:2015",
+    "Implementor ISO 9001:2015",
+    "Lead Implementor ISO 9001:2015",
+    "Junior Implementor ISO 14001:2015",
+    "Implementor ISO 14001:2015",
+    "Lead Implementor ISO 14001:2015",
+];
+
 export default function ComitePage() {
     const { user, isLoading: isAuthLoading } = useAuth();
 
-    const [responses, setResponses]   = useState<any[]>([]);
-    const [isLoading, setIsLoading]   = useState(true);
-    const [searchQuery, setSearchQuery] = useState("");
-    const [currentPage, setCurrentPage] = useState(1);
-    const [selected, setSelected]     = useState<any>(null);
+    const [responses, setResponses]       = useState<any[]>([]);
+    const [isLoading, setIsLoading]       = useState(true);
+    const [searchQuery, setSearchQuery]   = useState("");
+    const [selectedFormation, setSelectedFormation] = useState("");
+    const [showFilterModal, setShowFilterModal] = useState(false);
+    const [currentPage, setCurrentPage]   = useState(1);
+    const [selected, setSelected]         = useState<any>(null);
+
+    // Init formation filter from URL (?formation=...)
+    useEffect(() => {
+        if (typeof window !== "undefined") {
+            const params = new URLSearchParams(window.location.search);
+            const f = params.get("formation");
+            if (f) setSelectedFormation(f);
+        }
+    }, []);
 
     // PDF.js
     const [pdfjsReady, setPdfjsReady]         = useState(false);
@@ -304,7 +326,7 @@ export default function ComitePage() {
         setIsSubmittingDecision(true);
         try {
             const reason = rejectionReason === "Autre" ? customReason : rejectionReason;
-            const updated = await setFinalDecision(selected._id, {
+            const updated = await apiSetFinalDecision(selected._id, {
                 final_decision: finalDecision,
                 final_grade: finalGrade || effectiveJuryGrade() || selected.exam_grade,
                 final_appreciation: finalAppreciation || undefined,
@@ -328,25 +350,37 @@ export default function ComitePage() {
     };
 
     // ── Filtrage + pagination ─────────────────────────────────────────────────
+    // Count per formation (0 if no copies in that formation)
+    const formationCounts = useMemo(() => {
+        const map = new Map<string, number>();
+        for (const f of PREDEFINED_FORMATIONS) map.set(f, 0);
+        for (const r of responses) {
+            const f = (r.answers?.["Certification souhaitée"] || "").trim();
+            if (map.has(f)) map.set(f, (map.get(f) || 0) + 1);
+        }
+        return map;
+    }, [responses]);
+
     const filtered = responses.filter(r => {
         const q = searchQuery.toLowerCase();
-        return generateId(r).toLowerCase().includes(q) ||
+        const matchesSearch = generateId(r).toLowerCase().includes(q) ||
             (r.answers?.["Certification souhaitée"] || "").toLowerCase().includes(q) ||
             (r.assigned_examiner_email || "").toLowerCase().includes(q);
+        const matchesFormation = !selectedFormation ||
+            (r.answers?.["Certification souhaitée"] || "").trim() === selectedFormation;
+        return matchesSearch && matchesFormation;
     });
     const totalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE);
     const paginated  = filtered.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
 
-    const certified  = responses.filter(r => r.final_decision === "certified").length;
-    const rejected   = responses.filter(r => r.final_decision === "rejected").length;
-    const pending_decision = responses.filter(r => !r.final_decision).length;
+    const certified = responses.filter(r => r.final_decision === "certified").length;
 
     // ── Calcul totaux annotations jury ────────────────────────────────────────
     const { earned: juryEarned, max: juryMax } = computedJury();
 
     if (isAuthLoading || !user) return (
         <div className="min-h-screen flex items-center justify-center">
-            <Loader2 className="animate-spin h-8 w-8" style={{ color: "#4a148c" }} />
+            <Loader2 className="animate-spin h-8 w-8" style={{ color: "#1a237e" }} />
         </div>
     );
 
@@ -356,7 +390,7 @@ export default function ComitePage() {
             {/* ── En-tête ── */}
             <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
                 <div>
-                    <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight" style={{ color: "#4a148c" }}>
+                    <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight" style={{ color: "#1a237e" }}>
                         Comité de Validation
                     </h1>
                     <p className="text-gray-400 text-sm mt-1">
@@ -390,45 +424,170 @@ export default function ComitePage() {
                 )}
             </AnimatePresence>
 
-            {/* ── Stats ── */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                {[
-                    { label: "Total copies", value: responses.length,  color: "#4a148c", bg: "#f3e5f5" },
-                    { label: "En attente",   value: pending_decision,  color: "#e65100", bg: "#fff3e0" },
-                    { label: "Certifiés",    value: certified,         color: "#2e7d32", bg: "#e8f5e9" },
-                    { label: "Rejetés",      value: rejected,          color: "#c62828", bg: "#ffebee" },
-                ].map(s => (
-                    <div key={s.label} className="bg-white rounded-2xl px-5 py-4 shadow-sm border" style={{ borderColor: "#e8eaf6" }}>
-                        <p className="text-xs text-gray-500 font-semibold uppercase tracking-wide">{s.label}</p>
-                        <p className="text-3xl font-black mt-1" style={{ color: s.color }}>{s.value}</p>
-                    </div>
-                ))}
+            {/* ── Barre de recherche + filtre ── */}
+            <div className="flex items-center gap-2">
+                <div className="flex-1 bg-white p-3.5 rounded-xl shadow-sm border flex items-center gap-3" style={{ borderColor: "#e8eaf6" }}>
+                    <Search className="h-4 w-4 shrink-0" style={{ color: "#1a237e" }} />
+                    <input type="text" placeholder="Rechercher par matricule, certification, correcteur…"
+                        className="flex-1 bg-transparent border-none focus:ring-0 text-sm text-gray-700 placeholder-gray-400"
+                        value={searchQuery} onChange={e => { setSearchQuery(e.target.value); setCurrentPage(1); }} />
+                    {searchQuery && (
+                        <button onClick={() => { setSearchQuery(""); setCurrentPage(1); }}
+                            className="p-1 hover:bg-gray-100 rounded-full text-gray-400">
+                            <X className="h-4 w-4" />
+                        </button>
+                    )}
+                </div>
+
+                {/* Bouton filtre */}
+                <button
+                    onClick={() => setShowFilterModal(true)}
+                    className="relative flex items-center gap-2 px-4 py-3.5 rounded-xl border text-sm font-bold transition-all hover:shadow-sm shrink-0"
+                    style={{
+                        borderColor: selectedFormation ? "#1a237e" : "#e8eaf6",
+                        backgroundColor: selectedFormation ? "#1a237e" : "white",
+                        color: selectedFormation ? "white" : "#555",
+                    }}
+                >
+                    <SlidersHorizontal className="h-4 w-4" />
+                    Filtrer
+                    {selectedFormation && (
+                        <span className="absolute -top-1.5 -right-1.5 h-4 w-4 rounded-full text-[9px] font-black flex items-center justify-center text-white"
+                            style={{ backgroundColor: "#c62828" }}>1</span>
+                    )}
+                </button>
             </div>
 
-            {/* ── Recherche ── */}
-            <div className="bg-white p-3.5 rounded-xl shadow-sm border flex items-center gap-3" style={{ borderColor: "#e8eaf6" }}>
-                <Search className="h-4 w-4 shrink-0" style={{ color: "#4a148c" }} />
-                <input type="text" placeholder="Rechercher par matricule, certification, correcteur…"
-                    className="flex-1 bg-transparent border-none focus:ring-0 text-sm text-gray-700 placeholder-gray-400"
-                    value={searchQuery} onChange={e => { setSearchQuery(e.target.value); setCurrentPage(1); }} />
-                {searchQuery && <button onClick={() => { setSearchQuery(""); setCurrentPage(1); }} className="p-1 hover:bg-gray-100 rounded-full text-gray-400"><X className="h-4 w-4" /></button>}
-            </div>
+            {/* Badge certification active */}
+            {selectedFormation && (
+                <div className="flex items-center gap-2">
+                    <span className="text-xs text-gray-400">Filtre actif :</span>
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border-2"
+                        style={{ borderColor: "#1a237e", color: "#1a237e", backgroundColor: "#e8eaf6" }}>
+                        {selectedFormation}
+                        <button onClick={() => { setSelectedFormation(""); setCurrentPage(1); }}
+                            className="ml-0.5 hover:opacity-70">
+                            <X className="h-3 w-3" />
+                        </button>
+                    </span>
+                </div>
+            )}
+
+            {/* ══ Modal filtre ══ */}
+            <AnimatePresence>
+                {showFilterModal && (
+                    <>
+                        <motion.div key="filter-overlay"
+                            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                            className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm"
+                            onClick={() => setShowFilterModal(false)} />
+                        <motion.div key="filter-modal"
+                            initial={{ opacity: 0, scale: 0.93, y: 12 }}
+                            animate={{ opacity: 1, scale: 1, y: 0 }}
+                            exit={{ opacity: 0, scale: 0.93, y: 12 }}
+                            transition={{ duration: 0.2, ease: "easeOut" }}
+                            className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
+                            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden pointer-events-auto"
+                                style={{ border: "2px solid #e8eaf6" }}>
+
+                                {/* Header */}
+                                <div className="px-6 py-4 flex items-center justify-between"
+                                    style={{ backgroundColor: "#1a237e" }}>
+                                    <div className="flex items-center gap-2">
+                                        <SlidersHorizontal className="h-4 w-4 text-white/80" />
+                                        <span className="text-sm font-bold uppercase tracking-widest text-white">
+                                            Filtrer par certification
+                                        </span>
+                                    </div>
+                                    <button onClick={() => setShowFilterModal(false)}
+                                        className="text-white/60 hover:text-white transition-colors">
+                                        <X className="h-4 w-4" />
+                                    </button>
+                                </div>
+
+                                {/* Corps */}
+                                <div className="px-6 py-5 space-y-2 overflow-y-auto" style={{ maxHeight: "60vh" }}>
+                                    {/* Option "Toutes" */}
+                                    <button
+                                        onClick={() => { setSelectedFormation(""); setCurrentPage(1); setShowFilterModal(false); }}
+                                        className="w-full flex items-center justify-between px-4 py-3 rounded-xl border-2 text-sm font-semibold transition-all text-left"
+                                        style={{
+                                            borderColor: !selectedFormation ? "#1a237e" : "#e8eaf6",
+                                            backgroundColor: !selectedFormation ? "#e8eaf6" : "white",
+                                            color: !selectedFormation ? "#1a237e" : "#374151",
+                                        }}
+                                    >
+                                        <span>Toutes les certifications</span>
+                                        <span className="text-xs font-bold px-2 py-0.5 rounded-full"
+                                            style={{ backgroundColor: !selectedFormation ? "#1a237e" : "#f3f4f6", color: !selectedFormation ? "white" : "#374151" }}>
+                                            {responses.length}
+                                        </span>
+                                    </button>
+
+                                    {/* Séparateur */}
+                                    <div className="pt-1 pb-0.5">
+                                        <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 px-1">
+                                            Certifications
+                                        </p>
+                                    </div>
+
+                                    {/* Toutes les certifications prédéfinies */}
+                                    {PREDEFINED_FORMATIONS.map(f => {
+                                        const count = formationCounts.get(f) || 0;
+                                        const isActive = selectedFormation === f;
+                                        return (
+                                            <button
+                                                key={f}
+                                                onClick={() => { setSelectedFormation(f); setCurrentPage(1); setShowFilterModal(false); }}
+                                                className="w-full flex items-center justify-between px-4 py-3 rounded-xl border-2 text-sm font-semibold transition-all text-left"
+                                                style={{
+                                                    borderColor: isActive ? "#1a237e" : "#e8eaf6",
+                                                    backgroundColor: isActive ? "#e8eaf6" : "white",
+                                                    color: isActive ? "#1a237e" : "#374151",
+                                                }}
+                                            >
+                                                <span className="leading-snug">{f}</span>
+                                                <span className="text-xs font-bold px-2 py-0.5 rounded-full shrink-0 ml-2"
+                                                    style={{
+                                                        backgroundColor: isActive ? "#1a237e" : count > 0 ? "#f3f4f6" : "#fafafa",
+                                                        color: isActive ? "white" : count > 0 ? "#374151" : "#d1d5db",
+                                                    }}>
+                                                    {count}
+                                                </span>
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+
+                                {/* Footer */}
+                                <div className="px-6 pb-5">
+                                    <button
+                                        onClick={() => setShowFilterModal(false)}
+                                        className="w-full py-2.5 rounded-xl text-sm font-bold border border-gray-200 text-gray-500 hover:bg-gray-50 transition-colors">
+                                        Fermer
+                                    </button>
+                                </div>
+                            </div>
+                        </motion.div>
+                    </>
+                )}
+            </AnimatePresence>
 
             {/* ── Tableau ── */}
             {isLoading ? (
-                <div className="flex flex-col items-center justify-center py-24" style={{ color: "#4a148c" }}>
+                <div className="flex flex-col items-center justify-center py-24" style={{ color: "#1a237e" }}>
                     <Loader2 className="h-8 w-8 animate-spin mb-3" />
                     <p className="text-sm font-bold animate-pulse">Chargement…</p>
                 </div>
             ) : filtered.length === 0 ? (
                 <div className="bg-white rounded-2xl p-16 text-center border shadow-sm" style={{ borderColor: "#e8eaf6" }}>
-                    <CheckCircle2 className="h-12 w-12 mx-auto mb-4 opacity-20" style={{ color: "#4a148c" }} />
+                    <CheckCircle2 className="h-12 w-12 mx-auto mb-4 opacity-20" style={{ color: "#1a237e" }} />
                     <p className="text-sm font-medium text-gray-400">Aucune copie corrigée trouvée.</p>
                 </div>
             ) : (
                 <div className="bg-white rounded-2xl border shadow-sm overflow-hidden" style={{ borderColor: "#e8eaf6" }}>
                     <table className="w-full text-sm text-left">
-                        <thead className="text-xs uppercase font-bold border-b" style={{ backgroundColor: "#f4f6f9", borderColor: "#e8eaf6", color: "#4a148c" }}>
+                        <thead className="text-xs uppercase font-bold border-b" style={{ backgroundColor: "#f4f6f9", borderColor: "#e8eaf6", color: "#1a237e" }}>
                             <tr>
                                 <th className="px-5 py-3.5">Candidat</th>
                                 <th className="px-5 py-3.5 hidden sm:table-cell">Certification</th>
@@ -448,7 +607,7 @@ export default function ComitePage() {
                                         <td className="px-5 py-3.5">
                                             <div className="flex items-center gap-2.5">
                                                 <div className="h-8 w-8 rounded-lg flex items-center justify-center font-bold text-xs shrink-0 text-white"
-                                                    style={{ backgroundColor: "#4a148c" }}>
+                                                    style={{ backgroundColor: "#1a237e" }}>
                                                     {id.slice(-4)}
                                                 </div>
                                                 <div>
@@ -474,7 +633,7 @@ export default function ComitePage() {
                                         <td className="px-5 py-3.5 text-center">
                                             {r.jury_grade ? (
                                                 <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold border"
-                                                    style={{ background: "#ede7f6", color: "#4a148c", borderColor: "#ce93d8" }}>
+                                                    style={{ background: "#e3f2fd", color: "#1a237e", borderColor: "#90caf9" }}>
                                                     {r.jury_grade}
                                                 </span>
                                             ) : (
@@ -502,7 +661,7 @@ export default function ComitePage() {
                                         <td className="px-5 py-3.5 text-right">
                                             <button onClick={() => openModal(r)}
                                                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition-all hover:-translate-y-0.5"
-                                                style={{ borderColor: "#4a148c", color: "#4a148c", backgroundColor: "#f3e5f5" }}>
+                                                style={{ borderColor: "#1a237e", color: "#1a237e", backgroundColor: "#e3f2fd" }}>
                                                 <Eye className="h-3.5 w-3.5" /> Valider
                                             </button>
                                         </td>
@@ -516,11 +675,11 @@ export default function ComitePage() {
                     {totalPages > 1 && (
                         <div className="px-5 py-3.5 border-t flex items-center justify-between bg-[#f4f6f9]" style={{ borderColor: "#e8eaf6" }}>
                             <p className="text-xs text-gray-500">
-                                Page <span className="font-bold" style={{ color: "#4a148c" }}>{currentPage}</span> / {totalPages} · {filtered.length} copie{filtered.length > 1 ? "s" : ""}
+                                Page <span className="font-bold" style={{ color: "#1a237e" }}>{currentPage}</span> / {totalPages} · {filtered.length} copie{filtered.length > 1 ? "s" : ""}
                             </p>
                             <div className="flex items-center gap-1.5">
                                 <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}
-                                    className="p-2 rounded-lg border border-gray-200 hover:bg-[#f3e5f5] disabled:opacity-40 transition-colors" style={{ color: "#4a148c" }}>
+                                    className="p-2 rounded-lg border border-gray-200 hover:bg-[#e3f2fd] disabled:opacity-40 transition-colors" style={{ color: "#1a237e" }}>
                                     <ChevronLeft className="h-4 w-4" />
                                 </button>
                                 {Array.from({ length: totalPages }, (_, i) => i + 1)
@@ -533,13 +692,13 @@ export default function ComitePage() {
                                         <span key={`e-${i}`} className="text-gray-400 text-sm px-1">…</span>
                                     ) : (
                                         <button key={p} onClick={() => setCurrentPage(p as number)}
-                                            className={`w-8 h-8 rounded-lg text-xs font-bold ${currentPage === p ? "text-white" : "border border-gray-200 text-gray-600 hover:bg-[#f3e5f5]"}`}
-                                            style={currentPage === p ? { backgroundColor: "#4a148c" } : {}}>
+                                            className={`w-8 h-8 rounded-lg text-xs font-bold ${currentPage === p ? "text-white" : "border border-gray-200 text-gray-600 hover:bg-[#e3f2fd]"}`}
+                                            style={currentPage === p ? { backgroundColor: "#1a237e" } : {}}>
                                             {p}
                                         </button>
                                     ))}
                                 <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}
-                                    className="p-2 rounded-lg border border-gray-200 hover:bg-[#f3e5f5] disabled:opacity-40 transition-colors" style={{ color: "#4a148c" }}>
+                                    className="p-2 rounded-lg border border-gray-200 hover:bg-[#e3f2fd] disabled:opacity-40 transition-colors" style={{ color: "#1a237e" }}>
                                     <ChevronRight className="h-4 w-4" />
                                 </button>
                             </div>
@@ -567,7 +726,7 @@ export default function ComitePage() {
                             style={{ width: "98vw", height: "96vh" }}
                         >
                             {/* Header */}
-                            <div className="px-5 py-3.5 flex items-center justify-between shrink-0" style={{ backgroundColor: "#4a148c" }}>
+                            <div className="px-5 py-3.5 flex items-center justify-between shrink-0" style={{ backgroundColor: "#1a237e" }}>
                                 <div className="flex items-center gap-3">
                                     <div className="bg-white/10 p-1.5 rounded-lg"><ShieldCheck className="h-4 w-4 text-white" /></div>
                                     <div>
@@ -726,12 +885,12 @@ export default function ComitePage() {
                                                     <div className="absolute pointer-events-none" style={{ top: "2%", right: "2%", zIndex: 30 }}>
                                                         <div className="flex flex-col items-center gap-1" style={{ transform: "rotate(-8deg)" }}>
                                                             <div className="flex flex-col items-center justify-center rounded-full border-[4px]"
-                                                                style={{ width: 88, height: 88, borderColor: "#4a148c", backgroundColor: "rgba(255,255,255,0.95)", boxShadow: "0 0 0 2px rgba(74,20,140,0.15), 0 4px 16px rgba(74,20,140,0.3)" }}>
+                                                                style={{ width: 88, height: 88, borderColor: "#1a237e", backgroundColor: "rgba(255,255,255,0.95)", boxShadow: "0 0 0 2px rgba(74,20,140,0.15), 0 4px 16px rgba(74,20,140,0.3)" }}>
                                                                 <span className="font-black leading-tight text-center px-1"
-                                                                    style={{ fontSize: selected.final_grade.length > 5 ? 14 : 20, color: "#4a148c", lineHeight: 1.1 }}>
+                                                                    style={{ fontSize: selected.final_grade.length > 5 ? 14 : 20, color: "#1a237e", lineHeight: 1.1 }}>
                                                                     {selected.final_grade}
                                                                 </span>
-                                                                <span className="font-black uppercase tracking-widest" style={{ fontSize: 7, color: "#4a148c", opacity: 0.6 }}>FINAL</span>
+                                                                <span className="font-black uppercase tracking-widest" style={{ fontSize: 7, color: "#1a237e", opacity: 0.6 }}>FINAL</span>
                                                             </div>
                                                             {selected.final_decision === "certified" && (
                                                                 <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-green-100 text-green-800">Certifié</span>
@@ -831,8 +990,8 @@ export default function ComitePage() {
                                         )}
 
                                         {/* ── Décision finale ── */}
-                                        <div className="bg-white rounded-xl border-2 p-3 space-y-3" style={{ borderColor: selected.final_decision ? (selected.final_decision === "certified" ? "#2e7d32" : "#c62828") : "#4a148c" }}>
-                                            <p className="text-[10px] font-black uppercase tracking-widest" style={{ color: "#4a148c" }}>Décision finale</p>
+                                        <div className="bg-white rounded-xl border-2 p-3 space-y-3" style={{ borderColor: selected.final_decision ? (selected.final_decision === "certified" ? "#2e7d32" : "#c62828") : "#1a237e" }}>
+                                            <p className="text-[10px] font-black uppercase tracking-widest" style={{ color: "#1a237e" }}>Décision finale</p>
 
                                             {selected.final_decision ? (
                                                 /* Décision déjà prise */
@@ -880,7 +1039,7 @@ export default function ComitePage() {
                                                         <input type="text" value={finalGrade} onChange={e => setFinalGrade(e.target.value)}
                                                             placeholder={selected.jury_grade || selected.exam_grade || "Ex: 15/20"}
                                                             className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm font-mono font-bold focus:outline-none"
-                                                            style={{ color: "#4a148c" }} />
+                                                            style={{ color: "#1a237e" }} />
                                                     </div>
 
                                                     {/* Appréciation finale */}
@@ -917,7 +1076,7 @@ export default function ComitePage() {
                                                     <button onClick={handleSubmitDecision}
                                                         disabled={isSubmittingDecision || !finalDecision}
                                                         className="w-full py-2.5 rounded-xl text-xs font-bold text-white flex justify-center items-center gap-2 disabled:opacity-40 hover:opacity-90"
-                                                        style={{ backgroundColor: finalDecision === "certified" ? "#2e7d32" : finalDecision === "rejected" ? "#c62828" : "#4a148c" }}>
+                                                        style={{ backgroundColor: finalDecision === "certified" ? "#2e7d32" : finalDecision === "rejected" ? "#c62828" : "#1a237e" }}>
                                                         {isSubmittingDecision
                                                             ? <><Loader2 className="h-3.5 w-3.5 animate-spin" />Envoi…</>
                                                             : finalDecision === "certified"

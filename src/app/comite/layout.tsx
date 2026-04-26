@@ -13,7 +13,8 @@ export default function ComiteLayout({ children }: { children: React.ReactNode }
     const [showLogoutModal, setShowLogoutModal] = useState(false);
 
     const navItems = [
-        { name: "Validation des copies", href: "/comite", icon: ClipboardList },
+        { name: "Tableau de bord",       href: "/comite/dashboard", icon: LayoutDashboard },
+        { name: "Validation des copies", href: "/comite",           icon: ClipboardList },
     ];
 
     const handleLogout = () => {
@@ -36,7 +37,7 @@ export default function ComiteLayout({ children }: { children: React.ReactNode }
                             exit={{ opacity: 0, scale: 0.92, y: 16 }} transition={{ duration: 0.22 }}
                             className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
                             <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden pointer-events-auto" style={{ border: "2px solid #e8eaf6" }}>
-                                <div className="px-6 py-4 flex items-center justify-between" style={{ backgroundColor: "#4a148c" }}>
+                                <div className="px-6 py-4 flex items-center justify-between" style={{ backgroundColor: "#1a237e" }}>
                                     <div className="flex items-center gap-2">
                                         <LogOut className="h-4 w-4 text-white/80" />
                                         <span className="text-sm font-bold uppercase tracking-widest text-white">Déconnexion</span>
@@ -44,7 +45,7 @@ export default function ComiteLayout({ children }: { children: React.ReactNode }
                                     <button onClick={() => setShowLogoutModal(false)} className="text-white/60 hover:text-white"><X className="h-4 w-4" /></button>
                                 </div>
                                 <div className="px-6 py-6 text-center">
-                                    <div className="h-14 w-14 rounded-full flex items-center justify-center text-sm font-black text-white mx-auto mb-4" style={{ backgroundColor: "#4a148c" }}>CV</div>
+                                    <div className="h-14 w-14 rounded-full flex items-center justify-center text-sm font-black text-white mx-auto mb-4" style={{ backgroundColor: "#1a237e" }}>CV</div>
                                     <p className="font-bold text-gray-800 mb-1">Comité de Validation</p>
                                     <p className="text-gray-400 text-sm mb-6">Voulez-vous vraiment vous déconnecter ?</p>
                                     <div className="flex gap-3">
@@ -61,12 +62,12 @@ export default function ComiteLayout({ children }: { children: React.ReactNode }
             {/* ── Sidebar desktop ── */}
             <aside className="fixed top-0 left-0 h-screen w-64 hidden md:flex flex-col z-20 shadow-lg"
                 style={{ backgroundColor: "#ffffff", borderRight: "2px solid #e8eaf6" }}>
-                <div className="flex flex-col items-center justify-center gap-2 py-6 px-4 shrink-0" style={{ borderBottom: "3px solid #4a148c" }}>
+                <div className="flex flex-col items-center justify-center gap-2 py-6 px-4 shrink-0" style={{ borderBottom: "3px solid #1a237e" }}>
                     <Link href="/comite" className="flex flex-col items-center gap-2 group">
                         <div className="w-20 h-20 flex items-center justify-center drop-shadow-md group-hover:scale-105 transition-transform">
                             <Image src="/logo.png" alt="IRISQ Logo" width={80} height={80} className="object-contain w-full h-full" priority />
                         </div>
-                        <span className="text-[10px] font-extrabold tracking-[0.2em] uppercase" style={{ color: "#4a148c" }}>
+                        <span className="text-[10px] font-extrabold tracking-[0.2em] uppercase" style={{ color: "#1a237e" }}>
                             COMITÉ DE VALIDATION
                         </span>
                     </Link>
@@ -80,8 +81,8 @@ export default function ComiteLayout({ children }: { children: React.ReactNode }
                             return (
                                 <Link key={item.href} href={item.href}
                                     className="relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all"
-                                    style={{ color: isActive ? "#ffffff" : "#555", backgroundColor: isActive ? "#4a148c" : "transparent" }}
-                                    onMouseEnter={e => { if (!isActive) (e.currentTarget as HTMLElement).style.backgroundColor = "#f3e5f5"; }}
+                                    style={{ color: isActive ? "#ffffff" : "#555", backgroundColor: isActive ? "#1a237e" : "transparent" }}
+                                    onMouseEnter={e => { if (!isActive) (e.currentTarget as HTMLElement).style.backgroundColor = "#e8eaf6"; }}
                                     onMouseLeave={e => { if (!isActive) (e.currentTarget as HTMLElement).style.backgroundColor = "transparent"; }}>
                                     {isActive && (
                                         <motion.span layoutId="sidebar-active-comite"
@@ -89,7 +90,7 @@ export default function ComiteLayout({ children }: { children: React.ReactNode }
                                             style={{ backgroundColor: "#c62828" }}
                                             initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.2 }} />
                                     )}
-                                    <Icon className="h-5 w-5 shrink-0" style={{ color: isActive ? "#ffffff" : "#4a148c" }} />
+                                    <Icon className="h-5 w-5 shrink-0" style={{ color: isActive ? "#ffffff" : "#1a237e" }} />
                                     {item.name}
                                 </Link>
                             );
@@ -102,7 +103,7 @@ export default function ComiteLayout({ children }: { children: React.ReactNode }
                         className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all text-left group"
                         onMouseEnter={e => (e.currentTarget as HTMLElement).style.backgroundColor = "#f4f6f9"}
                         onMouseLeave={e => (e.currentTarget as HTMLElement).style.backgroundColor = "transparent"}>
-                        <div className="h-9 w-9 rounded-full flex items-center justify-center text-xs font-black text-white shrink-0" style={{ backgroundColor: "#4a148c" }}>CV</div>
+                        <div className="h-9 w-9 rounded-full flex items-center justify-center text-xs font-black text-white shrink-0" style={{ backgroundColor: "#1a237e" }}>CV</div>
                         <div className="flex flex-col min-w-0">
                             <span className="text-sm font-bold text-gray-800 truncate">Comité de Validation</span>
                             <span className="text-xs text-gray-400">Jury & Certifications</span>
@@ -115,14 +116,14 @@ export default function ComiteLayout({ children }: { children: React.ReactNode }
             {/* ── Main ── */}
             <main className="flex-1 flex flex-col min-w-0 md:pl-64">
                 <header className="fixed top-0 left-0 right-0 h-16 flex items-center justify-between px-4 md:hidden z-40 shadow-sm"
-                    style={{ backgroundColor: "#ffffff", borderBottom: "3px solid #4a148c" }}>
+                    style={{ backgroundColor: "#ffffff", borderBottom: "3px solid #1a237e" }}>
                     <Link href="/comite" className="flex items-center gap-2">
                         <Image src="/logo.png" alt="IRISQ" width={36} height={36} className="object-contain" />
-                        <span className="text-xs font-extrabold tracking-widest uppercase" style={{ color: "#4a148c" }}>COMITÉ</span>
+                        <span className="text-xs font-extrabold tracking-widest uppercase" style={{ color: "#1a237e" }}>COMITÉ</span>
                     </Link>
                     <button onClick={() => setShowLogoutModal(true)}
                         className="h-8 w-8 rounded-full flex items-center justify-center text-xs font-black text-white"
-                        style={{ backgroundColor: "#4a148c" }}>CV</button>
+                        style={{ backgroundColor: "#1a237e" }}>CV</button>
                 </header>
 
                 <div className="flex-1 w-full pt-20 md:pt-8 p-4 md:p-8">
