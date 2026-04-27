@@ -170,10 +170,23 @@ function CandidaturesInner() {
         [sessions, selectedId],
     );
 
+    // Emails qui ont plusieurs candidatures dans la même session → exclus ici,
+    // ils s'affichent uniquement dans /dashboard/candidats-multi.
+    const multiEmails = useMemo(() => {
+        const counts = new Map<string, number>();
+        for (const r of rows) {
+            const key = (r.email || "").toLowerCase().trim();
+            if (key) counts.set(key, (counts.get(key) || 0) + 1);
+        }
+        return new Set([...counts.entries()].filter(([, n]) => n > 1).map(([e]) => e));
+    }, [rows]);
+
     // Liste plate filtrée par mode, type d'examen, et recherche textuelle
     const filteredCandidates = useMemo(() => {
-        if (modeTab === "all") return rows;
-        let list = rows.filter(r => getExamMode(r) === modeTab);
+        if (modeTab === "all") return rows.filter(r => !multiEmails.has((r.email || "").toLowerCase().trim()));
+        let list = rows
+            .filter(r => !multiEmails.has((r.email || "").toLowerCase().trim()))
+            .filter(r => getExamMode(r) === modeTab);
         if (examTypeTab !== "all") list = list.filter(r => getExamType(r) === examTypeTab);
         if (searchQuery.trim()) {
             const q = searchQuery.toLowerCase().trim();
@@ -184,20 +197,21 @@ function CandidaturesInner() {
             );
         }
         return list;
-    }, [rows, modeTab, examTypeTab, searchQuery]);
+    }, [rows, modeTab, examTypeTab, searchQuery, multiEmails]);
 
-    // Dossiers formations (vue "Toutes les demandes" uniquement)
+    // Dossiers formations (vue "Toutes les demandes" uniquement) — exclut les multi-formations
     const formations = useMemo(() => {
         const map = new Map<string, CandidatureRow[]>();
         for (const name of PREDEFINED_FORMATIONS) map.set(name, []);
         for (const r of rows) {
+            if (multiEmails.has((r.email || "").toLowerCase().trim())) continue;
             const raw = r.answers?.[FORMATION_FIELD];
             const name = (typeof raw === "string" && raw.trim()) ? raw.trim() : UNCATEGORIZED;
             if (!map.has(name)) map.set(name, []);
             map.get(name)!.push(r);
         }
         return Array.from(map.entries()).map(([name, items]) => ({ name, items }));
-    }, [rows]);
+    }, [rows, multiEmails]);
 
     async function handleExport() {
         if (!selectedId || exporting) return;

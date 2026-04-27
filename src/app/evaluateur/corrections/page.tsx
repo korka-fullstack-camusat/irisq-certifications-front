@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { fetchSessions, fetchSessionResponses, unblockExam, API_URL } from "@/lib/api";
 import { FilePreviewModal } from "@/components/FilePreviewModal";
+import { AnnotatedCopyModal } from "@/components/AnnotatedCopyModal";
 
 const ITEMS_PER_PAGE = 10;
 
@@ -44,6 +45,7 @@ export default function CorrectionsPage() {
     const [currentPage, setCurrentPage] = useState(1);
     const [selected, setSelected]    = useState<any>(null);
     const [previewFile, setPreviewFile] = useState<{ url: string; title?: string } | null>(null);
+    const [showAnnotatedModal, setShowAnnotatedModal] = useState(false);
     const [isUnblocking, setIsUnblocking] = useState(false);
     const [modalView, setModalView] = useState<"main" | "webcam" | "alerts">("main");
     const [activePhotoIdx, setActivePhotoIdx] = useState(0);
@@ -472,15 +474,22 @@ export default function CorrectionsPage() {
                                                 <div className="flex-1 flex flex-col overflow-hidden border-r" style={{ borderColor: "#e8eaf6" }}>
                                                     {/* Barre titre */}
                                                     <div className="px-4 py-2 flex items-center justify-between shrink-0 border-b" style={{ backgroundColor: "#f4f6f9", borderColor: "#e8eaf6" }}>
-                                                        <div className="flex items-center gap-2">
+                                                        <div className="flex items-center gap-3">
                                                             <FileText className="h-3.5 w-3.5" style={{ color: "#1a237e" }} />
                                                             <span className="text-xs font-bold uppercase tracking-wide" style={{ color: "#1a237e" }}>Copie corrigée</span>
                                                             {isRenderingPdf && totalPdfPages > 0 && (
                                                                 <span className="text-[10px] text-gray-400 font-medium">{renderProgress}/{totalPdfPages} pages</span>
                                                             )}
+                                                            {/* Légende couleurs */}
+                                                            <span className="flex items-center gap-1.5 text-[10px] font-bold">
+                                                                <span className="w-2.5 h-2.5 rounded-full border-2 inline-block shrink-0" style={{ borderColor: "#c62828" }} />
+                                                                <span style={{ color: "#c62828" }}>Correcteur</span>
+                                                                <span className="w-2.5 h-2.5 rounded-full border-2 inline-block shrink-0 ml-1" style={{ borderColor: "#1565c0" }} />
+                                                                <span style={{ color: "#1565c0" }}>Jury</span>
+                                                            </span>
                                                         </div>
                                                         <button
-                                                            onClick={() => setPreviewFile({ url: resolveUrl(selected.exam_document), title: `Copie — ${generateId(selected)}` })}
+                                                            onClick={() => setShowAnnotatedModal(true)}
                                                             className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold text-white"
                                                             style={{ backgroundColor: "#1a237e" }}
                                                         >
@@ -518,10 +527,11 @@ export default function CorrectionsPage() {
 
                                                                     {/* Overlay bulles annotations */}
                                                                     <div className="absolute inset-0 pointer-events-none">
+                                                                        {/* Bulles correcteur (rouge) */}
                                                                         {(selected.answer_grades || [])
                                                                             .filter((g: any) => (g.page_index ?? 0) === pageIdx)
                                                                             .map((g: any, i: number) => (
-                                                                                <div key={i} className="absolute"
+                                                                                <div key={`c-${i}`} className="absolute"
                                                                                     style={{
                                                                                         left: `${g.x ?? 10}%`,
                                                                                         top:  `${g.y ?? 10}%`,
@@ -547,6 +557,41 @@ export default function CorrectionsPage() {
                                                                                         </div>
                                                                                         <span className="text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded bg-white/95 shadow-sm"
                                                                                             style={{ color: "#c62828" }}>
+                                                                                            {g.label || g.question_id || `Q${i + 1}`}
+                                                                                        </span>
+                                                                                    </div>
+                                                                                </div>
+                                                                            ))}
+                                                                        {/* Bulles jury (bleu) */}
+                                                                        {(selected.jury_answer_grades || [])
+                                                                            .filter((g: any) => (g.page_index ?? 0) === pageIdx)
+                                                                            .map((g: any, i: number) => (
+                                                                                <div key={`j-${i}`} className="absolute"
+                                                                                    style={{
+                                                                                        left: `${g.x ?? 10}%`,
+                                                                                        top:  `${g.y ?? 10}%`,
+                                                                                        transform: "translate(-50%, -50%)",
+                                                                                        zIndex: 20,
+                                                                                    }}>
+                                                                                    <div className="flex flex-col items-center gap-0.5">
+                                                                                        <div className="flex flex-col items-center justify-center rounded-full border-[3px]"
+                                                                                            style={{
+                                                                                                width: 44, height: 44,
+                                                                                                borderColor: "#1565c0",
+                                                                                                backgroundColor: "rgba(255,255,255,0.96)",
+                                                                                                boxShadow: "0 2px 10px rgba(21,101,192,0.4)",
+                                                                                            }}>
+                                                                                            <span className="font-black leading-none"
+                                                                                                style={{ fontSize: 15, color: "#1565c0" }}>
+                                                                                                {g.points_earned ?? "—"}
+                                                                                            </span>
+                                                                                            <span className="font-bold leading-none"
+                                                                                                style={{ fontSize: 7, color: "#1565c0", opacity: 0.7 }}>
+                                                                                                /{g.max_points}
+                                                                                            </span>
+                                                                                        </div>
+                                                                                        <span className="text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded bg-white/95 shadow-sm"
+                                                                                            style={{ color: "#1565c0" }}>
                                                                                             {g.label || g.question_id || `Q${i + 1}`}
                                                                                         </span>
                                                                                     </div>
@@ -729,6 +774,17 @@ export default function CorrectionsPage() {
 
             {previewFile && (
                 <FilePreviewModal url={previewFile.url} title={previewFile.title} onClose={() => setPreviewFile(null)} />
+            )}
+
+            {selected && (
+                <AnnotatedCopyModal
+                    open={showAnnotatedModal}
+                    onClose={() => setShowAnnotatedModal(false)}
+                    examDocument={selected?.exam_document || ""}
+                    answerGrades={selected?.answer_grades}
+                    juryAnswerGrades={selected?.jury_answer_grades}
+                    candidateName={generateId(selected)}
+                />
             )}
         </div>
     );

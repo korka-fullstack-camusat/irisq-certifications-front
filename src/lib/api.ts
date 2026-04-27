@@ -155,12 +155,19 @@ export async function submitResponse(formId: string, data: any) {
 
 export interface EligibilityResult {
     eligible: boolean;
-    code?: "ALREADY_APPLIED" | "APPLICATION_REJECTED";
+    code?: "ALREADY_APPLIED" | "APPLICATION_REJECTED" | "HAS_OTHER_APPLICATION" | "HAS_EXISTING_APPLICATION";
     message?: string;
+    existing_certifications?: string[];
 }
 
-export async function checkSessionEligibility(sessionId: string, email: string): Promise<EligibilityResult> {
-    const res = await apiFetch(url(`sessions/${sessionId}/eligibility?email=${encodeURIComponent(email)}`), { redirect: "follow" });
+export async function checkSessionEligibility(
+    sessionId: string,
+    email: string,
+    certification?: string | null,
+): Promise<EligibilityResult> {
+    const params = new URLSearchParams({ email });
+    if (certification) params.set("certification", certification);
+    const res = await apiFetch(url(`sessions/${sessionId}/eligibility?${params.toString()}`), { redirect: "follow" });
     if (!res.ok) throw new Error("Failed to check eligibility");
     return res.json();
 }
@@ -169,10 +176,51 @@ export async function checkSessionEligibility(sessionId: string, email: string):
  * Check if an email already has an active or rejected candidature across ALL
  * currently-open sessions. Called as soon as the candidate finishes typing
  * their email (on blur), before they even pick a session.
+ *
+ * Pass certification to get a cert-specific check:
+ * - Same cert already applied → ALREADY_APPLIED (blocking)
+ * - Different cert → HAS_OTHER_APPLICATION (informational, eligible: true)
+ * Without certification → HAS_EXISTING_APPLICATION (informational, eligible: true)
  */
-export async function checkEmailEligibility(email: string): Promise<EligibilityResult> {
-    const res = await fetch(url(`responses/check-email?email=${encodeURIComponent(email.trim())}`), { redirect: "follow" });
+export async function checkEmailEligibility(email: string, certification?: string | null): Promise<EligibilityResult> {
+    const params = new URLSearchParams({ email: email.trim() });
+    if (certification) params.set("certification", certification);
+    const res = await fetch(url(`responses/check-email?${params.toString()}`), { redirect: "follow" });
     if (!res.ok) throw new Error("Failed to check email eligibility");
+    return res.json();
+}
+
+export interface MultiCandidatureDossier {
+    _id: string;
+    public_id?: string;
+    form_id?: string;
+    status?: string;
+    exam_mode?: string;
+    exam_type?: string;
+    exam_status?: string;
+    exam_grade?: string;
+    final_grade?: string;
+    final_appreciation?: string;
+    submitted_at?: string;
+    certification?: string;
+    answers?: Record<string, any>;
+    documents_validation?: Record<string, DocumentValidationEntry>;
+}
+
+export interface MultiCandidatureEntry {
+    email: string;
+    name?: string;
+    session_id: string;
+    session_name: string;
+    candidate_account_id?: string;
+    candidatures_count: number;
+    dossiers: MultiCandidatureDossier[];
+}
+
+export async function fetchMultiCandidatures(sessionId?: string): Promise<MultiCandidatureEntry[]> {
+    const qs = sessionId ? `?session_id=${encodeURIComponent(sessionId)}` : "";
+    const res = await apiFetch(url(`responses/multi-candidatures${qs}`), { redirect: "follow" });
+    if (!res.ok) throw new Error("Failed to fetch multi-candidatures");
     return res.json();
 }
 
@@ -202,39 +250,65 @@ export async function deleteResponse(responseId: string): Promise<{ status: stri
 }
 
 export async function uploadFiles(formData: FormData): Promise<{ file_urls: string[] }> {
-    const res = await apiFetch(url("upload"), {
-        method: "POST",
-        body: formData,
-        redirect: "follow",
-    });
+    const MAX_ATTEMPTS = 3;
+    const RETRY_DELAY_MS = 1500;
 
-    if (!res.ok) {
-        const errorText = await res.text();
-        console.error("Upload HTTP error:", res.status, errorText);
-        throw new Error(`Failed to upload files: ${res.status}`);
+    let lastError: Error = new Error("Upload échoué");
+
+    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+        try {
+            const res = await apiFetch(url("upload"), {
+                method: "POST",
+                body: formData,
+                redirect: "follow",
+            });
+
+            if (!res.ok) {
+                // Erreur 4xx → ne pas retenter (problème côté client)
+                if (res.status >= 400 && res.status < 500) {
+                    const err = await res.json().catch(() => ({ detail: `Erreur ${res.status}` }));
+                    throw new Error(err.detail || `Erreur ${res.status} lors de l'upload.`);
+                }
+                // Erreur 5xx → retenter
+                const errText = await res.text().catch(() => "");
+                lastError = new Error(`Erreur serveur (${res.status}) — veuillez réessayer.`);
+                console.warn(`Upload attempt ${attempt}/${MAX_ATTEMPTS} failed (HTTP ${res.status}):`, errText);
+                if (attempt < MAX_ATTEMPTS) {
+                    await new Promise(r => setTimeout(r, RETRY_DELAY_MS * attempt));
+                    continue;
+                }
+                throw lastError;
+            }
+
+            const data = await res.json();
+
+            // Normalise la réponse quelle que soit la forme retournée par le backend
+            const fileUrls: string[] =
+                data?.file_urls ??
+                data?.urls ??
+                (data?.files ? data.files.map((f: any) => f.file_url || f.url || f) : null) ??
+                (data?.url ? [data.url] : null) ??
+                (Array.isArray(data) ? data.map((f: any) => (typeof f === "string" ? f : f.file_url)) : null) ??
+                [];
+
+            if (fileUrls.length === 0) {
+                throw new Error("Aucune URL retournée par le serveur après l'upload.");
+            }
+
+            return { file_urls: fileUrls };
+
+        } catch (err: any) {
+            // Erreurs 4xx ou logiques → ne pas retenter
+            if (err.message && !err.message.startsWith("Erreur serveur")) throw err;
+            lastError = err;
+            if (attempt < MAX_ATTEMPTS) {
+                console.warn(`Upload attempt ${attempt}/${MAX_ATTEMPTS} failed, retrying…`);
+                await new Promise(r => setTimeout(r, RETRY_DELAY_MS * attempt));
+            }
+        }
     }
 
-    const data = await res.json();
-    console.log("📦 Upload raw response:", data);
-
-    // Normalise la réponse quelle que soit la forme retournée par le backend
-    const fileUrls: string[] =
-        data?.file_urls ??
-        data?.urls ??
-        (data?.files ? data.files.map((f: any) => f.file_url || f.url || f) : null) ??
-        (data?.url ? [data.url] : null) ??
-        (Array.isArray(data) ? data.map((f: any) => (typeof f === 'string' ? f : f.file_url)) : null) ??
-        [];
-
-    if (fileUrls.length === 0) {
-        console.error("Réponse upload inattendue:", data);
-        throw new Error(
-            "L'upload a réussi (HTTP 200) mais aucune URL de fichier n'a été retournée. " +
-            "Vérifiez que votre endpoint /api/upload/ retourne bien { file_urls: [...] }."
-        );
-    }
-
-    return { file_urls: fileUrls };
+    throw lastError;
 }
 
 export async function updateEvaluatorDocument(responseId: string, documentUrl: string) {

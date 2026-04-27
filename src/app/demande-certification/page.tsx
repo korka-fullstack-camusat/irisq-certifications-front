@@ -174,6 +174,8 @@ export default function DemandeCertificationPage() {
     const [isError, setIsError] = useState(false);
 
     const [sessionBlock, setSessionBlock] = useState<{ code: "ALREADY_APPLIED" | "APPLICATION_REJECTED"; message: string } | null>(null);
+    // Informational warning: already has a candidature for a DIFFERENT certification
+    const [existingAppWarning, setExistingAppWarning] = useState<{ certs: string[]; message: string } | null>(null);
 
     const [isLoadingSessions, setIsLoadingSessions] = useState(true);
     // Spinner while the email eligibility check is in-flight
@@ -191,7 +193,8 @@ export default function DemandeCertificationPage() {
     const [telephone, setTelephone] = useState("");
     const [email, setEmail] = useState("");
     const [anneesExperience, setAnneesExperience] = useState("");
-    const [certification, setCertification] = useState("");
+    // Multi-select : jusqu'à 2 certifications par session
+    const [certifications, setCertifications] = useState<string[]>([]);
     const [sessions, setSessions] = useState<Session[]>([]);
     const [sessionId, setSessionId] = useState<string>("");
     const [examMode, setExamMode] = useState<"online" | "onsite" | "">("");
@@ -223,17 +226,22 @@ export default function DemandeCertificationPage() {
     };
 
     // Fired on email field blur — checks across all active sessions.
-    // If the email is already linked to an application, the full-page
-    // sessionBlock screen appears immediately (no need to continue the form).
+    // Hard block on APPLICATION_REJECTED; informational warning when already applied to a different cert.
     const handleEmailBlur = async (value: string) => {
         handleField("email", value, setEmail);
-        if (validators.email(value)) return; // don't check invalid format
+        if (validators.email(value)) return;
         setIsCheckingEmail(true);
+        setExistingAppWarning(null);
         try {
-            const result = await checkEmailEligibility(value);
-            if (!result.eligible && result.code) {
-                setSessionBlock({
-                    code: result.code as "ALREADY_APPLIED" | "APPLICATION_REJECTED",
+            // At step 1 certification is not yet chosen — pass first selected if any
+            const result = await checkEmailEligibility(value, certifications[0] ?? null);
+            if (!result.eligible && result.code === "APPLICATION_REJECTED") {
+                setSessionBlock({ code: "APPLICATION_REJECTED", message: result.message || "" });
+            } else if (!result.eligible && result.code === "ALREADY_APPLIED") {
+                setSessionBlock({ code: "ALREADY_APPLIED", message: result.message || "" });
+            } else if (result.code === "HAS_OTHER_APPLICATION" || result.code === "HAS_EXISTING_APPLICATION") {
+                setExistingAppWarning({
+                    certs: result.existing_certifications || [],
                     message: result.message || "",
                 });
             }
@@ -244,12 +252,21 @@ export default function DemandeCertificationPage() {
         }
     };
 
-    // When years change, reset certification if it falls outside the new eligible list
+    // When years change, remove any selected certification that falls outside the new eligible list
     const handleAnneesChange = (value: string) => {
         handleField("anneesExperience", value, setAnneesExperience);
-        if (certification && !getEligibleCertifications(value).includes(certification)) {
-            setCertification("");
-        }
+        const eligible = getEligibleCertifications(value);
+        setCertifications(prev => prev.filter(c => eligible.includes(c)));
+    };
+
+    const toggleCertification = (cert: string, eligible: string[]) => {
+        if (!eligible.includes(cert)) return;
+        setCertifications(prev => {
+            if (prev.includes(cert)) return prev.filter(c => c !== cert);
+            if (prev.length >= 2) return prev; // max 2
+            return [...prev, cert];
+        });
+        setValidationError("");
     };
 
     // Validation complète d'une étape : renseigne fieldErrors pour tous les
@@ -362,8 +379,8 @@ export default function DemandeCertificationPage() {
             return;
         }
 
-        console.log("Submit trigger:", { formId, cvFile: !!cvFile, certification, examMode, examType });
-        if (!formId || !cvFile || !certification || !examMode || !examType) {
+        console.log("Submit trigger:", { formId, cvFile: !!cvFile, certifications, examMode, examType });
+        if (!formId || !cvFile || certifications.length === 0 || !examMode || !examType) {
             console.error("Missing required data for submission.");
             setValidationError("Une erreur est survenue avec le formulaire. Veuillez rafraîchir la page.");
             return;
@@ -377,23 +394,24 @@ export default function DemandeCertificationPage() {
 
         setIsSubmitting(true);
         try {
-            // Pre-check eligibility before expensive file uploads
+            // Pre-check eligibility for each selected certification before file uploads
             if (sessionId && email) {
-                const eligibility = await checkSessionEligibility(sessionId, email);
-                if (!eligibility.eligible && eligibility.code) {
-                    setSessionBlock({ code: eligibility.code as "ALREADY_APPLIED" | "APPLICATION_REJECTED", message: eligibility.message || "" });
-                    setIsSubmitting(false);
-                    return;
+                for (const cert of certifications) {
+                    const eligibility = await checkSessionEligibility(sessionId, email, cert);
+                    if (!eligibility.eligible && eligibility.code) {
+                        setSessionBlock({ code: eligibility.code as "ALREADY_APPLIED" | "APPLICATION_REJECTED", message: eligibility.message || "" });
+                        setIsSubmitting(false);
+                        return;
+                    }
                 }
             }
 
-            // Upload CV
+            // Upload all files ONCE — shared across all candidatures
             const cvFd = new FormData();
             cvFd.append("files", cvFile);
             const cvUpload = await uploadFiles(cvFd);
             const cvUrl = cvUpload.file_urls?.[0] || "";
 
-            // Upload others
             let otherUrls: string[] = [];
             let pieceUrl = "";
             let justifxUrls: string[] = [];
@@ -410,7 +428,6 @@ export default function DemandeCertificationPage() {
                 const otherUpload = await uploadFiles(otherFd);
                 const urls = otherUpload.file_urls || [];
 
-                // Maps urls back based on what was included (maintaining order)
                 let urlIndex = 0;
                 if (pieceIdentite) { pieceUrl = urls[urlIndex++]; otherUrls.push(pieceUrl); }
                 if (justificatifExp.length > 0) {
@@ -427,43 +444,53 @@ export default function DemandeCertificationPage() {
             }
 
             const allFileUrls = [cvUrl, ...otherUrls];
-
             const examModeLabel = examMode === "online" ? "En ligne" : "Présentiel";
             const examTypeLabel = examType === "direct" ? "Examen direct" : "Examen après formation IRISQ";
 
-            await submitResponse(formId, {
-                form_id: formId,
-                session_id: sessionId || undefined,
-                name: `${prenom} ${nom}`.trim(),
-                email,
-                profile: "Candidat à la Certification",
-                exam_mode: examMode,
-                exam_type: examType,
-                answers: {
-                    Nom: nom,
-                    Prénom: prenom,
-                    "Date de naissance": dateNaissance,
-                    "Lieu de naissance": lieuNaissance,
-                    Nationalité: nationalite,
-                    Adresse: adresse,
-                    Téléphone: telephone,
-                    Email: email,
-                    "Années d'expérience sur la norme": anneesExperience,
-                    "Certification souhaitée": certification,
-                    "Mode d'examen": examModeLabel,
-                    "Type d'examen": examTypeLabel,
-                    "CV": [cvUrl],
-                    "Pièce d'identité": pieceUrl ? [pieceUrl] : [],
-                    "Justificatif d'expérience": justifxUrls,
-                    "Diplômes": diplomesUrls,
-                    "Attestation de formation": attestationUrl ? [attestationUrl] : [],
-                    "Autres documents": otherUrls,
-                    "Pièces justificatives": allFileUrls,
-                    "Aménagement spécifique": amenagement,
-                    "Détails aménagement": amenagement === "Oui" ? amenagementDetails : "N/A",
-                    "Déclaration acceptée": declarationActive,
-                },
-            });
+            // Submit one dossier per selected certification (same files, different cert name)
+            // The first submission generates the public_id; subsequent ones reuse it so
+            // the candidate has a single matricule for all their certifications in this session.
+            let sharedPublicId: string | undefined;
+            for (const cert of certifications) {
+                const result = await submitResponse(formId, {
+                    form_id: formId,
+                    session_id: sessionId || undefined,
+                    name: `${prenom} ${nom}`.trim(),
+                    email,
+                    profile: "Candidat à la Certification",
+                    exam_mode: examMode,
+                    exam_type: examType,
+                    public_id: sharedPublicId,
+                    answers: {
+                        Nom: nom,
+                        Prénom: prenom,
+                        "Date de naissance": dateNaissance,
+                        "Lieu de naissance": lieuNaissance,
+                        Nationalité: nationalite,
+                        Adresse: adresse,
+                        Téléphone: telephone,
+                        Email: email,
+                        "Années d'expérience sur la norme": anneesExperience,
+                        "Certification souhaitée": cert,
+                        "Mode d'examen": examModeLabel,
+                        "Type d'examen": examTypeLabel,
+                        "CV": [cvUrl],
+                        "Pièce d'identité": pieceUrl ? [pieceUrl] : [],
+                        "Justificatif d'expérience": justifxUrls,
+                        "Diplômes": diplomesUrls,
+                        "Attestation de formation": attestationUrl ? [attestationUrl] : [],
+                        "Autres documents": otherUrls,
+                        "Pièces justificatives": allFileUrls,
+                        "Aménagement spécifique": amenagement,
+                        "Détails aménagement": amenagement === "Oui" ? amenagementDetails : "N/A",
+                        "Déclaration acceptée": declarationActive,
+                    },
+                });
+                if (!sharedPublicId && result?.public_id) {
+                    sharedPublicId = result.public_id;
+                }
+            }
+
             setIsSuccess(true);
             router.replace("/");
         } catch (error: any) {
@@ -471,7 +498,17 @@ export default function DemandeCertificationPage() {
             if (error.code === "ALREADY_APPLIED" || error.code === "APPLICATION_REJECTED") {
                 setSessionBlock({ code: error.code, message: error.message });
             } else {
-                setValidationError(`Une erreur est survenue lors de l'envoi : ${error.message}`);
+                const msg: string = error?.message || "";
+                // Message convivial selon le type d'erreur
+                if (msg.toLowerCase().includes("type de fichier")) {
+                    setValidationError(msg);
+                } else if (msg.toLowerCase().includes("volumineux") || msg.toLowerCase().includes("trop grand")) {
+                    setValidationError(msg);
+                } else if (msg.toLowerCase().includes("erreur serveur") || msg.toLowerCase().includes("500") || msg.toLowerCase().includes("failed")) {
+                    setValidationError("Une erreur de connexion est survenue lors de l'envoi des fichiers. Votre connexion a été relancée automatiquement — veuillez réessayer.");
+                } else {
+                    setValidationError(`Une erreur est survenue lors de l'envoi : ${msg}`);
+                }
             }
         } finally {
             setIsSubmitting(false);
@@ -482,10 +519,10 @@ export default function DemandeCertificationPage() {
         if (s === 1) {
             return validateStepFields(1);
         }
-        if (s === 2) return !validators.anneesExperience(anneesExperience) && certification !== "" && (sessions.length === 0 || sessionId !== "");
+        if (s === 2) return !validators.anneesExperience(anneesExperience) && certifications.length > 0 && (sessions.length === 0 || sessionId !== "");
         if (s === 3) return examMode !== "" && examType !== "";
         if (s === 4) {
-            const isJunior = certification.startsWith("Junior");
+            const isJunior = certifications.every(c => c.startsWith("Junior"));
             const justifOk = isJunior || justificatifExp.length > 0;
             const baseOk = cvFile !== null && pieceIdentite !== null && justifOk && diplomes.length > 0;
             // Attestation de formation obligatoire pour un examen direct.
@@ -527,13 +564,15 @@ export default function DemandeCertificationPage() {
             setValidationError("Veuillez corriger les erreurs ci-dessus avant de continuer.");
             return;
         }
-        // Pre-check eligibility at step 2 (session + email both known)
-        if (step === 2 && sessionId && email) {
+        // Pre-check eligibility at step 2 for each selected certification
+        if (step === 2 && sessionId && email && certifications.length > 0) {
             try {
-                const result = await checkSessionEligibility(sessionId, email);
-                if (!result.eligible && result.code) {
-                    setSessionBlock({ code: result.code as "ALREADY_APPLIED" | "APPLICATION_REJECTED", message: result.message || "" });
-                    return;
+                for (const cert of certifications) {
+                    const result = await checkSessionEligibility(sessionId, email, cert);
+                    if (!result.eligible && result.code) {
+                        setSessionBlock({ code: result.code as "ALREADY_APPLIED" | "APPLICATION_REJECTED", message: result.message || "" });
+                        return;
+                    }
                 }
             } catch {
                 // eligibility check failure is non-blocking — backend will catch it at submit
@@ -684,6 +723,31 @@ export default function DemandeCertificationPage() {
         <>
         <div className="min-h-screen py-10 px-4 sm:px-6" style={{ backgroundColor: "#f4f6f9" }}>
             <div className="max-w-2xl mx-auto space-y-6">
+
+                {/* ── Bandeau info : candidature existante sur autre certification ── */}
+                {existingAppWarning && (
+                    <motion.div
+                        initial={{ opacity: 0, y: -8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="flex items-start gap-3 rounded-xl px-4 py-3 border"
+                        style={{ backgroundColor: "#fff8e1", borderColor: "#f59e0b" }}
+                    >
+                        <Info className="h-4 w-4 shrink-0 mt-0.5" style={{ color: "#b45309" }} />
+                        <div className="flex-1 min-w-0">
+                            <p className="text-xs font-bold uppercase tracking-widest" style={{ color: "#b45309" }}>
+                                Candidature en cours détectée
+                            </p>
+                            <p className="text-sm text-amber-800 mt-0.5">{existingAppWarning.message}</p>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={() => setExistingAppWarning(null)}
+                            className="text-amber-400 hover:text-amber-600 transition-colors shrink-0"
+                        >
+                            <X className="h-4 w-4" />
+                        </button>
+                    </motion.div>
+                )}
 
                 {/* ── En-tête ── */}
                 <div className="flex flex-col items-center text-center gap-2">
@@ -1016,6 +1080,21 @@ export default function DemandeCertificationPage() {
                                                         ? "Certifications disponibles selon votre expérience :"
                                                         : "Saisissez d'abord vos années d'expérience pour voir les certifications disponibles."}
                                                 </p>
+                                                {/* Counter badge */}
+                                                <div className="flex items-center justify-between mb-3">
+                                                    <span className="text-xs text-gray-400">
+                                                        Vous pouvez sélectionner jusqu&apos;à <strong>2 formations</strong>.
+                                                    </span>
+                                                    <span
+                                                        className="text-xs font-bold px-2 py-0.5 rounded-full"
+                                                        style={{
+                                                            backgroundColor: certifications.length === 2 ? "#c62828" : "#1a237e",
+                                                            color: "#fff",
+                                                        }}
+                                                    >
+                                                        {certifications.length}/2 sélectionnée{certifications.length > 1 ? "s" : ""}
+                                                    </span>
+                                                </div>
                                                 <AnimatePresence mode="wait">
                                                     <motion.div
                                                         key={eligible.join(",")}
@@ -1026,9 +1105,10 @@ export default function DemandeCertificationPage() {
                                                         className="space-y-2"
                                                     >
                                                         {(hasYears ? eligible : CERTIFICATIONS).map((cert) => {
-                                                            const selected = certification === cert;
+                                                            const selected = certifications.includes(cert);
+                                                            const maxReached = certifications.length >= 2 && !selected;
                                                             const color = cert.includes("17025") ? "#1a237e" : cert.includes("9001") ? "#2e7d32" : cert.includes("45001") ? "#7b1fa2" : "#b45309";
-                                                            const isDisabled = hasYears && !eligible.includes(cert);
+                                                            const isDisabled = (hasYears && !eligible.includes(cert)) || maxReached;
                                                             return (
                                                                 <label
                                                                     key={cert}
@@ -1039,13 +1119,12 @@ export default function DemandeCertificationPage() {
                                                                     }}
                                                                 >
                                                                     <input
-                                                                        type="radio"
-                                                                        name="certification"
+                                                                        type="checkbox"
                                                                         value={cert}
                                                                         checked={selected}
                                                                         disabled={isDisabled}
-                                                                        onChange={() => { if (!isDisabled) { setCertification(cert); setValidationError(""); } }}
-                                                                        className="w-4 h-4 shrink-0"
+                                                                        onChange={() => { if (!isDisabled) { toggleCertification(cert, eligible); setValidationError(""); } }}
+                                                                        className="w-4 h-4 shrink-0 accent-[#1a237e]"
                                                                     />
                                                                     <div className="flex items-center gap-2 flex-1 min-w-0">
                                                                         {selected && (
@@ -1055,11 +1134,25 @@ export default function DemandeCertificationPage() {
                                                                             {cert}
                                                                         </span>
                                                                     </div>
+                                                                    {selected && (
+                                                                        <span className="text-xs font-medium px-1.5 py-0.5 rounded" style={{ backgroundColor: `${color}20`, color }}>
+                                                                            Sélectionnée
+                                                                        </span>
+                                                                    )}
                                                                 </label>
                                                             );
                                                         })}
                                                     </motion.div>
                                                 </AnimatePresence>
+                                                {certifications.length === 2 && (
+                                                    <motion.p
+                                                        initial={{ opacity: 0, y: -4 }}
+                                                        animate={{ opacity: 1, y: 0 }}
+                                                        className="mt-2 text-xs font-medium text-[#c62828]"
+                                                    >
+                                                        Maximum atteint. Désélectionnez une formation pour en choisir une autre.
+                                                    </motion.p>
+                                                )}
                                             </div>
                                         </div>
                                     );
@@ -1246,7 +1339,7 @@ export default function DemandeCertificationPage() {
                                         </div>
 
                                         {/* Zone de dépôt Justificatif Expérience — masqué pour les Junior */}
-                                        {!certification.startsWith("Junior") && (
+                                        {!certifications.every(c => c.startsWith("Junior")) && (
                                             <div className="mb-6">
                                                 <p className="text-sm font-bold text-[#1a237e] mb-2">
                                                     3. Justificatif d&apos;expérience (Système Management / Labo) <span className="text-[#c62828]">*</span>
@@ -1469,13 +1562,13 @@ export default function DemandeCertificationPage() {
                                             </p>
                                             {[
                                                 ["Nom complet", `${prenom} ${nom}`],
-                                                ["Certification", certification || "Non sélectionnée"],
+                                                ["Certification", certifications.length > 0 ? certifications.join(" + ") : "Non sélectionnée"],
                                                 ["Mode d'examen", examMode === "online" ? "En ligne" : examMode === "onsite" ? "Présentiel" : "Non choisi"],
                                                 ["Type d'examen", examType === "direct" ? "Examen direct" : examType === "after_formation" ? "Après formation IRISQ" : "Non choisi"],
                                                 ["Email", email],
                                                 ["CV", cvFile ? "Uploadé" : "Manquant"],
                                                 ["Pièce Identité", pieceIdentite ? "Uploadé" : "Manquant"],
-                                                ...(!certification.startsWith("Junior") ? [["Justificatif Expérience", justificatifExp.length > 0 ? `${justificatifExp.length} fichier(s) uploadé(s)` : "Manquant"]] : []),
+                                                ...(!certifications.every(c => c.startsWith("Junior")) ? [["Justificatif Expérience", justificatifExp.length > 0 ? `${justificatifExp.length} fichier(s) uploadé(s)` : "Manquant"]] : []),
                                                 ["Diplômes", diplomes.length > 0 ? `${diplomes.length} fichier(s) uploadé(s)` : "Manquant"],
                                                 ["Attestation formation", attestationFormation ? "Uploadé" : (examType === "direct" ? "Manquant" : "Non fourni")],
                                             ].map(([k, v]) => (

@@ -20,6 +20,7 @@ import {
     CalendarDays,
     Send,
     Trophy,
+    Layers,
 } from "lucide-react";
 
 import { useCandidate } from "@/lib/candidate-context";
@@ -48,9 +49,10 @@ function formatDateTime(iso: string) {
 }
 
 export default function CandidateDashboardPage() {
-    const { dossier, loading } = useCandidate();
+    const { dossier, dossiers, loading, setActiveDossierId } = useCandidate();
     const [exam, setExam] = useState<CandidateExam | null | undefined>(undefined);
     const [now, setNow] = useState(Date.now());
+    const hasMultiple = dossiers.length > 1;
 
     useEffect(() => {
         fetchCandidateExam().then(setExam).catch(() => setExam(null));
@@ -94,6 +96,50 @@ export default function CandidateDashboardPage() {
 
     return (
         <div className="space-y-6">
+            {/* Sélecteur de candidature — visible seulement si plusieurs dossiers */}
+            {hasMultiple && (
+                <motion.div
+                    initial={{ opacity: 0, y: -6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4"
+                >
+                    <div className="flex items-center gap-2 mb-3">
+                        <Layers className="h-4 w-4 shrink-0" style={{ color: "#1a237e" }} />
+                        <p className="text-xs font-bold uppercase tracking-widest" style={{ color: "#1a237e" }}>
+                            Mes candidatures ({dossiers.length})
+                        </p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                        {dossiers.map(d => {
+                            const cert = d.answers?.["Certification souhaitée"] || d.public_id || "Dossier";
+                            const isActive = d._id === dossier?._id;
+                            const st = statusStyle(d.status);
+                            return (
+                                <button
+                                    key={d._id}
+                                    type="button"
+                                    onClick={() => setActiveDossierId(d._id)}
+                                    className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold border transition-all"
+                                    style={isActive
+                                        ? { backgroundColor: "#1a237e", color: "#fff", borderColor: "#1a237e" }
+                                        : { backgroundColor: "#f4f6f9", color: "#555", borderColor: "#e0e0e0" }
+                                    }
+                                >
+                                    <ShieldCheck className="h-3 w-3 shrink-0" />
+                                    <span className="truncate max-w-[140px]">{cert}</span>
+                                    <span
+                                        className="text-[10px] px-1.5 py-0.5 rounded-full font-bold"
+                                        style={{ backgroundColor: isActive ? "rgba(255,255,255,0.2)" : st.bg, color: isActive ? "#fff" : st.color }}
+                                    >
+                                        {st.label}
+                                    </span>
+                                </button>
+                            );
+                        })}
+                    </div>
+                </motion.div>
+            )}
+
             {/* Identity card */}
             <motion.div
                 initial={{ opacity: 0, y: 10 }}

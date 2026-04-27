@@ -25,6 +25,7 @@ import {
 import { fetchResponse, API_URL, type DocumentValidationEntry } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { FilePreviewModal } from "@/components/FilePreviewModal";
+import { AnnotatedCopyModal } from "@/components/AnnotatedCopyModal";
 
 function resolveDocUrl(u: string) {
     if (!u) return "";
@@ -78,6 +79,7 @@ export function CandidatDossierDetail({ candidatId, variant = "validee" }: Props
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [previewFile, setPreviewFile] = useState<{ url: string; title?: string } | null>(null);
+    const [showAnnotatedModal, setShowAnnotatedModal] = useState(false);
 
     useEffect(() => {
         if (!isLoading && (!user || user.role !== "RH")) {
@@ -302,15 +304,15 @@ export function CandidatDossierDetail({ candidatId, variant = "validee" }: Props
                                         <div className="min-w-0">
                                             <p className="font-bold text-gray-800 text-sm">Copie corrigée</p>
                                             <button type="button"
-                                                onClick={() => setPreviewFile({ url: resolveDocUrl(response.exam_document), title: "Copie corrigée" })}
+                                                onClick={() => setShowAnnotatedModal(true)}
                                                 className="text-[11px] text-indigo-600 hover:underline inline-flex items-center gap-1 mt-0.5">
-                                                <Eye className="h-3 w-3" /> Visualiser
+                                                <Eye className="h-3 w-3" /> Visualiser (avec notes)
                                             </button>
                                         </div>
                                     </div>
                                     <div className="flex items-center gap-2 shrink-0">
                                         <button type="button"
-                                            onClick={() => setPreviewFile({ url: resolveDocUrl(response.exam_document), title: "Copie corrigée" })}
+                                            onClick={() => setShowAnnotatedModal(true)}
                                             className="p-2 rounded-lg border text-gray-500 hover:text-gray-800 hover:bg-white"
                                             style={{ borderColor: "#e0e0e0" }}>
                                             <Eye className="h-4 w-4" />
@@ -398,10 +400,10 @@ export function CandidatDossierDetail({ candidatId, variant = "validee" }: Props
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
                             <button type="button"
-                                onClick={() => setPreviewFile({ url: resolveDocUrl(response.exam_document), title: `Copie — ${response.name || "Candidat"}` })}
+                                onClick={() => setShowAnnotatedModal(true)}
                                 className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border text-xs font-bold text-gray-700 hover:bg-white transition-colors"
                                 style={{ borderColor: "#d1d5db" }}>
-                                <Eye className="h-3.5 w-3.5" /> Visualiser
+                                <Eye className="h-3.5 w-3.5" /> Visualiser (avec notes)
                             </button>
                             <a href={resolveDocUrl(response.exam_document)} target="_blank" rel="noreferrer"
                                 className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold text-white transition-all hover:-translate-y-0.5"
@@ -420,6 +422,15 @@ export function CandidatDossierDetail({ candidatId, variant = "validee" }: Props
                     onClose={() => setPreviewFile(null)}
                 />
             )}
+
+            <AnnotatedCopyModal
+                open={showAnnotatedModal}
+                onClose={() => setShowAnnotatedModal(false)}
+                examDocument={response?.exam_document || ""}
+                answerGrades={response?.answer_grades}
+                juryAnswerGrades={response?.jury_answer_grades}
+                candidateName={response?.name}
+            />
         </div>
     );
 }

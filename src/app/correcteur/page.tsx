@@ -414,7 +414,7 @@ export default function CorrecteurPage() {
                                                 <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold border" style={{ background: "#fffbeb", color: "#b45309", borderColor: "#fde68a" }}><AlertTriangle className="h-3 w-3" />En attente</span>
                                             )}
                                         </div>
-                                        <div className="col-span-1 flex justify-center">{locked && <Lock className="h-4 w-4 text-rose-500" title="Verrouillée" />}</div>
+                                        <div className="col-span-1 flex justify-center">{locked && <Lock className="h-4 w-4 text-rose-500" aria-label="Verrouillée" />}</div>
                                         <div className="col-span-2 flex items-center justify-end">
                                             <button onClick={() => openModal(response)} disabled={!hasDoc}
                                                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-white disabled:opacity-40 hover:opacity-90"
