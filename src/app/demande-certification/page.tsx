@@ -10,7 +10,7 @@ import {
     Info
 } from "lucide-react";
 import Image from "next/image";
-import { fetchForms, createForm, submitResponse, uploadFiles, fetchSessions, checkSessionEligibility, checkEmailEligibility, type Session } from "@/lib/api";
+import { fetchForms, fetchFormById, createForm, submitResponse, uploadFiles, fetchSessions, checkSessionEligibility, checkEmailEligibility, type Session } from "@/lib/api";
 
 const CERTIFICATIONS = [
     "Junior Implementor ISO/IEC17025:2017",
@@ -306,10 +306,23 @@ export default function DemandeCertificationPage() {
             .catch(() => {})
             .finally(() => setIsLoadingSessions(false));
 
-        const cachedId = typeof window !== "undefined" ? localStorage.getItem(FORM_ID_CACHE_KEY) : null;
-
-        const formsPromise = cachedId ? Promise.resolve() : (async () => {
+        const formsPromise = (async () => {
             try {
+                // 1. Vérifier si le cache local est encore valide en base
+                const cachedId = typeof window !== "undefined" ? localStorage.getItem(FORM_ID_CACHE_KEY) : null;
+                if (cachedId) {
+                    try {
+                        await fetchFormById(cachedId);
+                        // Le form existe toujours → on utilise l'ID caché
+                        setFormId(cachedId);
+                        return;
+                    } catch {
+                        // Form introuvable (supprimé ou env différent) → vider le cache
+                        localStorage.removeItem(FORM_ID_CACHE_KEY);
+                    }
+                }
+
+                // 2. Chercher un form existant par titre, ou en créer un nouveau
                 const forms = await fetchForms();
                 const existing = forms.find((f: any) => f.title === FORM_TITLE);
                 let id: string;

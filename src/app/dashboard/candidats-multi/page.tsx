@@ -20,7 +20,6 @@ import {
     Users,
     Hourglass,
     Folder,
-    FolderOpen,
     FolderRoot,
 } from "lucide-react";
 
@@ -60,6 +59,7 @@ function DossierSubFolder({
     const status = (dossier.status || "pending") as "pending" | "approved" | "rejected";
     const docState = validationState(dossier);
     const color = certColor(dossier.certification || "");
+    const certLabel = dossier.certification || "Certification inconnue";
 
     return (
         <motion.div
@@ -67,22 +67,22 @@ function DossierSubFolder({
             animate={{ opacity: 1, y: 0 }}
         >
             <Link
-                href={`/dashboard/candidatures/${dossier._id}`}
+                href={`/dashboard/candidatures/${dossier._id}?from=multi`}
                 className="group flex items-center gap-4 p-4 rounded-2xl bg-white border border-gray-100 shadow-sm hover:shadow-md hover:border-indigo-200 transition-all"
             >
-                {/* Folder icon avec couleur certification */}
+                {/* Avatar avec initiales (même pattern que mode=onsite) */}
                 <div
-                    className="h-11 w-11 rounded-xl flex items-center justify-center shrink-0"
-                    style={{ backgroundColor: `${color}15` }}
+                    className="h-11 w-11 rounded-xl flex items-center justify-center shrink-0 text-white text-sm font-black"
+                    style={{ backgroundColor: color }}
                 >
-                    <FolderOpen className="h-5 w-5" style={{ color }} />
+                    {certLabel.substring(0, 2).toUpperCase()}
                 </div>
 
                 {/* Infos */}
                 <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-bold text-gray-800 truncate">
-                            {dossier.certification || "Certification inconnue"}
+                            {certLabel}
                         </span>
                         {dossier.public_id && (
                             <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-gray-100 text-gray-500">
@@ -147,13 +147,7 @@ function DossierSubFolder({
 
 // ── Root folder: one candidate with all their dossiers ─────────────────────
 
-function CandidateRootFolder({
-    entry,
-    onPreview,
-}: {
-    entry: MultiCandidatureEntry;
-    onPreview: (url: string, title?: string) => void;
-}) {
+function CandidateRootFolder({ entry }: { entry: MultiCandidatureEntry }) {
     const [open, setOpen] = useState(true);
     const publicId = entry.dossiers[0]?.public_id;
 
@@ -232,7 +226,6 @@ function CandidateRootFolder({
                                     key={d._id}
                                     dossier={d}
                                     isLast={idx === entry.dossiers.length - 1}
-                                    onPreview={onPreview}
                                 />
                             ))}
                         </div>
@@ -252,10 +245,13 @@ export default function CandidatsMultiPage() {
     const [search, setSearch] = useState("");
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [previewFile, setPreviewFile] = useState<{ url: string; title?: string } | null>(null);
 
     useEffect(() => {
-        fetchSessions().then(setSessions).catch(() => {});
+        fetchSessions().then(list => {
+            setSessions(list);
+            const active = list.find(s => s.status === "active") || list[0];
+            if (active) setSelectedSession(active._id);
+        }).catch(() => {});
     }, []);
 
     useEffect(() => {
@@ -359,19 +355,11 @@ export default function CandidatsMultiPage() {
                         <CandidateRootFolder
                             key={`${entry.email}-${entry.session_id}-${i}`}
                             entry={entry}
-                            onPreview={(url, title) => setPreviewFile({ url, title })}
                         />
                     ))}
                 </div>
             )}
 
-            {previewFile && (
-                <FilePreviewModal
-                    url={previewFile.url}
-                    title={previewFile.title}
-                    onClose={() => setPreviewFile(null)}
-                />
-            )}
         </div>
     );
 }

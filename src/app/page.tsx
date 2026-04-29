@@ -119,10 +119,9 @@ export default function Home() {
               href="/candidat/login"
               className="w-full sm:flex-1 flex items-center justify-center gap-2 rounded-xl px-6 py-3.5 text-base font-bold shadow-lg transition-all duration-200 hover:-translate-y-0.5 whitespace-nowrap"
               style={{
-                backgroundColor: "#2e7d32",
+                backgroundColor: "#0e7490",
                 color: "#ffffff",
-                border: "2px solid #2e7d32",
-                boxShadow: "0 6px 20px rgba(46,125,50,0.3)",
+                boxShadow: "0 6px 20px rgba(14,116,144,0.3)",
               }}
             >
               <GraduationCap className="h-5 w-5" />

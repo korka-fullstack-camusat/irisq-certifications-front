@@ -58,6 +58,8 @@ function CandidatureDossierInner() {
     const fromMode = searchParams.get("from");
     const backHref = fromMode === "online" || fromMode === "onsite"
         ? `/dashboard/candidatures?mode=${fromMode}`
+        : fromMode === "multi"
+        ? "/dashboard/candidats-multi"
         : "/dashboard/candidatures";
 
     const [response, setResponse] = useState<any>(null);
