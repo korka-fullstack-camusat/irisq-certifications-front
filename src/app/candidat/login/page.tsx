@@ -39,8 +39,9 @@ export default function CandidateLoginPage() {
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
-        if (getCandidateToken()) router.replace("/candidat");
-    }, [router]);
+        // Déjà connecté → redirection complète pour forcer des données fraîches
+        if (getCandidateToken()) window.location.href = "/candidat";
+    }, []);
 
     async function handleSubmit(e: React.FormEvent) {
         e.preventDefault();
@@ -49,10 +50,18 @@ export default function CandidateLoginPage() {
             setLoading(true);
             const { access_token, must_change_password } = await candidateLogin(publicId.trim(), password);
             setCandidateToken(access_token);
-            router.replace(must_change_password ? "/candidat/change-password" : "/candidat");
+
+            // Vider le sessionStorage (état examen, etc.) pour repartir sur une
+            // base propre et voir les dernières mises à jour de la plateforme.
+            if (typeof sessionStorage !== "undefined") sessionStorage.clear();
+
+            // Navigation complète (pas router.replace) pour vider le cache Next.js
+            // et garantir que toutes les données sont fraîches depuis le serveur.
+            window.location.href = must_change_password
+                ? "/candidat/change-password"
+                : "/candidat";
         } catch (err) {
             setError(err instanceof Error ? err.message : "Erreur de connexion");
-        } finally {
             setLoading(false);
         }
     }

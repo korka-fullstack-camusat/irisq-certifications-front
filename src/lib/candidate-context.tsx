@@ -69,13 +69,15 @@ export function CandidateProvider({ children }: { children: React.ReactNode }) {
 
     const logout = useCallback(() => {
         clearCandidateToken();
-        router.replace("/candidat/login");
-    }, [router]);
+        if (typeof sessionStorage !== "undefined") sessionStorage.clear();
+        window.location.href = "/candidat/login";
+    }, []);
 
     const confirmSessionLogout = useCallback(() => {
         clearCandidateToken();
-        router.replace("/candidat/login?reason=autre_appareil");
-    }, [router]);
+        if (typeof sessionStorage !== "undefined") sessionStorage.clear();
+        window.location.href = "/candidat/login?reason=autre_appareil";
+    }, []);
 
     const setDossier = useCallback((d: CandidateDossier) => {
         setDossiers(prev => {
