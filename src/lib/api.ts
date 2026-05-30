@@ -991,6 +991,13 @@ export async function fetchCandidateExam(): Promise<CandidateExam | null> {
     return res.json();
 }
 
+/** Retourne le dernier examen pour chaque certification du candidat (multi-formations). */
+export async function fetchCandidateExams(): Promise<CandidateExam[]> {
+    const res = await candidateFetch(url("candidate/exams-all"));
+    if (!res.ok) return [];
+    return res.json();
+}
+
 export async function candidateResubmitDocument(documentName: string, fileUrl: string): Promise<CandidateDossier> {
     const res = await candidateFetch(url("candidate/resubmit-document"), {
         method: "POST",

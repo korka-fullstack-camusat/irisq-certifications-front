@@ -13,10 +13,11 @@ import {
     Send,
     Trophy,
     Upload,
+    ShieldCheck,
 } from "lucide-react";
 
 import { useCandidate } from "@/lib/candidate-context";
-import { fetchCandidateExam, type CandidateExam, type DocumentValidationEntry } from "@/lib/api";
+import { fetchCandidateExams, type CandidateExam, type DocumentValidationEntry } from "@/lib/api";
 
 const DOC_LABELS: Record<string, string> = {
     "CV": "Curriculum Vitae",
@@ -25,20 +26,29 @@ const DOC_LABELS: Record<string, string> = {
     "Diplômes": "Diplômes / attestations",
 };
 
+// ── Types de notification ──────────────────────────────────────
+type Notif =
+    | { type: "available"; exam: CandidateExam; cert: string }
+    | { type: "done";      cert: string; graded: boolean; grade?: string | null; appreciation?: string | null }
+    | { type: "expired";   cert: string }
+    | { type: "doc";       key: string; label: string; v: DocumentValidationEntry };
+
 export default function CandidateDashboardPage() {
-    const { dossier, loading } = useCandidate();
-    const [exam, setExam] = useState<CandidateExam | null | undefined>(undefined);
+    const { dossier, dossiers, loading } = useCandidate();
+    const [exams, setExams] = useState<CandidateExam[]>([]);
     const [now, setNow] = useState(Date.now());
 
+    // Chargement initial + rafraîchissement toutes les 30s
     useEffect(() => {
-        fetchCandidateExam().then(setExam).catch(() => setExam(null));
+        fetchCandidateExams().then(setExams).catch(() => {});
         const id = setInterval(
-            () => fetchCandidateExam().then(setExam).catch(() => {}),
+            () => fetchCandidateExams().then(setExams).catch(() => {}),
             30_000,
         );
         return () => clearInterval(id);
     }, []);
 
+    // Horloge pour la vérification de deadline
     useEffect(() => {
         const id = setInterval(() => setNow(Date.now()), 1000);
         return () => clearInterval(id);
@@ -52,28 +62,51 @@ export default function CandidateDashboardPage() {
         );
     }
 
-    // ── Calcul des notifications ────────────────────────────────
+    // ── Construction des notifications ────────────────────────────
+    const notifications: Notif[] = [];
+
+    // 1. Une notification d'examen par dossier
+    for (const d of dossiers) {
+        const cert = d.answers?.["Certification souhaitée"];
+        if (!cert) continue;
+
+        const exam   = exams.find(e => e.certification === cert) ?? null;
+        const alreadyDone = d.exam_status === "submitted" || d.exam_status === "graded";
+        const isGraded    = d.exam_status === "graded";
+
+        if (alreadyDone) {
+            notifications.push({
+                type: "done",
+                cert,
+                graded: isGraded,
+                grade: d.final_grade ?? (d as any).exam_grade ?? null,
+                appreciation: d.final_appreciation ?? (d as any).exam_appreciation ?? null,
+            });
+            continue;
+        }
+
+        if (!exam || !d.exam_token) continue;
+
+        const deadline = exam.deadline;
+        const expired  = deadline
+            ? new Date(deadline + "T23:59:59").getTime() < now
+            : false;
+
+        if (expired) {
+            notifications.push({ type: "expired", cert });
+        } else {
+            notifications.push({ type: "available", exam, cert });
+        }
+    }
+
+    // 2. Documents à renvoyer (une seule fois — dossier actif)
     const validation = dossier.documents_validation || {};
-    const docIssues = Object.entries(DOC_LABELS)
+    const docIssues: Notif[] = Object.entries(DOC_LABELS)
         .map(([key, label]) => ({ key, label, v: (validation[key] || {}) as DocumentValidationEntry }))
-        .filter(d => d.v.resubmit_requested);
+        .filter(d => d.v.resubmit_requested)
+        .map(d => ({ type: "doc" as const, ...d }));
 
-    const hasToken        = !!dossier.exam_token;
-    const alreadyDone     = dossier.exam_status === "submitted" || dossier.exam_status === "graded";
-    const isGraded        = dossier.exam_status === "graded";
-    const deadline        = exam?.deadline;
-    const examExpired     = deadline ? new Date(deadline + "T23:59:59").getTime() < now : false;
-
-    const showExpired     = !!exam && hasToken && !alreadyDone && examExpired;
-    const showAvailable   = !!exam && hasToken && !alreadyDone && !examExpired;
-    const showDone        = alreadyDone;
-
-    const notifications = [
-        ...docIssues.map(d => ({ type: "doc" as const, ...d })),
-        ...(showExpired && exam   ? [{ type: "expired"   as const, exam }] : []),
-        ...(showAvailable && exam ? [{ type: "available" as const, exam }] : []),
-        ...(showDone              ? [{ type: "done"      as const }]        : []),
-    ];
+    notifications.push(...docIssues);
 
     const displayName = dossier.name || "Candidat";
 
@@ -81,10 +114,7 @@ export default function CandidateDashboardPage() {
         <div className="max-w-xl mx-auto space-y-8 py-4">
 
             {/* ── Nom ── */}
-            <motion.div
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-            >
+            <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
                 <p className="text-xs font-bold uppercase tracking-[0.2em] text-gray-400 mb-1">
                     Espace candidat
                 </p>
@@ -104,25 +134,22 @@ export default function CandidateDashboardPage() {
                     {notifications.length === 0 ? (
                         <motion.div
                             key="empty"
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            exit={{ opacity: 0 }}
+                            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
                             className="flex items-center gap-3 px-5 py-4 rounded-2xl bg-white border border-gray-100 shadow-sm"
                         >
                             <CheckCircle2 className="h-5 w-5 text-emerald-500 shrink-0" />
-                            <p className="text-sm text-gray-500">
-                                Aucune action requise pour le moment.
-                            </p>
+                            <p className="text-sm text-gray-500">Aucune action requise pour le moment.</p>
                         </motion.div>
                     ) : (
                         notifications.map((n, i) => (
                             <motion.div
-                                key={n.type === "doc" ? n.key : n.type}
+                                key={n.type === "doc" ? `doc-${n.key}` : `${n.type}-${n.cert ?? i}`}
                                 initial={{ opacity: 0, y: 8 }}
                                 animate={{ opacity: 1, y: 0 }}
                                 exit={{ opacity: 0, y: -8 }}
                                 transition={{ delay: i * 0.05 }}
                             >
+
                                 {/* Examen disponible */}
                                 {n.type === "available" && (
                                     <div className="flex items-center gap-4 px-5 py-4 rounded-2xl bg-emerald-50 border border-emerald-100 shadow-sm">
@@ -130,13 +157,23 @@ export default function CandidateDashboardPage() {
                                             <BookOpen className="h-5 w-5 text-emerald-700" />
                                         </div>
                                         <div className="flex-1 min-w-0">
-                                            <p className="font-bold text-gray-800 text-sm leading-snug">
-                                                {n.exam.title || n.exam.certification}
+                                            <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-700 mb-0.5">
+                                                Examen disponible
                                             </p>
-                                            {deadline && (
+                                            <p className="font-bold text-gray-800 text-sm leading-snug truncate">
+                                                {n.exam.title || n.cert}
+                                            </p>
+                                            <p className="text-[11px] text-gray-500 mt-0.5 flex items-center gap-1">
+                                                <ShieldCheck className="h-3 w-3 shrink-0" />
+                                                {n.cert}
+                                            </p>
+                                            {n.exam.deadline && (
                                                 <p className="text-xs text-red-600 mt-0.5 flex items-center gap-1 font-medium">
                                                     <Clock className="h-3 w-3 shrink-0" />
-                                                    Limite&nbsp;: {new Date(deadline).toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" })}
+                                                    Limite&nbsp;:{" "}
+                                                    {new Date(n.exam.deadline).toLocaleDateString("fr-FR", {
+                                                        day: "2-digit", month: "long", year: "numeric",
+                                                    })}
                                                 </p>
                                             )}
                                         </div>
@@ -152,33 +189,37 @@ export default function CandidateDashboardPage() {
 
                                 {/* Examen soumis / corrigé */}
                                 {n.type === "done" && (
-                                    <div className={`flex items-center gap-4 px-5 py-4 rounded-2xl border shadow-sm ${isGraded ? "bg-emerald-50 border-emerald-100" : "bg-blue-50 border-blue-100"}`}>
-                                        <div className={`h-10 w-10 rounded-xl flex items-center justify-center shrink-0 ${isGraded ? "bg-emerald-100" : "bg-blue-100"}`}>
-                                            {isGraded
+                                    <div className={`flex items-center gap-4 px-5 py-4 rounded-2xl border shadow-sm ${n.graded ? "bg-emerald-50 border-emerald-100" : "bg-blue-50 border-blue-100"}`}>
+                                        <div className={`h-10 w-10 rounded-xl flex items-center justify-center shrink-0 ${n.graded ? "bg-emerald-100" : "bg-blue-100"}`}>
+                                            {n.graded
                                                 ? <Trophy className="h-5 w-5 text-emerald-700" />
                                                 : <Send className="h-5 w-5 text-blue-700" />
                                             }
                                         </div>
                                         <div className="flex-1 min-w-0">
-                                            <p className={`font-bold text-sm ${isGraded ? "text-emerald-800" : "text-blue-800"}`}>
-                                                {isGraded ? "Résultats disponibles" : "Copie en cours de correction"}
+                                            <p className={`font-bold text-sm ${n.graded ? "text-emerald-800" : "text-blue-800"}`}>
+                                                {n.graded ? "Résultats disponibles" : "Copie en cours de correction"}
                                             </p>
-                                            {isGraded && dossier.final_grade != null && (
+                                            <p className="text-[11px] text-gray-500 mt-0.5 flex items-center gap-1">
+                                                <ShieldCheck className="h-3 w-3 shrink-0" />
+                                                {n.cert}
+                                            </p>
+                                            {n.graded && n.grade != null && (
                                                 <p className="text-xs text-emerald-700 mt-0.5 font-semibold">
-                                                    Note&nbsp;: <span className="font-black">{dossier.final_grade}</span>
-                                                    {dossier.final_appreciation && (
-                                                        <span className="font-normal italic ml-1">— {dossier.final_appreciation}</span>
+                                                    Note&nbsp;: <span className="font-black">{n.grade}</span>
+                                                    {n.appreciation && (
+                                                        <span className="font-normal italic ml-1">— {n.appreciation}</span>
                                                     )}
                                                 </p>
                                             )}
-                                            {!isGraded && (
+                                            {!n.graded && (
                                                 <p className="text-xs text-blue-600 mt-0.5">
                                                     Résultats envoyés par email après correction.
                                                 </p>
                                             )}
                                         </div>
-                                        <span className={`shrink-0 text-[10px] font-bold px-3 py-1.5 rounded-lg ${isGraded ? "bg-emerald-100 text-emerald-700" : "bg-blue-100 text-blue-700"}`}>
-                                            {isGraded ? "Corrigé" : "Soumis"}
+                                        <span className={`shrink-0 text-[10px] font-bold px-3 py-1.5 rounded-lg ${n.graded ? "bg-emerald-100 text-emerald-700" : "bg-blue-100 text-blue-700"}`}>
+                                            {n.graded ? "Corrigé" : "Soumis"}
                                         </span>
                                     </div>
                                 )}
@@ -190,7 +231,11 @@ export default function CandidateDashboardPage() {
                                             <CalendarDays className="h-5 w-5 text-rose-700" />
                                         </div>
                                         <div className="flex-1 min-w-0">
-                                            <p className="font-bold text-rose-800 text-sm">Délai examen dépassé</p>
+                                            <p className="font-bold text-rose-800 text-sm">Délai dépassé</p>
+                                            <p className="text-[11px] text-gray-500 mt-0.5 flex items-center gap-1">
+                                                <ShieldCheck className="h-3 w-3 shrink-0" />
+                                                {n.cert}
+                                            </p>
                                             <p className="text-xs text-rose-600 mt-0.5">
                                                 Contactez le responsable IRISQ.
                                             </p>
@@ -208,6 +253,9 @@ export default function CandidateDashboardPage() {
                                             <AlertTriangle className="h-5 w-5 text-red-600" />
                                         </div>
                                         <div className="flex-1 min-w-0">
+                                            <p className="text-[10px] font-bold uppercase tracking-widest text-red-700 mb-0.5">
+                                                Document à renvoyer
+                                            </p>
                                             <p className="font-bold text-gray-800 text-sm">{n.label}</p>
                                             {n.v.resubmit_message && (
                                                 <p className="text-xs text-red-700 mt-0.5 italic truncate">
@@ -224,6 +272,7 @@ export default function CandidateDashboardPage() {
                                         </Link>
                                     </div>
                                 )}
+
                             </motion.div>
                         ))
                     )}
