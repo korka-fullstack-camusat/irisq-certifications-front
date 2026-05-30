@@ -161,41 +161,44 @@ export default function DashboardDocumentsPage() {
                 </button>
             </div>
 
-            {/* ── Formulaire d'ajout ── */}
+            {/* ── Modal ajout document ── */}
             {formOpen && (
-                <motion.div
-                    initial={{ opacity: 0, y: -8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden"
-                >
-                    <div
-                        className="px-6 py-4 flex items-center justify-between"
-                        style={{ backgroundColor: "#1a237e" }}
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+                    <motion.div
+                        initial={{ opacity: 0, scale: 0.95, y: 16 }}
+                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                        exit={{ opacity: 0, scale: 0.95, y: 16 }}
+                        transition={{ duration: 0.2 }}
+                        className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden"
                     >
-                        <div className="flex items-center gap-2">
-                            <Upload className="h-4 w-4 text-white/80" />
-                            <span className="text-sm font-bold uppercase tracking-widest text-white">
-                                Nouveau document
-                            </span>
-                        </div>
-                        <button
-                            onClick={() => { setFormOpen(false); resetForm(); }}
-                            className="text-white/60 hover:text-white transition-colors"
+                        {/* Header */}
+                        <div
+                            className="px-6 py-4 flex items-center justify-between"
+                            style={{ backgroundColor: "#1a237e" }}
                         >
-                            <X className="h-4 w-4" />
-                        </button>
-                    </div>
-
-                    <form onSubmit={handleSubmit} className="p-6 space-y-4">
-                        {formError && (
-                            <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm">
-                                {formError}
+                            <div className="flex items-center gap-2">
+                                <Upload className="h-4 w-4 text-white/80" />
+                                <span className="text-sm font-bold uppercase tracking-widest text-white">
+                                    Nouveau document
+                                </span>
                             </div>
-                        )}
+                            <button
+                                onClick={() => { setFormOpen(false); resetForm(); }}
+                                className="text-white/60 hover:text-white transition-colors"
+                            >
+                                <X className="h-4 w-4" />
+                            </button>
+                        </div>
 
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+                            {formError && (
+                                <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm">
+                                    {formError}
+                                </div>
+                            )}
+
                             {/* Titre */}
-                            <div className="sm:col-span-2">
+                            <div>
                                 <label className="text-xs font-bold uppercase tracking-widest text-gray-500 block mb-1">
                                     Titre <span className="text-red-500">*</span>
                                 </label>
@@ -205,86 +208,90 @@ export default function DashboardDocumentsPage() {
                                     onChange={e => setTitle(e.target.value)}
                                     placeholder="Ex : Guide de validation ISO 9001:2015"
                                     className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+                                    autoFocus
                                 />
                             </div>
 
-                            {/* Catégorie */}
-                            <div>
-                                <label className="text-xs font-bold uppercase tracking-widest text-gray-500 block mb-1">
-                                    Catégorie
-                                </label>
-                                <select
-                                    value={category}
-                                    onChange={e => setCategory(e.target.value)}
-                                    className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 bg-white"
-                                >
-                                    {CATEGORIES.map(c => (
-                                        <option key={c} value={c}>{c}</option>
-                                    ))}
-                                </select>
-                            </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                {/* Catégorie */}
+                                <div>
+                                    <label className="text-xs font-bold uppercase tracking-widest text-gray-500 block mb-1">
+                                        Catégorie
+                                    </label>
+                                    <select
+                                        value={category}
+                                        onChange={e => setCategory(e.target.value)}
+                                        className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 bg-white"
+                                    >
+                                        {CATEGORIES.map(c => (
+                                            <option key={c} value={c}>{c}</option>
+                                        ))}
+                                    </select>
+                                </div>
 
-                            {/* Fichier */}
-                            <div>
-                                <label className="text-xs font-bold uppercase tracking-widest text-gray-500 block mb-1">
-                                    Fichier <span className="text-red-500">*</span>
-                                </label>
-                                <div
-                                    className="relative flex items-center gap-3 rounded-xl border border-dashed border-gray-300 px-4 py-2.5 cursor-pointer hover:border-indigo-400 transition-colors"
-                                    onClick={() => fileInputRef.current?.click()}
-                                >
-                                    <Upload className="h-4 w-4 text-gray-400 shrink-0" />
-                                    <span className="text-sm text-gray-500 truncate">
-                                        {fileObj ? fileObj.name : "Choisir un fichier PDF, DOCX…"}
-                                    </span>
-                                    <input
-                                        ref={fileInputRef}
-                                        type="file"
-                                        className="hidden"
-                                        accept="application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/msword,image/jpeg,image/png"
-                                        onChange={e => setFileObj(e.target.files?.[0] || null)}
-                                    />
+                                {/* Fichier */}
+                                <div>
+                                    <label className="text-xs font-bold uppercase tracking-widest text-gray-500 block mb-1">
+                                        Fichier <span className="text-red-500">*</span>
+                                    </label>
+                                    <div
+                                        className="flex items-center gap-2 rounded-xl border border-dashed border-gray-300 px-4 py-2.5 cursor-pointer hover:border-indigo-400 transition-colors"
+                                        onClick={() => fileInputRef.current?.click()}
+                                    >
+                                        <Upload className="h-4 w-4 text-gray-400 shrink-0" />
+                                        <span className="text-sm text-gray-500 truncate">
+                                            {fileObj ? fileObj.name : "PDF, DOCX…"}
+                                        </span>
+                                        <input
+                                            ref={fileInputRef}
+                                            type="file"
+                                            className="hidden"
+                                            accept="application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/msword,image/jpeg,image/png"
+                                            onChange={e => setFileObj(e.target.files?.[0] || null)}
+                                        />
+                                    </div>
                                 </div>
                             </div>
 
                             {/* Description */}
-                            <div className="sm:col-span-2">
+                            <div>
                                 <label className="text-xs font-bold uppercase tracking-widest text-gray-500 block mb-1">
                                     Description <span className="text-gray-300">(optionnel)</span>
                                 </label>
                                 <textarea
                                     value={description}
                                     onChange={e => setDescription(e.target.value)}
-                                    rows={2}
+                                    rows={3}
                                     placeholder="Courte description visible par les candidats…"
                                     className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm resize-none focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
                                 />
                             </div>
-                        </div>
 
-                        <div className="flex gap-3 pt-1">
-                            <button
-                                type="button"
-                                onClick={() => { setFormOpen(false); resetForm(); }}
-                                disabled={uploading}
-                                className="flex-1 py-2.5 rounded-xl text-sm font-bold border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-50"
-                            >
-                                Annuler
-                            </button>
-                            <button
-                                type="submit"
-                                disabled={uploading}
-                                className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white disabled:opacity-50 inline-flex items-center justify-center gap-2"
-                                style={{ backgroundColor: "#1a237e" }}
-                            >
-                                {uploading
-                                    ? <><Loader2 className="h-4 w-4 animate-spin" /> Envoi…</>
-                                    : <><Upload className="h-4 w-4" /> Publier le document</>
-                                }
-                            </button>
-                        </div>
-                    </form>
-                </motion.div>
+                            {/* Actions */}
+                            <div className="flex gap-3 pt-1">
+                                <button
+                                    type="button"
+                                    onClick={() => { setFormOpen(false); resetForm(); }}
+                                    disabled={uploading}
+                                    className="flex-1 py-2.5 rounded-xl text-sm font-bold border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-50 transition-colors"
+                                >
+                                    Annuler
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={uploading}
+                                    className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white disabled:opacity-50 inline-flex items-center justify-center gap-2 transition-all hover:-translate-y-0.5"
+                                    style={{ backgroundColor: "#1a237e", boxShadow: uploading ? "none" : "0 6px 16px rgba(26,35,126,0.25)" }}
+                                >
+                                    {uploading
+                                        ? <><Loader2 className="h-4 w-4 animate-spin" /> Envoi…</>
+                                        : <><Upload className="h-4 w-4" /> Publier</>
+                                    }
+                                </button>
+                            </div>
+                        </form>
+                    </motion.div>
+                </div>
             )}
 
             {/* ── Contenu ── */}
