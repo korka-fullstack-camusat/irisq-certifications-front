@@ -832,14 +832,26 @@ export default function CandidatExamenPage() {
                         {/* Questions list (paginated) */}
                         <div className="flex-1 overflow-y-auto p-5 space-y-6">
                             {questions.length === 0 ? (
-                                <div className="flex flex-col gap-4">
-                                    {/* Sujet PDF — affiché si disponible */}
-                                    {exam.document_url && (
+                                <div className="flex flex-col gap-5">
+                                    {/* ── Sujet du document (HTML converti depuis DOCX/PDF) ── */}
+                                    {exam.exam_content_html ? (
                                         <div className="flex flex-col gap-2">
-                                            <p className="text-[10px] font-bold uppercase tracking-widest text-[#1a237e] mb-1">
+                                            <p className="text-[10px] font-bold uppercase tracking-widest text-[#1a237e]">
                                                 Sujet d&apos;examen
                                             </p>
-                                            <div className="w-full rounded-xl border border-gray-200 overflow-hidden" style={{ height: "480px" }}>
+                                            <div
+                                                className="rounded-xl border border-[#c5cae9] p-5 overflow-y-auto"
+                                                style={{ maxHeight: "460px", backgroundColor: "#fafafa" }}
+                                                dangerouslySetInnerHTML={{ __html: exam.exam_content_html }}
+                                            />
+                                        </div>
+                                    ) : exam.document_url ? (
+                                        /* Fallback PDF iframe si pas d'HTML (anciens examens) */
+                                        <div className="flex flex-col gap-2">
+                                            <p className="text-[10px] font-bold uppercase tracking-widest text-[#1a237e]">
+                                                Sujet d&apos;examen
+                                            </p>
+                                            <div className="w-full rounded-xl border border-gray-200 overflow-hidden" style={{ height: "460px" }}>
                                                 <iframe
                                                     src={exam.document_url}
                                                     title="Sujet d'examen"
@@ -857,12 +869,13 @@ export default function CandidatExamenPage() {
                                                 Ouvrir dans un nouvel onglet
                                             </a>
                                         </div>
-                                    )}
+                                    ) : null}
+
                                     {/* Zone de réponse libre */}
                                     <div className="flex flex-col gap-2">
                                         <h3 className="text-sm font-bold text-gray-700">
                                             Votre Copie{" "}
-                                            <span className="text-xs font-normal text-gray-500">(rédigez ci-dessous)</span>
+                                            <span className="text-xs font-normal text-gray-500">(rédigez vos réponses ci-dessous)</span>
                                         </h3>
                                         <RichTextEditor
                                             value={answers["general_text"] || ""}

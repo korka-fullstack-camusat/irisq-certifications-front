@@ -918,6 +918,7 @@ export interface CandidateExam {
     deadline?: string;
     session_id?: string;
     document_url?: string;
+    exam_content_html?: string;
     created_at?: string;
     parsed_questions?: Array<{
         id: string;
