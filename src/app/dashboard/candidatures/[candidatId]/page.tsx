@@ -18,6 +18,14 @@ import {
     XCircle,
     Ban,
     Trash2,
+    Phone,
+    MapPin,
+    CalendarDays,
+    Globe,
+    Clock,
+    Monitor,
+    GraduationCap,
+    Wrench,
 } from "lucide-react";
 
 import {
@@ -301,6 +309,69 @@ function CandidatureDossierInner() {
                     </span>
                 </div>
             </div>
+
+            {/* ── Informations du candidat ── */}
+            {(() => {
+                const a = response.answers || {};
+
+                const infoRows: { icon: React.ReactNode; label: string; value: string }[] = [];
+
+                const add = (icon: React.ReactNode, label: string, key: string) => {
+                    const v = a[key];
+                    if (v && String(v).trim() && String(v) !== "N/A") {
+                        infoRows.push({ icon, label, value: String(v).trim() });
+                    }
+                };
+
+                // Identité
+                add(<User className="h-4 w-4" />,          "Nom",                "Nom");
+                add(<User className="h-4 w-4" />,          "Prénom",             "Prénom");
+                add(<CalendarDays className="h-4 w-4" />,  "Date de naissance",  "Date de naissance");
+                add(<MapPin className="h-4 w-4" />,        "Lieu de naissance",  "Lieu de naissance");
+                add(<Globe className="h-4 w-4" />,         "Nationalité",        "Nationalité");
+                add(<MapPin className="h-4 w-4" />,        "Adresse",            "Adresse");
+                add(<Phone className="h-4 w-4" />,         "Téléphone",          "Téléphone");
+                add(<Mail className="h-4 w-4" />,          "Email",              "Email");
+
+                // Candidature
+                add(<Clock className="h-4 w-4" />,         "Années d'expérience","Années d'expérience sur la norme");
+                add(<Monitor className="h-4 w-4" />,       "Mode d'examen",      "Mode d'examen");
+                add(<GraduationCap className="h-4 w-4" />, "Type d'examen",      "Type d'examen");
+
+                // Aménagement
+                add(<Wrench className="h-4 w-4" />,        "Aménagement",        "Aménagement spécifique");
+                add(<Wrench className="h-4 w-4" />,        "Détails aménagement","Détails aménagement");
+
+                if (infoRows.length === 0) return null;
+
+                return (
+                    <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm space-y-4">
+                        <h2 className="font-bold text-gray-800 flex items-center gap-2">
+                            <User className="h-4 w-4" style={{ color: "#1a237e" }} />
+                            Informations du candidat
+                        </h2>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            {infoRows.map(({ icon, label, value }) => (
+                                <div
+                                    key={label}
+                                    className="flex items-start gap-3 rounded-xl px-4 py-3"
+                                    style={{ backgroundColor: "#f4f6f9" }}
+                                >
+                                    <span className="mt-0.5 shrink-0" style={{ color: "#1a237e" }}>
+                                        {icon}
+                                    </span>
+                                    <div className="min-w-0">
+                                        <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 leading-none mb-0.5">
+                                            {label}
+                                        </p>
+                                        <p className="text-sm font-semibold text-gray-800 break-words">{value}</p>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                );
+            })()}
 
             {/* ── Documents checklist ── */}
             <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm space-y-4">
