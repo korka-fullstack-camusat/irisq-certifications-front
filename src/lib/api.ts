@@ -901,6 +901,7 @@ export interface CandidateDossier {
     exam_type?: string;
     final_grade?: string;
     final_appreciation?: string;
+    final_decision?: "certified" | "rejected" | null;
     must_change_password?: boolean;
     exam_token?: string;
     /** Positionné à true par le système si le candidat a rechargé la page pendant l'examen.

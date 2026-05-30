@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LogOut, X, MonitorSmartphone } from "lucide-react";
+import { LogOut, X, MonitorSmartphone, Home, Award, FileText, BookOpen } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import Image from "next/image";
 import { CandidateProvider, useCandidate } from "@/lib/candidate-context";
@@ -29,12 +29,25 @@ export default function CandidateLayout({ children }: { children: React.ReactNod
     );
 }
 
+// ── Navigation items ──────────────────────────────────────────────────────
+const NAV_ITEMS = [
+    { href: "/candidat",               label: "Accueil",        icon: Home   },
+    { href: "/candidat/certifications",label: "Certifications", icon: Award  },
+    { href: "/candidat/documents",     label: "Documents",      icon: FileText },
+    { href: "/candidat/examen",        label: "Examen",         icon: BookOpen },
+];
+
 function Shell({ children }: { children: React.ReactNode }) {
     const { dossier, logout, examActive, sessionInvalidated, confirmSessionLogout } = useCandidate();
+    const pathname = usePathname();
     const [showLogoutModal, setShowLogoutModal] = useState(false);
 
     const initials    = (dossier?.name || dossier?.public_id || "??").substring(0, 2).toUpperCase();
     const displayName = dossier?.name || dossier?.public_id || "Candidat";
+
+    // Nav active : match exact pour "/" et prefix pour les autres
+    const isActive = (href: string) =>
+        href === "/candidat" ? pathname === "/candidat" : pathname.startsWith(href);
 
     return (
         <div className={`flex min-h-screen font-sans${examActive ? " overflow-hidden" : ""}`} style={{ backgroundColor: "#f4f6f9" }}>
@@ -182,11 +195,45 @@ function Shell({ children }: { children: React.ReactNode }) {
                 fixed inset-0 z-[200] par-dessus tout — le contenu normal reste
                 monté mais invisible pour ne pas interférer.
             ── */}
-            <main className="flex-1 pt-16">
+            <main className="flex-1 pt-16 pb-20">
                 <div className={`w-full max-w-2xl mx-auto px-4 py-10 transition-opacity duration-300 ${examActive ? "opacity-0 pointer-events-none" : "opacity-100"}`}>
                     {children}
                 </div>
             </main>
+
+            {/* ── Barre de navigation bas ── */}
+            <nav
+                className={`fixed bottom-0 left-0 right-0 z-40 flex items-center justify-around border-t transition-transform duration-300 ${examActive ? "translate-y-full pointer-events-none" : "translate-y-0"}`}
+                style={{ backgroundColor: "#ffffff", borderColor: "#e0e0e0", height: "64px" }}
+            >
+                {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
+                    const active = isActive(href);
+                    return (
+                        <Link
+                            key={href}
+                            href={href}
+                            className="flex flex-col items-center gap-0.5 px-4 py-2 rounded-xl transition-colors group"
+                        >
+                            <div
+                                className="h-8 w-8 flex items-center justify-center rounded-xl transition-colors"
+                                style={{ backgroundColor: active ? "#e8eaf6" : "transparent" }}
+                            >
+                                <Icon
+                                    className="h-4.5 w-4.5 transition-colors"
+                                    style={{ color: active ? "#1a237e" : "#9e9e9e" }}
+                                    size={18}
+                                />
+                            </div>
+                            <span
+                                className="text-[10px] font-bold uppercase tracking-wide transition-colors"
+                                style={{ color: active ? "#1a237e" : "#9e9e9e" }}
+                            >
+                                {label}
+                            </span>
+                        </Link>
+                    );
+                })}
+            </nav>
         </div>
     );
 }
