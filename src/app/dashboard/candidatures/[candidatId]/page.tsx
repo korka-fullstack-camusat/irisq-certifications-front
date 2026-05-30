@@ -28,6 +28,7 @@ import {
     Wrench,
     RefreshCw,
     Award,
+    UserCircle,
 } from "lucide-react";
 
 import {
@@ -94,6 +95,9 @@ function CandidatureDossierInner() {
     const [certList, setCertList] = useState<string[]>([]);
     const [selectedCert, setSelectedCert] = useState("");
     const [changingCert, setChangingCert] = useState(false);
+
+    // Modal infos candidat
+    const [infoOpen, setInfoOpen] = useState(false);
 
     useEffect(() => {
         if (!isLoading && (!user || user.role !== "RH")) {
@@ -326,6 +330,21 @@ function CandidatureDossierInner() {
                         </div>
                     </div>
                     <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
+                        {/* Bouton profil candidat */}
+                        <button
+                            onClick={() => setInfoOpen(true)}
+                            className="inline-flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold border transition-all hover:-translate-y-0.5"
+                            style={{
+                                borderColor: "#c5cae9",
+                                color: "#1a237e",
+                                backgroundColor: "#e8eaf6",
+                            }}
+                            title="Voir le profil du candidat"
+                        >
+                            <UserCircle className="h-3.5 w-3.5" />
+                            Profil candidat
+                        </button>
+
                         {/* Bouton changer la certification */}
                         <button
                             onClick={openCertModal}
@@ -364,69 +383,6 @@ function CandidatureDossierInner() {
                     </div>
                 </div>
             </div>
-
-            {/* ── Informations du candidat ── */}
-            {(() => {
-                const a = response.answers || {};
-
-                const infoRows: { icon: React.ReactNode; label: string; value: string }[] = [];
-
-                const add = (icon: React.ReactNode, label: string, key: string) => {
-                    const v = a[key];
-                    if (v && String(v).trim() && String(v) !== "N/A") {
-                        infoRows.push({ icon, label, value: String(v).trim() });
-                    }
-                };
-
-                // Identité
-                add(<User className="h-4 w-4" />,          "Nom",                "Nom");
-                add(<User className="h-4 w-4" />,          "Prénom",             "Prénom");
-                add(<CalendarDays className="h-4 w-4" />,  "Date de naissance",  "Date de naissance");
-                add(<MapPin className="h-4 w-4" />,        "Lieu de naissance",  "Lieu de naissance");
-                add(<Globe className="h-4 w-4" />,         "Nationalité",        "Nationalité");
-                add(<MapPin className="h-4 w-4" />,        "Adresse",            "Adresse");
-                add(<Phone className="h-4 w-4" />,         "Téléphone",          "Téléphone");
-                add(<Mail className="h-4 w-4" />,          "Email",              "Email");
-
-                // Candidature
-                add(<Clock className="h-4 w-4" />,         "Années d'expérience","Années d'expérience sur la norme");
-                add(<Monitor className="h-4 w-4" />,       "Mode d'examen",      "Mode d'examen");
-                add(<GraduationCap className="h-4 w-4" />, "Type d'examen",      "Type d'examen");
-
-                // Aménagement
-                add(<Wrench className="h-4 w-4" />,        "Aménagement",        "Aménagement spécifique");
-                add(<Wrench className="h-4 w-4" />,        "Détails aménagement","Détails aménagement");
-
-                if (infoRows.length === 0) return null;
-
-                return (
-                    <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm space-y-4">
-                        <h2 className="font-bold text-gray-800 flex items-center gap-2">
-                            <User className="h-4 w-4" style={{ color: "#1a237e" }} />
-                            Informations du candidat
-                        </h2>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                            {infoRows.map(({ icon, label, value }) => (
-                                <div
-                                    key={label}
-                                    className="flex items-start gap-3 rounded-xl px-4 py-3"
-                                    style={{ backgroundColor: "#f4f6f9" }}
-                                >
-                                    <span className="mt-0.5 shrink-0" style={{ color: "#1a237e" }}>
-                                        {icon}
-                                    </span>
-                                    <div className="min-w-0">
-                                        <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 leading-none mb-0.5">
-                                            {label}
-                                        </p>
-                                        <p className="text-sm font-semibold text-gray-800 break-words">{value}</p>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                );
-            })()}
 
             {/* ── Documents checklist ── */}
             <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm space-y-4">
@@ -647,6 +603,114 @@ function CandidatureDossierInner() {
                     </div>
                 )}
             </div>
+
+            {/* ── Modal profil candidat ── */}
+            {infoOpen && (() => {
+                const a = response.answers || {};
+                const infoRows: { icon: React.ReactNode; label: string; value: string }[] = [];
+                const add = (icon: React.ReactNode, label: string, key: string) => {
+                    const v = a[key];
+                    if (v && String(v).trim() && String(v) !== "N/A") {
+                        infoRows.push({ icon, label, value: String(v).trim() });
+                    }
+                };
+                add(<User className="h-4 w-4" />,          "Nom",                "Nom");
+                add(<User className="h-4 w-4" />,          "Prénom",             "Prénom");
+                add(<CalendarDays className="h-4 w-4" />,  "Date de naissance",  "Date de naissance");
+                add(<MapPin className="h-4 w-4" />,        "Lieu de naissance",  "Lieu de naissance");
+                add(<Globe className="h-4 w-4" />,         "Nationalité",        "Nationalité");
+                add(<MapPin className="h-4 w-4" />,        "Adresse",            "Adresse");
+                add(<Phone className="h-4 w-4" />,         "Téléphone",          "Téléphone");
+                add(<Mail className="h-4 w-4" />,          "Email",              "Email");
+                add(<Clock className="h-4 w-4" />,         "Années d'expérience","Années d'expérience sur la norme");
+                add(<Monitor className="h-4 w-4" />,       "Mode d'examen",      "Mode d'examen");
+                add(<GraduationCap className="h-4 w-4" />, "Type d'examen",      "Type d'examen");
+                add(<Wrench className="h-4 w-4" />,        "Aménagement",        "Aménagement spécifique");
+                add(<Wrench className="h-4 w-4" />,        "Détails aménagement","Détails aménagement");
+
+                return (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+                        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden">
+                            {/* Header */}
+                            <div
+                                className="px-6 py-4 flex items-center justify-between"
+                                style={{ backgroundColor: "#1a237e" }}
+                            >
+                                <div className="flex items-center gap-2">
+                                    <UserCircle className="h-4 w-4 text-white/80" />
+                                    <span className="text-sm font-bold uppercase tracking-widest text-white">
+                                        Profil candidat
+                                    </span>
+                                </div>
+                                <button
+                                    onClick={() => setInfoOpen(false)}
+                                    className="text-white/60 hover:text-white transition-colors text-lg leading-none"
+                                    aria-label="Fermer"
+                                >
+                                    ✕
+                                </button>
+                            </div>
+
+                            {/* Identité résumée */}
+                            <div className="px-6 pt-5 pb-4 flex items-center gap-4 border-b border-gray-100">
+                                <div
+                                    className="h-12 w-12 rounded-2xl flex items-center justify-center text-white text-sm font-black shrink-0"
+                                    style={{ backgroundColor: "#1a237e" }}
+                                >
+                                    {candidateName.substring(0, 2).toUpperCase()}
+                                </div>
+                                <div>
+                                    <p className="font-black text-gray-800">{candidateName}</p>
+                                    {candidateEmail && (
+                                        <p className="text-xs text-gray-400 mt-0.5 inline-flex items-center gap-1">
+                                            <Mail className="h-3 w-3" /> {candidateEmail}
+                                        </p>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Grille des infos */}
+                            <div className="px-6 py-5 max-h-[60vh] overflow-y-auto">
+                                {infoRows.length === 0 ? (
+                                    <p className="text-sm text-gray-400 text-center py-4">
+                                        Aucune information renseignée.
+                                    </p>
+                                ) : (
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                        {infoRows.map(({ icon, label, value }) => (
+                                            <div
+                                                key={label}
+                                                className="flex items-start gap-3 rounded-xl px-4 py-3"
+                                                style={{ backgroundColor: "#f4f6f9" }}
+                                            >
+                                                <span className="mt-0.5 shrink-0" style={{ color: "#1a237e" }}>
+                                                    {icon}
+                                                </span>
+                                                <div className="min-w-0">
+                                                    <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 leading-none mb-0.5">
+                                                        {label}
+                                                    </p>
+                                                    <p className="text-sm font-semibold text-gray-800 break-words">{value}</p>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Footer */}
+                            <div className="px-6 pb-5">
+                                <button
+                                    onClick={() => setInfoOpen(false)}
+                                    className="w-full py-2.5 rounded-xl text-sm font-bold border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors"
+                                >
+                                    Fermer
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                );
+            })()}
 
             {/* ── Reject modal ── */}
             {rejectOpen && (
