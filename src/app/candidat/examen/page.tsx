@@ -829,61 +829,56 @@ export default function CandidatExamenPage() {
                             )}
                         </div>
 
-                        {/* Questions list (paginated) */}
-                        <div className="flex-1 overflow-y-auto p-5 space-y-6">
-                            {questions.length === 0 ? (
-                                <div className="flex flex-col gap-5">
-                                    {/* ── Sujet du document (HTML converti depuis DOCX/PDF) ── */}
-                                    {exam.exam_content_html ? (
-                                        <div className="flex flex-col gap-2">
-                                            <p className="text-[10px] font-bold uppercase tracking-widest text-[#1a237e]">
-                                                Sujet d&apos;examen
-                                            </p>
-                                            <div
-                                                className="rounded-xl border border-[#c5cae9] p-5 overflow-y-auto"
-                                                style={{ maxHeight: "460px", backgroundColor: "#fafafa" }}
-                                                dangerouslySetInnerHTML={{ __html: exam.exam_content_html }}
+                        {/* ── Sujet du document — toujours affiché en référence ── */}
+                        {(exam.exam_content_html || exam.document_url) && (
+                            <div className="shrink-0 border-b" style={{ borderColor: "#e8eaf6" }}>
+                                {exam.exam_content_html ? (
+                                    /* HTML converti depuis DOCX/TXT/PDF — fidèle au document original */
+                                    <div
+                                        className="overflow-y-auto px-5 py-4"
+                                        style={{ maxHeight: questions.length > 0 ? "320px" : "460px", backgroundColor: "#fafafa" }}
+                                        dangerouslySetInnerHTML={{ __html: exam.exam_content_html }}
+                                    />
+                                ) : (
+                                    /* Fallback : iframe pour les PDF (rendu natif du navigateur) */
+                                    <div className="flex flex-col gap-2 p-4">
+                                        <div className="w-full rounded-xl border border-gray-200 overflow-hidden" style={{ height: "320px" }}>
+                                            <iframe
+                                                src={exam.document_url}
+                                                title="Sujet d'examen"
+                                                className="w-full h-full"
+                                                style={{ border: "none" }}
                                             />
                                         </div>
-                                    ) : exam.document_url ? (
-                                        /* Fallback PDF iframe si pas d'HTML (anciens examens) */
-                                        <div className="flex flex-col gap-2">
-                                            <p className="text-[10px] font-bold uppercase tracking-widest text-[#1a237e]">
-                                                Sujet d&apos;examen
-                                            </p>
-                                            <div className="w-full rounded-xl border border-gray-200 overflow-hidden" style={{ height: "460px" }}>
-                                                <iframe
-                                                    src={exam.document_url}
-                                                    title="Sujet d'examen"
-                                                    className="w-full h-full"
-                                                    style={{ border: "none" }}
-                                                />
-                                            </div>
-                                            <a
-                                                href={exam.document_url}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                className="self-start text-xs font-semibold underline"
-                                                style={{ color: "#1a237e" }}
-                                            >
-                                                Ouvrir dans un nouvel onglet
-                                            </a>
-                                        </div>
-                                    ) : null}
-
-                                    {/* Zone de réponse libre */}
-                                    <div className="flex flex-col gap-2">
-                                        <h3 className="text-sm font-bold text-gray-700">
-                                            Votre Copie{" "}
-                                            <span className="text-xs font-normal text-gray-500">(rédigez vos réponses ci-dessous)</span>
-                                        </h3>
-                                        <RichTextEditor
-                                            value={answers["general_text"] || ""}
-                                            onChange={html => setAnswers(prev => ({ ...prev, general_text: html }))}
-                                            placeholder="Rédigez vos réponses ici — texte formaté, tableaux, listes…"
-                                            minHeight="280px"
-                                        />
+                                        <a
+                                            href={exam.document_url}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="self-start text-xs font-semibold underline"
+                                            style={{ color: "#1a237e" }}
+                                        >
+                                            Ouvrir dans un nouvel onglet ↗
+                                        </a>
                                     </div>
+                                )}
+                            </div>
+                        )}
+
+                        {/* Questions list (paginated) ou zone de réponse libre */}
+                        <div className="flex-1 overflow-y-auto p-5 space-y-6">
+                            {questions.length === 0 ? (
+                                /* Zone de réponse libre (aucune question parsée) */
+                                <div className="flex flex-col gap-2">
+                                    <h3 className="text-sm font-bold text-gray-700">
+                                        Votre Copie{" "}
+                                        <span className="text-xs font-normal text-gray-500">(rédigez vos réponses ci-dessous)</span>
+                                    </h3>
+                                    <RichTextEditor
+                                        value={answers["general_text"] || ""}
+                                        onChange={html => setAnswers(prev => ({ ...prev, general_text: html }))}
+                                        placeholder="Rédigez vos réponses ici — texte formaté, tableaux, listes…"
+                                        minHeight="240px"
+                                    />
                                 </div>
                             ) : (
                                 pageQuestions.map((q, idx) => {
