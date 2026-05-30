@@ -1018,6 +1018,65 @@ export async function fetchCandidateExams(): Promise<CandidateExam[]> {
     return res.json();
 }
 
+// ──────────────────────────────────────────────────────────────
+// Admin documents (documents officiels partagés avec les candidats)
+// ──────────────────────────────────────────────────────────────
+
+export interface AdminDocument {
+    _id: string;
+    title: string;
+    description?: string;
+    category?: string;
+    file_url: string;
+    original_name?: string;
+    uploaded_by?: string;
+    uploaded_at?: string;
+}
+
+export async function fetchAdminDocuments(): Promise<AdminDocument[]> {
+    const res = await apiFetch(url("admin-documents"), { redirect: "follow" });
+    if (!res.ok) throw new Error("Failed to fetch admin documents");
+    return res.json();
+}
+
+export async function fetchAdminDocumentsPublic(): Promise<AdminDocument[]> {
+    // accessible sans auth (candidat) — utilise candidateFetch
+    const res = await candidateFetch(url("admin-documents"));
+    if (!res.ok) return [];
+    return res.json();
+}
+
+export async function createAdminDocument(data: {
+    title: string;
+    description?: string;
+    category?: string;
+    file_url: string;
+    original_name?: string;
+}): Promise<AdminDocument> {
+    const res = await apiFetch(url("admin-documents"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+        redirect: "follow",
+    });
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || "Erreur lors de la création du document");
+    }
+    return res.json();
+}
+
+export async function deleteAdminDocument(docId: string): Promise<void> {
+    const res = await apiFetch(url(`admin-documents/${docId}`), {
+        method: "DELETE",
+        redirect: "follow",
+    });
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || "Erreur lors de la suppression");
+    }
+}
+
 export async function candidateResubmitDocument(documentName: string, fileUrl: string): Promise<CandidateDossier> {
     const res = await candidateFetch(url("candidate/resubmit-document"), {
         method: "POST",

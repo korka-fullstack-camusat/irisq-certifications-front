@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import {
     Upload,
@@ -10,10 +10,13 @@ import {
     FileText,
     Eye,
     Clock,
+    ExternalLink,
+    Tag,
+    CalendarDays,
 } from "lucide-react";
 
 import { useCandidate } from "@/lib/candidate-context";
-import { candidateResubmitDocument, uploadFiles, type DocumentValidationEntry } from "@/lib/api";
+import { candidateResubmitDocument, uploadFiles, fetchAdminDocumentsPublic, type DocumentValidationEntry, type AdminDocument } from "@/lib/api";
 import { FilePreviewModal } from "@/components/FilePreviewModal";
 
 const DOC_LABELS: Record<string, string> = {
@@ -30,6 +33,16 @@ function extractUrl(value: unknown): string | null {
     return null;
 }
 
+const API_BASE = process.env.NEXT_PUBLIC_API_URL?.replace("/api", "") || "https://irisq-certifications-api.onrender.com";
+
+function categoryColor(cat: string): { bg: string; text: string; border: string } {
+    if (cat === "Conditions de validation") return { bg: "#e8f5e9", text: "#2e7d32", border: "#c8e6c9" };
+    if (cat === "Guide candidat")          return { bg: "#e8eaf6", text: "#1a237e", border: "#c5cae9" };
+    if (cat === "Règlement d'examen")      return { bg: "#fff8e1", text: "#b45309", border: "#ffe082" };
+    if (cat === "Formulaire")              return { bg: "#fce4ec", text: "#c62828", border: "#f8bbd0" };
+    return { bg: "#f3f4f6", text: "#555", border: "#e0e0e0" };
+}
+
 export default function CandidateDocumentsPage() {
     const { dossier, loading, setDossier } = useCandidate();
     const [uploadingKey, setUploadingKey] = useState<string | null>(null);
@@ -37,6 +50,17 @@ export default function CandidateDocumentsPage() {
     const [toast, setToast] = useState<string | null>(null);
     const [previewFile, setPreviewFile] = useState<{ url: string; title?: string } | null>(null);
     const fileInputs = useRef<Record<string, HTMLInputElement | null>>({});
+
+    // Documents officiels
+    const [officialDocs, setOfficialDocs] = useState<AdminDocument[]>([]);
+    const [loadingDocs, setLoadingDocs] = useState(true);
+
+    useEffect(() => {
+        fetchAdminDocumentsPublic()
+            .then(setOfficialDocs)
+            .catch(() => setOfficialDocs([]))
+            .finally(() => setLoadingDocs(false));
+    }, []);
 
     async function handleResubmit(docKey: string, file: File) {
         try {
@@ -86,12 +110,104 @@ export default function CandidateDocumentsPage() {
                     Espace candidat
                 </p>
                 <h1 className="text-2xl font-black" style={{ color: "#1a237e" }}>
-                    Renvoi de documents
+                    Documents
                 </h1>
                 <p className="text-sm text-gray-500 mt-1">
-                    Téléversez directement le bon fichier pour les documents signalés par l&apos;administration. Une fois validés, les nouveaux fichiers apparaissent automatiquement dans votre dossier côté admin.
+                    Consultez les documents officiels publiés par IRISQ et gérez vos documents de dossier.
                 </p>
             </header>
+
+            {/* ── Section : Documents officiels ── */}
+            <section className="space-y-3">
+                <h2 className="font-bold text-gray-700 text-sm flex items-center gap-2">
+                    <FileText className="h-4 w-4" style={{ color: "#1a237e" }} />
+                    Documents officiels
+                </h2>
+
+                {loadingDocs ? (
+                    <div className="flex items-center justify-center py-8">
+                        <Loader2 className="h-5 w-5 animate-spin text-gray-300" />
+                    </div>
+                ) : officialDocs.length === 0 ? (
+                    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8 text-center">
+                        <FileText className="h-8 w-8 mx-auto text-gray-200 mb-2" />
+                        <p className="text-sm text-gray-400">Aucun document officiel disponible pour le moment.</p>
+                    </div>
+                ) : (
+                    <div className="space-y-2">
+                        {officialDocs.map((doc) => {
+                            const col = categoryColor(doc.category || "Autre");
+                            const date = doc.uploaded_at
+                                ? new Date(doc.uploaded_at).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" })
+                                : null;
+                            const fullUrl = doc.file_url.startsWith("http")
+                                ? doc.file_url
+                                : `${API_BASE}${doc.file_url}`;
+
+                            return (
+                                <div
+                                    key={doc._id}
+                                    className="bg-white rounded-2xl border border-gray-100 shadow-sm px-5 py-4 flex items-start gap-4"
+                                >
+                                    <div
+                                        className="h-10 w-10 rounded-xl flex items-center justify-center shrink-0"
+                                        style={{ backgroundColor: "#e8eaf6" }}
+                                    >
+                                        <FileText className="h-5 w-5" style={{ color: "#1a237e" }} />
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <p className="font-bold text-gray-800 text-sm leading-snug">{doc.title}</p>
+                                        {doc.description && (
+                                            <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{doc.description}</p>
+                                        )}
+                                        <div className="flex items-center gap-3 mt-1.5 flex-wrap">
+                                            <span
+                                                className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full"
+                                                style={{ backgroundColor: col.bg, color: col.text, border: `1px solid ${col.border}` }}
+                                            >
+                                                <Tag className="h-2.5 w-2.5" />
+                                                {doc.category || "Autre"}
+                                            </span>
+                                            {date && (
+                                                <span className="inline-flex items-center gap-1 text-[10px] text-gray-400">
+                                                    <CalendarDays className="h-2.5 w-2.5" />
+                                                    {date}
+                                                </span>
+                                            )}
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-2 shrink-0">
+                                        <button
+                                            onClick={() => setPreviewFile({ url: doc.file_url, title: doc.title })}
+                                            className="p-2 rounded-lg text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
+                                            title="Aperçu"
+                                        >
+                                            <Eye className="h-4 w-4" />
+                                        </button>
+                                        <a
+                                            href={fullUrl}
+                                            target="_blank"
+                                            rel="noreferrer"
+                                            className="p-2 rounded-lg text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
+                                            title="Télécharger"
+                                        >
+                                            <ExternalLink className="h-4 w-4" />
+                                        </a>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                )}
+            </section>
+
+            {/* ── Séparateur ── */}
+            <div className="border-t border-gray-100 pt-2">
+                <h2 className="font-bold text-gray-700 text-sm flex items-center gap-2 mb-3">
+                    <Upload className="h-4 w-4" style={{ color: "#1a237e" }} />
+                    Renvoi de documents signalés
+                </h2>
+            </div>
 
             {error && (
                 <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm">
