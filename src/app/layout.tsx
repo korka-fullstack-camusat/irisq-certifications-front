@@ -14,7 +14,7 @@ const outfit = Outfit({
 });
 
 export const metadata: Metadata = {
-  title: "IRISQ-CERTIFICATIONS",
+  title: "IRISQ-CERTIFICATION",
   description: "Plateforme de gestion des formations et certifications.",
 };
 

@@ -780,7 +780,7 @@ export default function DemandeCertificationPage() {
                         className="text-[11px] font-extrabold tracking-[0.22em] uppercase"
                         style={{ color: "#1a237e" }}
                     >
-                        IRISQ-CERTIFICATIONS
+                        IRISQ-CERTIFICATION
                     </span>
                     {/* Titre formulaire */}
                     <h1
@@ -1651,7 +1651,7 @@ export default function DemandeCertificationPage() {
                             <div className="flex-1 h-px" style={{ backgroundColor: "#2e7d32" }} />
                         </div>
                         <span className="text-[10px] font-extrabold tracking-[0.22em] uppercase" style={{ color: "#1a237e" }}>
-                            IRISQ-CERTIFICATIONS
+                            IRISQ-CERTIFICATION
                         </span>
                         <p className="text-[10px] text-gray-400">
                             © {new Date().getFullYear()} — Tous droits réservés

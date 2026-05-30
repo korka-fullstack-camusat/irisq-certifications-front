@@ -34,7 +34,7 @@ export default function Home() {
               className="text-[10px] sm:text-[12px] font-extrabold tracking-[0.25em] uppercase"
               style={{ color: "#1a237e" }}
             >
-              IRISQ-CERTIFICATIONS
+              IRISQ-CERTIFICATION
             </span>
           </motion.div>
         </div>
@@ -53,7 +53,7 @@ export default function Home() {
           >
             <span className="w-2.5 h-2.5 rotate-45 flex-shrink-0" style={{ backgroundColor: "#c62828" }} />
             <span className="text-xs sm:text-sm font-bold tracking-widest uppercase" style={{ color: "#2e7d32" }}>
-              Plateforme de gestion des formations
+              Plateforme de gestion des examens
             </span>
           </motion.div>
 
@@ -65,9 +65,9 @@ export default function Home() {
             className="text-3xl sm:text-5xl lg:text-[3.5rem] font-extrabold leading-tight tracking-tight"
             style={{ color: "#1a237e" }}
           >
-            Pilotez vos formations{" "}
+            Obtenez votre certification{" "}
             <span style={{ color: "#2e7d32" }}>
-              du début jusqu&apos;au diplôme.
+              reconnue et valorisée.
             </span>
           </motion.h1>
 
@@ -78,9 +78,9 @@ export default function Home() {
             transition={{ duration: 0.65, delay: 0.2 }}
             className="text-base sm:text-lg lg:text-xl leading-relaxed max-w-2xl text-gray-500"
           >
-            Gérez vos apprenants, vos évaluations et vos certifications depuis une seule plateforme.{" "}
+            Déposez votre dossier, passez votre examen et suivez l&apos;avancement de votre certification en toute simplicité.{" "}
             <span className="font-semibold" style={{ color: "#1a237e" }}>
-              Simple, puissant, conçu pour les organismes de formation ambitieux.
+              IRISQ vous accompagne à chaque étape de votre parcours.
             </span>
           </motion.p>
 

@@ -1,16 +1,37 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { Loader2, KeyRound, ShieldCheck, Fingerprint, Eye, EyeOff } from "lucide-react";
+import { Loader2, KeyRound, ShieldCheck, Fingerprint, Eye, EyeOff, MonitorSmartphone } from "lucide-react";
 
 import { candidateLogin, setCandidateToken, getCandidateToken } from "@/lib/api";
 
+// Composant séparé pour useSearchParams (requis par Next.js pour le Suspense boundary)
+function AutreAppareilBanner() {
+    const searchParams = useSearchParams();
+    if (searchParams.get("reason") !== "autre_appareil") return null;
+    return (
+        <motion.div
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="flex items-start gap-3 p-3 rounded-xl text-sm"
+            style={{ backgroundColor: "#fff8e1", border: "1px solid #ffe082" }}
+        >
+            <MonitorSmartphone className="h-4 w-4 shrink-0 mt-0.5" style={{ color: "#b45309" }} />
+            <p style={{ color: "#7c4d00" }}>
+                <strong>Session fermée.</strong> Votre compte a été connecté sur un autre appareil.
+                Reconnectez-vous pour reprendre.
+            </p>
+        </motion.div>
+    );
+}
+
 export default function CandidateLoginPage() {
     const router = useRouter();
+
     const [publicId, setPublicId] = useState("");
     const [password, setPassword] = useState("");
     const [showPassword, setShowPassword] = useState(false);
@@ -61,6 +82,10 @@ export default function CandidateLoginPage() {
                     </div>
 
                     <form onSubmit={handleSubmit} className="p-6 space-y-4">
+                        <Suspense fallback={null}>
+                            <AutreAppareilBanner />
+                        </Suspense>
+
                         <p className="text-sm text-gray-600">
                             Connectez-vous avec votre <strong>ID Public</strong> et le <strong>mot de passe</strong> reçus par email lors de votre inscription.
                         </p>

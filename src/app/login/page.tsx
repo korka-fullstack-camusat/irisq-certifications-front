@@ -268,7 +268,7 @@ export default function LoginPage() {
                             </div>
                         </div>
                         <h1 className="text-xl font-extrabold tracking-[0.18em] uppercase text-white">
-                            IRISQ-CERTIFICATIONS
+                            IRISQ-CERTIFICATION
                         </h1>
                         <p className="text-white/60 text-xs mt-1 tracking-wider uppercase">
                             Institut des Risques &amp; de la Qualité

@@ -47,7 +47,7 @@ export default function ExamensPage() {
     certification: "",
     title: "",
     duration_minutes: "" as string | number,
-    start_time: "",
+    deadline: "",
   });
   const [file, setFile] = useState<File | null>(null);
 
@@ -98,7 +98,7 @@ export default function ExamensPage() {
         document_url: docUrl,
         duration_minutes: duration,
         session_id: selectedSessionId || null,
-        start_time: newExam.start_time || null,
+        deadline: newExam.deadline || null,
       });
 
       closeModal();
@@ -141,7 +141,7 @@ export default function ExamensPage() {
     setShowModal(false);
     setFile(null);
     setUploadError(null);
-    setNewExam(prev => ({ ...prev, title: "", duration_minutes: "", start_time: "" }));
+    setNewExam(prev => ({ ...prev, title: "", duration_minutes: "", deadline: "" }));
   };
 
   const filteredExams = useMemo(() => exams.filter(e => {
@@ -360,11 +360,11 @@ export default function ExamensPage() {
                           {exam.duration_minutes} min
                         </span>
                       )}
-                      {exam.start_time && (
+                      {exam.deadline && (
                         <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full"
-                          style={{ backgroundColor: "#fff8e1", color: "#b45309" }}>
+                          style={{ backgroundColor: "#ffebee", color: "#c62828" }}>
                           <CalendarDays className="h-3 w-3" />
-                          {new Date(exam.start_time).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" })}
+                          Limite : {new Date(exam.deadline).toLocaleDateString("fr-FR")}
                         </span>
                       )}
                     </div>
@@ -555,17 +555,21 @@ export default function ExamensPage() {
                   </div>
                 </div>
 
-                {/* Date et heure de début */}
+                {/* Date limite de dépôt */}
                 <div>
                   <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">
-                    Date et heure de début
+                    Date limite de dépôt
                   </label>
+                  <p className="text-xs text-gray-400 mb-2">
+                    Le candidat peut passer l&apos;examen à son heure, jusqu&apos;à cette date.
+                  </p>
                   <div className="relative">
                     <CalendarDays className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                     <input
-                      type="datetime-local"
-                      value={newExam.start_time}
-                      onChange={e => setNewExam({ ...newExam, start_time: e.target.value })}
+                      type="date"
+                      value={newExam.deadline}
+                      min={new Date().toISOString().split("T")[0]}
+                      onChange={e => setNewExam({ ...newExam, deadline: e.target.value })}
                       className="w-full pl-9 py-2.5 bg-[#f4f6f9] border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 transition-all"
                       style={{ "--tw-ring-color": "#1a237e33" } as React.CSSProperties}
                     />

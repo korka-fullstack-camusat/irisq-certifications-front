@@ -416,7 +416,7 @@ export async function createExam(data: {
     document_url: string;
     duration_minutes?: number | null;
     session_id?: string | null;
-    start_time?: string | null;
+    deadline?: string | null;
 }) {
     const res = await apiFetch(url("exams"), {
         method: "POST",
@@ -915,7 +915,7 @@ export interface CandidateExam {
     certification?: string;
     title?: string;
     duration_minutes?: number;
-    start_time?: string;
+    deadline?: string;
     session_id?: string;
     created_at?: string;
     parsed_questions?: Array<{
@@ -978,7 +978,10 @@ export async function candidateChangePassword(currentPassword: string, newPasswo
 
 export async function candidateMe(): Promise<CandidateDossier> {
     const res = await candidateFetch(url("candidate/me"));
-    if (!res.ok) throw new Error("Session expirée");
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(typeof err.detail === "string" ? err.detail : "Session expirée");
+    }
     return res.json();
 }
 

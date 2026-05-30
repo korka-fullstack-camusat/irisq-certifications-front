@@ -182,7 +182,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
                             className="text-[10px] font-extrabold tracking-[0.2em] uppercase"
                             style={{ color: "#1a237e" }}
                         >
-                            IRISQ-CERTIFICATIONS
+                            IRISQ-CERTIFICATION
                         </span>
                     </Link>
                 </div>

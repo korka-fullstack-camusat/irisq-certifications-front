@@ -35,13 +35,8 @@ function formatTime(seconds: number) {
     return `${String(m).padStart(2, "0")}m ${String(s).padStart(2, "0")}s`;
 }
 
-/** Calcule le temps restant en secondes en tenant compte du décalage du candidat. */
+/** Calcule la durée initiale du timer en secondes (pleine durée — pas d'heure fixe). */
 function computeInitialTimer(exam: CandidateExam): number {
-    if (exam.start_time && exam.duration_minutes) {
-        const endTime = new Date(exam.start_time).getTime() + exam.duration_minutes * 60 * 1000;
-        const remaining = Math.floor((endTime - Date.now()) / 1000);
-        return Math.max(1, remaining);
-    }
     return (exam.duration_minutes ?? 120) * 60;
 }
 
@@ -163,6 +158,31 @@ export default function CandidatExamenPage() {
         setExamActive(phase === "exam");
         return () => setExamActive(false);
     }, [phase, setExamActive]);
+
+    // ── Auto-arrêt caméra + plein écran si la copie est déjà soumise ───────
+    // Se déclenche si exam_status passe à "submitted"/"graded" pendant l'examen
+    // (ex : soumission depuis un autre appareil, ou double-soumission détectée).
+    useEffect(() => {
+        const alreadyDone =
+            dossier?.exam_status === "submitted" || dossier?.exam_status === "graded";
+        if (!alreadyDone) return;
+        if (mediaStream) {
+            mediaStream.getTracks().forEach(t => t.stop());
+            setMediaStream(null);
+            setIsCameraActive(false);
+        }
+        if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+        sessionStorage.removeItem(EXAM_SESSION_KEY);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [dossier?.exam_status]);
+
+    // ── Cleanup caméra au démontage du composant ───────────────────────────
+    useEffect(() => {
+        return () => {
+            if (mediaStream) mediaStream.getTracks().forEach(t => t.stop());
+        };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [mediaStream]);
 
     // ── Load exam data ──────────────────────────────────────────────────────
     useEffect(() => {
@@ -292,7 +312,10 @@ export default function CandidatExamenPage() {
     const startExam = async () => {
         if (!dossier?.exam_token || !exam) return;
 
-        // Période expirée → modal informatif, on n'enchaîne pas
+        // Copie déjà soumise → on n'autorise pas un second démarrage
+        if (dossier?.exam_status === "submitted" || dossier?.exam_status === "graded") return;
+
+        // Deadline dépassée → on n'enchaîne pas
         if (examExpired) {
             setShowExpiredModal(true);
             return;
@@ -513,19 +536,48 @@ export default function CandidatExamenPage() {
     }
 
     const hasToken   = !!dossier?.exam_token;
-    const startTime  = exam.start_time;
+    const deadline   = exam.deadline;
 
-    // L'examen a-t-il commencé ?
-    const examStarted = !startTime || new Date(startTime).getTime() <= now;
+    // Examen expiré si la deadline (fin de journée) est dépassée
+    const examExpired = deadline
+        ? new Date(deadline + "T23:59:59").getTime() < now
+        : false;
 
-    // La période d'examen est-elle expirée ?
-    // Expirée = start_time + duration_minutes < maintenant
-    const examExpired =
-        !!startTime &&
-        !!exam.duration_minutes &&
-        new Date(startTime).getTime() + exam.duration_minutes * 60 * 1000 < now;
+    const canStart = hasToken && !examExpired;
 
-    const canStart = hasToken && examStarted;
+    // ── Deadline dépassée ───────────────────────────────────────────────────
+    if (examExpired) {
+        return (
+            <div className="flex items-center justify-center min-h-[60vh]">
+                <motion.div
+                    initial={{ scale: 0.9, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    className="bg-white rounded-2xl p-10 max-w-md w-full text-center border-t-4 shadow-xl"
+                    style={{ borderTopColor: "#c62828" }}
+                >
+                    <div className="h-16 w-16 rounded-full flex items-center justify-center mx-auto mb-6"
+                        style={{ backgroundColor: "#ffebee" }}>
+                        <CalendarDays className="h-8 w-8" style={{ color: "#c62828" }} />
+                    </div>
+                    <h2 className="text-2xl font-black mb-3" style={{ color: "#c62828" }}>
+                        Date limite dépassée
+                    </h2>
+                    <p className="text-gray-500 text-sm leading-relaxed mb-4">
+                        La date limite de dépôt pour cet examen était le{" "}
+                        <strong>
+                            {new Date(deadline! + "T00:00:00").toLocaleDateString("fr-FR", {
+                                day: "2-digit", month: "long", year: "numeric",
+                            })}
+                        </strong>.
+                    </p>
+                    <p className="text-gray-400 text-sm">
+                        Vous ne pouvez plus accéder à cette épreuve.<br />
+                        Contactez le responsable IRISQ si vous pensez qu&apos;il s&apos;agit d&apos;une erreur.
+                    </p>
+                </motion.div>
+            </div>
+        );
+    }
 
     // ── Page INFO ────────────────────────────────────────────────────────────
     if (phase === "info") {
@@ -561,23 +613,20 @@ export default function CandidatExamenPage() {
                                         </div>
                                     </div>
                                 )}
-                                {startTime && (
-                                    <div className="flex items-center gap-3 p-3 rounded-xl" style={{ backgroundColor: "#f4f6f9" }}>
-                                        <CalendarDays className="h-5 w-5 shrink-0" style={{ color: "#b45309" }} />
+                                {deadline && (
+                                    <div className="flex items-center gap-3 p-3 rounded-xl" style={{ backgroundColor: "#ffebee" }}>
+                                        <CalendarDays className="h-5 w-5 shrink-0" style={{ color: "#c62828" }} />
                                         <div>
-                                            <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Début</p>
-                                            <p className="text-xs font-bold text-gray-800">{formatDateTime(startTime)}</p>
+                                            <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Date limite</p>
+                                            <p className="text-xs font-bold" style={{ color: "#c62828" }}>
+                                                {new Date(deadline).toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" })}
+                                            </p>
                                         </div>
                                     </div>
                                 )}
                             </div>
 
-                            {startTime && !examStarted && (
-                                <div className="border border-amber-200 rounded-xl p-5 text-center" style={{ backgroundColor: "#fffbeb" }}>
-                                    <p className="text-xs font-bold uppercase tracking-widest text-amber-600 mb-1">L&apos;examen commence dans</p>
-                                    <Countdown targetIso={startTime} />
-                                </div>
-                            )}
+
 
                             <div className="rounded-xl p-4" style={{ backgroundColor: "#fff1f2", borderLeft: "4px solid #e11d48" }}>
                                 <p className="text-xs font-bold uppercase tracking-widest mb-2" style={{ color: "#be123c" }}>Règles importantes</p>
@@ -596,9 +645,9 @@ export default function CandidatExamenPage() {
                                     <p className="text-amber-700 text-xs">Votre accès à l&apos;examen n&apos;a pas encore été activé par l&apos;évaluateur.</p>
                                 </div>
                             )}
-                            {hasToken && !examStarted && (
-                                <button disabled className="w-full inline-flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold text-white opacity-50 cursor-not-allowed" style={{ backgroundColor: "#1a237e" }}>
-                                    <Lock className="h-4 w-4" />Examen pas encore ouvert
+                            {hasToken && examExpired && (
+                                <button disabled className="w-full inline-flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold text-white opacity-50 cursor-not-allowed" style={{ backgroundColor: "#c62828" }}>
+                                    <Lock className="h-4 w-4" />Date limite dépassée
                                 </button>
                             )}
                             {canStart && (
@@ -665,6 +714,32 @@ export default function CandidatExamenPage() {
     const pageQuestions = questions.slice(currentPage * QUESTIONS_PER_PAGE, (currentPage + 1) * QUESTIONS_PER_PAGE);
     const isLastPage = currentPage === totalPages - 1;
     const answeredCount = Object.values(answers).filter(v => v !== "" && v !== "<p></p>").length;
+
+    // Copie soumise détectée pendant la phase exam (autre appareil ou double soumission)
+    const alreadySubmittedMidExam =
+        dossier?.exam_status === "submitted" || dossier?.exam_status === "graded";
+
+    if (alreadySubmittedMidExam) {
+        return (
+            <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-900">
+                <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
+                    className="bg-white rounded-2xl p-8 max-w-md w-full text-center border-t-4 shadow-2xl"
+                    style={{ borderTopColor: "#2e7d32" }}>
+                    <div className="h-16 w-16 rounded-full flex items-center justify-center mx-auto mb-6"
+                        style={{ backgroundColor: "#e8f5e9" }}>
+                        <CheckCircle2 className="h-8 w-8" style={{ color: "#2e7d32" }} />
+                    </div>
+                    <h2 className="text-2xl font-black mb-3" style={{ color: "#1a237e" }}>
+                        Examen déjà soumis
+                    </h2>
+                    <p className="text-slate-600 text-sm leading-relaxed">
+                        Votre copie a déjà été transmise au correcteur.<br />
+                        Vous ne pouvez pas passer cet examen une seconde fois.
+                    </p>
+                </motion.div>
+            </div>
+        );
+    }
 
     // Camera disconnected
     if (!isCameraActive) {

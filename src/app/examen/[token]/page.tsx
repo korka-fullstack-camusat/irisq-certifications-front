@@ -419,7 +419,7 @@ export default function AntiCheatPortal() {
                             className="text-[10px] sm:text-[12px] font-extrabold tracking-[0.25em] uppercase mb-4"
                             style={{ color: "#1a237e" }}
                         >
-                            IRISQ-CERTIFICATIONS
+                            IRISQ-CERTIFICATION
                         </span>
                         <h1 className="text-2xl font-black text-center" style={{ color: "#1a237e" }}>
                             Vérification d'Identité

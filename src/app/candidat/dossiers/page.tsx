@@ -10,6 +10,7 @@ import {
     Eye,
     Loader2,
     ShieldCheck,
+    Layers,
 } from "lucide-react";
 
 import { useCandidate } from "@/lib/candidate-context";
@@ -113,6 +114,9 @@ export default function CandidateDossiersPage() {
 
     const hasMultiple = dossiers.length > 1;
 
+    // For multi-formation: use the active (primary) dossier for documents
+    const primaryDossier = dossier;
+
     return (
         <motion.div
             initial={{ opacity: 0, y: 10 }}
@@ -131,47 +135,68 @@ export default function CandidateDossiersPage() {
                 </p>
             </header>
 
-            {/* Mode multi-candidatures : une carte par dossier */}
-            {hasMultiple ? (
-                <div className="space-y-4">
-                    {dossiers.map((d, idx) => {
-                        const cert = d.answers?.["Certification souhaitée"] || d.public_id || `Dossier ${idx + 1}`;
-                        const st = statusStyle(d.status);
-                        return (
-                            <div key={d._id} className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-                                {/* Dossier header */}
-                                <div className="px-6 py-4 border-b border-gray-100 flex items-center gap-3" style={{ backgroundColor: "#f8f9ff" }}>
-                                    <ShieldCheck className="h-4 w-4 shrink-0" style={{ color: "#1a237e" }} />
-                                    <div className="flex-1 min-w-0">
-                                        <p className="text-sm font-black truncate" style={{ color: "#1a237e" }}>{cert}</p>
-                                        {d.public_id && (
-                                            <p className="text-[10px] font-mono text-gray-400">{d.public_id}</p>
-                                        )}
-                                    </div>
+            {/* Multi-candidatures : liste compacte des certifications en haut */}
+            {hasMultiple && (
+                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                    <div className="px-6 py-4 border-b border-gray-100 flex items-center gap-2" style={{ backgroundColor: "#f8f9ff" }}>
+                        <Layers className="h-4 w-4 shrink-0" style={{ color: "#1a237e" }} />
+                        <h2 className="text-sm font-black uppercase tracking-widest" style={{ color: "#1a237e" }}>
+                            Candidatures
+                        </h2>
+                        <span
+                            className="ml-auto text-[10px] font-black px-2 py-0.5 rounded-full text-white"
+                            style={{ backgroundColor: "#1a237e" }}
+                        >
+                            {dossiers.length}
+                        </span>
+                    </div>
+                    <ul className="divide-y divide-gray-50">
+                        {dossiers.map((d, idx) => {
+                            const cert = d.answers?.["Certification souhaitée"] || d.public_id || `Dossier ${idx + 1}`;
+                            const st = statusStyle(d.status);
+                            const isActive = d._id === primaryDossier._id;
+                            return (
+                                <li
+                                    key={d._id}
+                                    className="px-6 py-3 flex items-center gap-3"
+                                    style={isActive ? { backgroundColor: "#f0f4ff" } : undefined}
+                                >
+                                    <ShieldCheck
+                                        className="h-4 w-4 shrink-0"
+                                        style={{ color: isActive ? "#1a237e" : "#94a3b8" }}
+                                    />
+                                    <p
+                                        className="flex-1 text-sm font-semibold truncate"
+                                        style={{ color: isActive ? "#1a237e" : "#374151" }}
+                                    >
+                                        {cert}
+                                    </p>
                                     <span
                                         className="text-[10px] font-bold px-2.5 py-1 rounded-full shrink-0"
                                         style={{ backgroundColor: st.bg, color: st.color }}
                                     >
                                         {st.label}
                                     </span>
-                                </div>
-                                <DossierDocuments d={d} onPreview={(url, title) => setPreviewFile({ url, title })} />
-                            </div>
-                        );
-                    })}
-                </div>
-            ) : (
-                /* Mode candidature unique (comportement original) */
-                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-                    <div className="px-6 py-4 border-b border-gray-100 flex items-center gap-2">
-                        <FileText className="h-4 w-4" style={{ color: "#1a237e" }} />
-                        <h2 className="text-sm font-black uppercase tracking-widest" style={{ color: "#1a237e" }}>
-                            Documents transmis
-                        </h2>
-                    </div>
-                    <DossierDocuments d={dossier} onPreview={(url, title) => setPreviewFile({ url, title })} />
+                                </li>
+                            );
+                        })}
+                    </ul>
                 </div>
             )}
+
+            {/* Documents transmis — une seule section quelle que soit le nombre de candidatures */}
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                <div className="px-6 py-4 border-b border-gray-100 flex items-center gap-2">
+                    <FileText className="h-4 w-4" style={{ color: "#1a237e" }} />
+                    <h2 className="text-sm font-black uppercase tracking-widest" style={{ color: "#1a237e" }}>
+                        Documents transmis
+                    </h2>
+                </div>
+                <DossierDocuments
+                    d={primaryDossier}
+                    onPreview={(url, title) => setPreviewFile({ url, title })}
+                />
+            </div>
 
             {previewFile && (
                 <FilePreviewModal
