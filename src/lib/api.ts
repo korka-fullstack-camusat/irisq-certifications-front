@@ -621,6 +621,23 @@ export interface DocumentValidationEntry {
     previous_url?: string;
 }
 
+export async function updateCertification(
+    responseId: string,
+    certification: string,
+): Promise<any> {
+    const res = await apiFetch(url(`responses/${responseId}/certification`), {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ certification }),
+        redirect: "follow",
+    });
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || "Erreur lors du changement de certification");
+    }
+    return res.json();
+}
+
 export async function updateDocumentsValidation(
     responseId: string,
     documents_validation: Record<string, DocumentValidationEntry>,

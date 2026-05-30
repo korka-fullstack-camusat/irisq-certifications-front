@@ -26,13 +26,17 @@ import {
     Monitor,
     GraduationCap,
     Wrench,
+    RefreshCw,
+    Award,
 } from "lucide-react";
 
 import {
     fetchResponse,
+    fetchCertifications,
     updateDocumentsValidation,
     requestDocumentResubmit,
     updateResponseStatus,
+    updateCertification,
     deleteResponse,
     type DocumentValidationEntry,
 } from "@/lib/api";
@@ -84,6 +88,12 @@ function CandidatureDossierInner() {
     const [deleteOpen, setDeleteOpen] = useState(false);
     const [deleting, setDeleting] = useState(false);
     const [previewFile, setPreviewFile] = useState<{ url: string; title?: string } | null>(null);
+
+    // Changement de certification
+    const [certModalOpen, setCertModalOpen] = useState(false);
+    const [certList, setCertList] = useState<string[]>([]);
+    const [selectedCert, setSelectedCert] = useState("");
+    const [changingCert, setChangingCert] = useState(false);
 
     useEffect(() => {
         if (!isLoading && (!user || user.role !== "RH")) {
@@ -214,6 +224,33 @@ function CandidatureDossierInner() {
         }
     }
 
+    async function openCertModal() {
+        if (certList.length === 0) {
+            try {
+                const list = await fetchCertifications();
+                setCertList(list);
+            } catch {
+                setCertList([]);
+            }
+        }
+        setSelectedCert(response?.answers?.["Certification souhaitée"] || "");
+        setCertModalOpen(true);
+    }
+
+    async function confirmChangeCert() {
+        if (!response || !selectedCert) return;
+        try {
+            setChangingCert(true);
+            const updated = await updateCertification(response._id, selectedCert);
+            setResponse(updated);
+            setCertModalOpen(false);
+        } catch (e) {
+            alert(e instanceof Error ? e.message : "Erreur lors du changement");
+        } finally {
+            setChangingCert(false);
+        }
+    }
+
     async function confirmDelete() {
         if (!response) return;
         try {
@@ -288,25 +325,43 @@ function CandidatureDossierInner() {
                             </div>
                         </div>
                     </div>
-                    <span
-                        className="inline-flex items-center gap-1 text-[10px] uppercase tracking-widest font-bold px-2 py-1 rounded-full"
-                        style={{
-                            backgroundColor:
-                                response.status === "approved"
-                                    ? "#e8f5e9"
-                                    : response.status === "rejected"
-                                        ? "#ffebee"
-                                        : "#fff8e1",
-                            color:
-                                response.status === "approved"
-                                    ? "#2e7d32"
-                                    : response.status === "rejected"
-                                        ? "#c62828"
-                                        : "#b45309",
-                        }}
-                    >
-                        {response.status}
-                    </span>
+                    <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
+                        {/* Bouton changer la certification */}
+                        <button
+                            onClick={openCertModal}
+                            className="inline-flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold border transition-all hover:-translate-y-0.5"
+                            style={{
+                                borderColor: "#c5cae9",
+                                color: "#1a237e",
+                                backgroundColor: "#e8eaf6",
+                            }}
+                            title="Modifier la certification cible de ce candidat"
+                        >
+                            <RefreshCw className="h-3.5 w-3.5" />
+                            Changer la certification
+                        </button>
+
+                        {/* Badge statut */}
+                        <span
+                            className="inline-flex items-center gap-1 text-[10px] uppercase tracking-widest font-bold px-2 py-1 rounded-full"
+                            style={{
+                                backgroundColor:
+                                    response.status === "approved"
+                                        ? "#e8f5e9"
+                                        : response.status === "rejected"
+                                            ? "#ffebee"
+                                            : "#fff8e1",
+                                color:
+                                    response.status === "approved"
+                                        ? "#2e7d32"
+                                        : response.status === "rejected"
+                                            ? "#c62828"
+                                            : "#b45309",
+                            }}
+                        >
+                            {response.status}
+                        </span>
+                    </div>
                 </div>
             </div>
 
@@ -698,6 +753,101 @@ function CandidatureDossierInner() {
                     title={previewFile.title}
                     onClose={() => setPreviewFile(null)}
                 />
+            )}
+
+            {/* ── Modal changement de certification ── */}
+            {certModalOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+                        {/* Header */}
+                        <div
+                            className="px-6 py-4 flex items-center gap-2"
+                            style={{ backgroundColor: "#1a237e" }}
+                        >
+                            <Award className="h-4 w-4 text-white/80" />
+                            <span className="text-sm font-bold uppercase tracking-widest text-white">
+                                Changer la certification
+                            </span>
+                        </div>
+
+                        <div className="p-6 space-y-5">
+                            {/* Certification actuelle */}
+                            <div>
+                                <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1">
+                                    Certification actuelle
+                                </p>
+                                <div
+                                    className="px-4 py-2.5 rounded-xl text-sm font-semibold text-gray-700"
+                                    style={{ backgroundColor: "#f4f6f9" }}
+                                >
+                                    {response?.answers?.["Certification souhaitée"] || "—"}
+                                </div>
+                            </div>
+
+                            {/* Nouvelle certification */}
+                            <div>
+                                <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400 block mb-1">
+                                    Nouvelle certification <span className="text-red-500">*</span>
+                                </label>
+                                {certList.length === 0 ? (
+                                    <div className="flex items-center gap-2 py-3 text-gray-400 text-sm">
+                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                        Chargement des certifications…
+                                    </div>
+                                ) : (
+                                    <select
+                                        value={selectedCert}
+                                        onChange={e => setSelectedCert(e.target.value)}
+                                        className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 bg-white"
+                                    >
+                                        <option value="" disabled>Sélectionner une certification…</option>
+                                        {certList.map(c => (
+                                            <option key={c} value={c}>{c}</option>
+                                        ))}
+                                    </select>
+                                )}
+                            </div>
+
+                            {/* Avertissement */}
+                            <div
+                                className="flex items-start gap-3 px-4 py-3 rounded-xl text-xs"
+                                style={{ backgroundColor: "#fff8e1", border: "1px solid #ffe082", color: "#b45309" }}
+                            >
+                                <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+                                <div>
+                                    <p className="font-bold mb-0.5">Ce changement est immédiat</p>
+                                    <p>La certification du candidat sera mise à jour en temps réel. L&apos;accès à l&apos;examen sera réinitialisé — un nouvel examen devra être publié pour la nouvelle certification.</p>
+                                </div>
+                            </div>
+
+                            {/* Actions */}
+                            <div className="flex gap-3 pt-1">
+                                <button
+                                    onClick={() => setCertModalOpen(false)}
+                                    disabled={changingCert}
+                                    className="flex-1 py-2.5 rounded-xl text-sm font-bold border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+                                >
+                                    Annuler
+                                </button>
+                                <button
+                                    onClick={confirmChangeCert}
+                                    disabled={
+                                        changingCert ||
+                                        !selectedCert ||
+                                        selectedCert === response?.answers?.["Certification souhaitée"]
+                                    }
+                                    className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white disabled:opacity-50 inline-flex items-center justify-center gap-2"
+                                    style={{ backgroundColor: "#1a237e" }}
+                                >
+                                    {changingCert
+                                        ? <><Loader2 className="h-4 w-4 animate-spin" /> Mise à jour…</>
+                                        : <><RefreshCw className="h-4 w-4" /> Confirmer le changement</>
+                                    }
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             )}
 
             {/* ── Resubmit modal ── */}
