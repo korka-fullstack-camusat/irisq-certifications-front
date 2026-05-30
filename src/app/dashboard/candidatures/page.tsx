@@ -32,6 +32,7 @@ import {
     type Session,
 } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
+import { Pagination } from "@/components/Pagination";
 
 interface CandidatureRow {
     _id: string;
@@ -111,6 +112,12 @@ function CandidaturesInner() {
     const [examTypeOpen, setExamTypeOpen] = useState(false);
     const filterRef = useRef<HTMLDivElement>(null);
 
+    // Pagination
+    const LIST_PAGE_SIZE = 15;
+    const FOLDER_PAGE_SIZE = 12;
+    const [listPage, setListPage] = useState(1);
+    const [folderPage, setFolderPage] = useState(1);
+
     useEffect(() => {
         if (!isLoading && (!user || user.role !== "RH")) {
             router.replace("/dashboard");
@@ -152,7 +159,12 @@ function CandidaturesInner() {
         setExamTypeTab("all");
         setSearchQuery("");
         setExamTypeOpen(false);
+        setListPage(1);
     }, [modeTab]);
+
+    // Reset list page when session or filters change
+    useEffect(() => { setListPage(1); }, [selectedId, examTypeTab, searchQuery]);
+    useEffect(() => { setFolderPage(1); }, [selectedId]);
 
     // Close exam type dropdown on outside click
     useEffect(() => {
@@ -212,6 +224,18 @@ function CandidaturesInner() {
         }
         return Array.from(map.entries()).map(([name, items]) => ({ name, items }));
     }, [rows, multiEmails]);
+
+    // Paginated slices
+    const pagedCandidates = useMemo(() => {
+        const start = (listPage - 1) * LIST_PAGE_SIZE;
+        return filteredCandidates.slice(start, start + LIST_PAGE_SIZE);
+    }, [filteredCandidates, listPage]);
+
+    const pagedFormations = useMemo(() => {
+        const nonEmpty = formations.filter(f => f.items.length > 0);
+        const start = (folderPage - 1) * FOLDER_PAGE_SIZE;
+        return nonEmpty.slice(start, start + FOLDER_PAGE_SIZE);
+    }, [formations, folderPage]);
 
     async function handleExport() {
         if (!selectedId || exporting) return;
@@ -402,7 +426,7 @@ function CandidaturesInner() {
                         </div>
                     ) : (
                     <div className="grid gap-3">
-                        {filteredCandidates.map((r, i) => {
+                        {pagedCandidates.map((r, i) => {
                             const status = (r.status || "pending") as "pending" | "approved" | "rejected";
                             const docState = validationState(r);
                             const formation = r.answers?.[FORMATION_FIELD] || "—";
@@ -486,55 +510,79 @@ function CandidaturesInner() {
                         })}
                     </div>
                     )}
+                    {filteredCandidates.length > LIST_PAGE_SIZE && (
+                        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm px-4 py-2">
+                            <Pagination
+                                total={filteredCandidates.length}
+                                page={listPage}
+                                pageSize={LIST_PAGE_SIZE}
+                                onPageChange={setListPage}
+                            />
+                        </div>
+                    )}
                 </div>
             ) : (
                 /* ── VUE DOSSIERS : Toutes les demandes ── */
-                formations.every(f => f.items.length === 0) ? (
-                    <div className="p-12 text-center rounded-2xl bg-white border border-dashed border-gray-200">
-                        <Folder className="h-10 w-10 mx-auto mb-3 text-gray-300" />
-                        <p className="text-gray-500 text-sm">Aucun dossier disponible pour cette session.</p>
-                    </div>
-                ) : (
-                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                        {formations.map((f, i) => {
-                            const pending = f.items.filter(r => !r.status || r.status === "pending").length;
-                            const approved = f.items.filter(r => r.status === "approved").length;
-                            const isEmpty = f.items.length === 0;
-                            return (
-                                <motion.div
-                                    key={f.name}
-                                    initial={{ opacity: 0, y: 8 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    transition={{ delay: i * 0.03 }}
-                                >
-                                    <Link
-                                        href={`/dashboard/candidatures/formation?session=${encodeURIComponent(selectedId)}&name=${encodeURIComponent(f.name)}`}
-                                        className="group flex items-start gap-4 p-5 rounded-2xl bg-white border border-gray-100 shadow-sm hover:shadow-md hover:border-indigo-200 transition-all h-full"
-                                    >
-                                        <div
-                                            className="h-12 w-12 rounded-xl flex items-center justify-center shrink-0"
-                                            style={{ backgroundColor: isEmpty ? "#f3f4f6" : "#fff8e1" }}
+                (() => {
+                    const nonEmptyFormations = formations.filter(f => f.items.length > 0);
+                    if (nonEmptyFormations.length === 0) return (
+                        <div className="p-12 text-center rounded-2xl bg-white border border-dashed border-gray-200">
+                            <Folder className="h-10 w-10 mx-auto mb-3 text-gray-300" />
+                            <p className="text-gray-500 text-sm">Aucun dossier disponible pour cette session.</p>
+                        </div>
+                    );
+                    return (
+                        <div className="space-y-4">
+                            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                                {pagedFormations.map((f, i) => {
+                                    const pending = f.items.filter(r => !r.status || r.status === "pending").length;
+                                    const approved = f.items.filter(r => r.status === "approved").length;
+                                    return (
+                                        <motion.div
+                                            key={f.name}
+                                            initial={{ opacity: 0, y: 8 }}
+                                            animate={{ opacity: 1, y: 0 }}
+                                            transition={{ delay: i * 0.03 }}
                                         >
-                                            <Folder className="h-5 w-5" style={{ color: isEmpty ? "#9ca3af" : "#f59e0b" }} />
-                                        </div>
-                                        <div className="flex-1 min-w-0">
-                                            <h3 className="font-bold text-gray-800 leading-snug line-clamp-2">{f.name}</h3>
-                                            <div className="mt-2 flex items-center gap-3 text-xs text-gray-500 flex-wrap">
-                                                <span className="inline-flex items-center gap-1">
-                                                    <Users className="h-3 w-3" /> {f.items.length} candidat{f.items.length > 1 ? "s" : ""}
-                                                </span>
-                                                {pending > 0 && <span className="text-amber-700">{pending} en attente</span>}
-                                                {approved > 0 && <span className="text-green-700">{approved} validé{approved > 1 ? "s" : ""}</span>}
-                                                {isEmpty && <span className="text-gray-400 italic">Vide</span>}
-                                            </div>
-                                        </div>
-                                        <ChevronRight className="h-5 w-5 text-gray-300 group-hover:text-indigo-500 transition-colors shrink-0" />
-                                    </Link>
-                                </motion.div>
-                            );
-                        })}
-                    </div>
-                )
+                                            <Link
+                                                href={`/dashboard/candidatures/formation?session=${encodeURIComponent(selectedId)}&name=${encodeURIComponent(f.name)}`}
+                                                className="group flex items-start gap-4 p-5 rounded-2xl bg-white border border-gray-100 shadow-sm hover:shadow-md hover:border-indigo-200 transition-all h-full"
+                                            >
+                                                <div
+                                                    className="h-12 w-12 rounded-xl flex items-center justify-center shrink-0"
+                                                    style={{ backgroundColor: "#fff8e1" }}
+                                                >
+                                                    <Folder className="h-5 w-5" style={{ color: "#f59e0b" }} />
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <h3 className="font-bold text-gray-800 leading-snug line-clamp-2">{f.name}</h3>
+                                                    <div className="mt-2 flex items-center gap-3 text-xs text-gray-500 flex-wrap">
+                                                        <span className="inline-flex items-center gap-1">
+                                                            <Users className="h-3 w-3" /> {f.items.length} candidat{f.items.length > 1 ? "s" : ""}
+                                                        </span>
+                                                        {pending > 0 && <span className="text-amber-700">{pending} en attente</span>}
+                                                        {approved > 0 && <span className="text-green-700">{approved} validé{approved > 1 ? "s" : ""}</span>}
+                                                    </div>
+                                                </div>
+                                                <ChevronRight className="h-5 w-5 text-gray-300 group-hover:text-indigo-500 transition-colors shrink-0" />
+                                            </Link>
+                                        </motion.div>
+                                    );
+                                })}
+                            </div>
+                            {nonEmptyFormations.length > FOLDER_PAGE_SIZE && (
+                                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm px-4 py-2">
+                                    <Pagination
+                                        total={nonEmptyFormations.length}
+                                        page={folderPage}
+                                        pageSize={FOLDER_PAGE_SIZE}
+                                        onPageChange={setFolderPage}
+                                    />
+                                </div>
+                            )}
+                        </div>
+                    );
+                })()
             )}
         </div>
     );

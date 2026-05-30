@@ -30,6 +30,7 @@ import {
     type MultiCandidatureDossier,
     type Session,
 } from "@/lib/api";
+import { Pagination } from "@/components/Pagination";
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -239,12 +240,15 @@ function CandidateRootFolder({ entry }: { entry: MultiCandidatureEntry }) {
 // ── Page ───────────────────────────────────────────────────────────────────
 
 export default function CandidatsMultiPage() {
+    const PAGE_SIZE = 10;
+
     const [entries, setEntries] = useState<MultiCandidatureEntry[]>([]);
     const [sessions, setSessions] = useState<Session[]>([]);
     const [selectedSession, setSelectedSession] = useState<string>("");
     const [search, setSearch] = useState("");
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [page, setPage] = useState(1);
 
     useEffect(() => {
         fetchSessions().then(list => {
@@ -257,6 +261,7 @@ export default function CandidatsMultiPage() {
     useEffect(() => {
         setLoading(true);
         setError(null);
+        setPage(1);
         fetchMultiCandidatures(selectedSession || undefined)
             .then(setEntries)
             .catch(() => setError("Impossible de charger les données."))
@@ -264,6 +269,7 @@ export default function CandidatsMultiPage() {
     }, [selectedSession]);
 
     const filtered = useMemo(() => {
+        setPage(1);
         if (!search.trim()) return entries;
         const q = search.toLowerCase();
         return entries.filter(e =>
@@ -273,6 +279,11 @@ export default function CandidatsMultiPage() {
             e.dossiers.some(d => d.certification?.toLowerCase().includes(q))
         );
     }, [entries, search]);
+
+    const pagedEntries = useMemo(() => {
+        const start = (page - 1) * PAGE_SIZE;
+        return filtered.slice(start, start + PAGE_SIZE);
+    }, [filtered, page]);
 
     return (
         <div className="space-y-6">
@@ -351,12 +362,22 @@ export default function CandidatsMultiPage() {
                 </motion.div>
             ) : (
                 <div className="space-y-4">
-                    {filtered.map((entry, i) => (
+                    {pagedEntries.map((entry, i) => (
                         <CandidateRootFolder
                             key={`${entry.email}-${entry.session_id}-${i}`}
                             entry={entry}
                         />
                     ))}
+                    {filtered.length > PAGE_SIZE && (
+                        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm px-4 py-2">
+                            <Pagination
+                                total={filtered.length}
+                                page={page}
+                                pageSize={PAGE_SIZE}
+                                onPageChange={setPage}
+                            />
+                        </div>
+                    )}
                 </div>
             )}
 
