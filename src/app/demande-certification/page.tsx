@@ -41,7 +41,7 @@ function getEligibleCertifications(yearsStr: string): string[] {
 
 /** Extrait la norme ISO d'un libellé de certification (ex: "9001", "17025"). */
 function extractNorm(cert: string): string {
-    const m = cert.match(/\b(17025|9001|14001|45001)\b/);
+    const m = cert.match(/(17025|9001|14001|45001)/);
     return m ? m[1] : cert;
 }
 
