@@ -382,6 +382,13 @@ export async function unblockExam(responseId: string) {
     return res.json();
 }
 
+/** Retourne tous les candidats dont l'accès à l'examen est actuellement bloqué. */
+export async function fetchExamBlockedResponses(): Promise<any[]> {
+    const res = await apiFetch(url("responses/exam-blocked"), { redirect: "follow" });
+    if (!res.ok) throw new Error("Failed to fetch blocked responses");
+    return res.json();
+}
+
 export async function reportExamBlocked(reason = "Rechargement de page pendant l'examen") {
     const token = typeof window !== "undefined" ? localStorage.getItem("candidate_token") : null;
     if (!token) return;

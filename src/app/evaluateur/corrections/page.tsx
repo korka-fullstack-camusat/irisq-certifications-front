@@ -8,7 +8,7 @@ import {
     Edit3, Camera, FileText, AlertTriangle,
     ChevronLeft, ChevronRight, Lock, Clock, Maximize2,
 } from "lucide-react";
-import { fetchSessions, fetchSessionResponses, unblockExam, API_URL } from "@/lib/api";
+import { fetchSessions, fetchSessionResponses, fetchExamBlockedResponses, unblockExam, API_URL } from "@/lib/api";
 import { FilePreviewModal } from "@/components/FilePreviewModal";
 import { AnnotatedCopyModal } from "@/components/AnnotatedCopyModal";
 
@@ -57,23 +57,29 @@ export default function CorrectionsPage() {
     const [renderProgress, setRenderProgress] = useState(0);
     const [totalPdfPages, setTotalPdfPages]   = useState(0);
 
-    // ── Chargement de toutes les sessions ──────────────────────────────────
+    // ── Chargement des copies + candidats bloqués (sessions + hors-session) ──
     useEffect(() => {
         const load = async () => {
             setIsLoading(true);
             try {
+                // 1. Réponses liées à des sessions (copies soumises + bloquées en session)
                 const sessions = await fetchSessions();
                 const chunks = await Promise.all(
                     sessions.map((s: any) => fetchSessionResponses(s._id).catch(() => []))
                 );
-                const all: any[] = ([] as any[]).concat(...chunks);
-                const withExam = all.filter(
+                const fromSessions: any[] = ([] as any[]).concat(...chunks);
+                const withExam = fromSessions.filter(
                     (r: any) => r.status === "approved" &&
                         (r.exam_document || (r.exam_answers && r.exam_answers.length > 0) || r.exam_blocked)
                 );
-                // dédoublonner par _id
+
+                // 2. Candidats bloqués hors-session (candidatures publiques ou directes)
+                const blocked = await fetchExamBlockedResponses().catch(() => []);
+
+                // 3. Fusionner + dédoublonner par _id
+                const combined = [...withExam, ...blocked];
                 const seen = new Set<string>();
-                setResponses(withExam.filter(r => { if (seen.has(r._id)) return false; seen.add(r._id); return true; }));
+                setResponses(combined.filter(r => { if (seen.has(r._id)) return false; seen.add(r._id); return true; }));
             } catch (err) {
                 console.error("Erreur chargement corrections", err);
             } finally {
