@@ -471,8 +471,11 @@ export default function DemandeCertificationPage() {
             // Submit one dossier per selected certification (same files, different cert name)
             // The first submission generates the public_id; subsequent ones reuse it so
             // the candidate has a single matricule for all their certifications in this session.
+            // all_certifications is passed ONLY on the first call so the backend sends
+            // a single confirmation email listing all chosen formations.
             let sharedPublicId: string | undefined;
             for (const cert of certifications) {
+                const isFirst = !sharedPublicId;
                 const result = await submitResponse(formId, {
                     form_id: formId,
                     session_id: sessionId || undefined,
@@ -482,6 +485,9 @@ export default function DemandeCertificationPage() {
                     exam_mode: examMode,
                     exam_type: examType,
                     public_id: sharedPublicId,
+                    // Liste complète des certifications transmise au backend pour
+                    // l'email récapitulatif (seulement sur le 1er dossier).
+                    all_certifications: isFirst ? certifications : undefined,
                     answers: {
                         Nom: nom,
                         Prénom: prenom,
