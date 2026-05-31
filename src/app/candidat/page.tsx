@@ -1,15 +1,21 @@
 "use client";
 
-import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import {
     CheckCircle2, Clock, Loader2, BookOpen,
-    Layers, PlusCircle, Award, ShieldCheck, X, ArrowRight, Info,
+    Layers, PlusCircle, Award, ShieldCheck, X,
+    MonitorSmartphone, MapPin,
 } from "lucide-react";
 
 import { useCandidate } from "@/lib/candidate-context";
-import { fetchCandidateExams, type CandidateExam, type CandidateDossier } from "@/lib/api";
+import {
+    fetchCandidateExams,
+    candidateNewApplication,
+    type CandidateExam,
+    type CandidateDossier,
+} from "@/lib/api";
 
 // ── Certifications disponibles ─────────────────────────────────────────────────
 const CERTIFICATIONS = [
@@ -97,145 +103,232 @@ function DossierCard({
 
 // ── Modal Nouvelle formation ───────────────────────────────────────────────
 function NouvelleFormationModal({
-    email,
     existingCerts,
     onClose,
+    onSuccess,
 }: {
-    email: string;
     existingCerts: string[];
     onClose: () => void;
+    onSuccess: () => void;
 }) {
     const available = CERTIFICATIONS.filter(c => !existingCerts.includes(c));
 
-    return (
-        <AnimatePresence>
-            <>
-                {/* Overlay */}
-                <motion.div
-                    key="overlay"
-                    initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                    className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm"
-                    onClick={onClose}
-                />
+    const [selected,  setSelected]  = useState<string | null>(null);
+    const [examMode,  setExamMode]  = useState<"online" | "onsite">("online");
+    const [submitting, setSubmitting] = useState(false);
+    const [error,     setError]     = useState<string | null>(null);
+    const [done,      setDone]      = useState(false);
 
-                {/* Modal */}
-                <motion.div
-                    key="modal"
-                    initial={{ opacity: 0, scale: 0.93, y: 20 }}
-                    animate={{ opacity: 1, scale: 1, y: 0 }}
-                    exit={{ opacity: 0, scale: 0.93, y: 20 }}
-                    transition={{ duration: 0.22 }}
-                    className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none"
+    const handleSubmit = async () => {
+        if (!selected) return;
+        try {
+            setSubmitting(true);
+            setError(null);
+            await candidateNewApplication(selected, examMode);
+            setDone(true);
+            // Laisser 1.5 s d'affichage du succès puis fermer + refresh
+            setTimeout(() => {
+                onSuccess();
+            }, 1500);
+        } catch (e) {
+            setError(e instanceof Error ? e.message : "Erreur lors de la soumission");
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    return (
+        <>
+            {/* Overlay */}
+            <motion.div
+                key="overlay"
+                initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm"
+                onClick={onClose}
+            />
+
+            {/* Modal */}
+            <motion.div
+                key="modal"
+                initial={{ opacity: 0, scale: 0.93, y: 20 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.93, y: 20 }}
+                transition={{ duration: 0.22 }}
+                className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none"
+            >
+                <div
+                    className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-hidden flex flex-col pointer-events-auto"
+                    style={{ border: "2px solid #e8eaf6" }}
                 >
-                    <div
-                        className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-hidden flex flex-col pointer-events-auto"
-                        style={{ border: "2px solid #e8eaf6" }}
-                    >
-                        {/* Header modal */}
-                        <div className="px-6 py-4 flex items-center justify-between shrink-0" style={{ backgroundColor: "#1a237e" }}>
-                            <div className="flex items-center gap-2">
-                                <PlusCircle className="h-4 w-4 text-white/80" />
-                                <span className="text-sm font-bold uppercase tracking-widest text-white">Nouvelle formation</span>
-                            </div>
-                            <button onClick={onClose} className="text-white/60 hover:text-white transition-colors">
-                                <X className="h-4 w-4" />
+                    {/* Header */}
+                    <div className="px-6 py-4 flex items-center justify-between shrink-0" style={{ backgroundColor: "#1a237e" }}>
+                        <div className="flex items-center gap-2">
+                            <PlusCircle className="h-4 w-4 text-white/80" />
+                            <span className="text-sm font-bold uppercase tracking-widest text-white">
+                                Nouvelle formation
+                            </span>
+                        </div>
+                        <button onClick={onClose} className="text-white/60 hover:text-white transition-colors">
+                            <X className="h-4 w-4" />
+                        </button>
+                    </div>
+
+                    {/* Corps */}
+                    <div className="flex-1 overflow-y-auto p-6 space-y-5">
+
+                        {/* Écran succès */}
+                        {done ? (
+                            <motion.div
+                                initial={{ opacity: 0, scale: 0.92 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                className="py-8 flex flex-col items-center gap-4 text-center"
+                            >
+                                <div
+                                    className="h-16 w-16 rounded-full flex items-center justify-center"
+                                    style={{ backgroundColor: "#e8f5e9" }}
+                                >
+                                    <CheckCircle2 className="h-8 w-8" style={{ color: "#2e7d32" }} />
+                                </div>
+                                <div>
+                                    <p className="font-black text-gray-800 text-lg">Demande soumise !</p>
+                                    <p className="text-sm text-gray-500 mt-1">
+                                        Votre candidature pour<br />
+                                        <span className="font-bold text-gray-700">«&nbsp;{selected}&nbsp;»</span>
+                                        <br />a bien été enregistrée.
+                                    </p>
+                                </div>
+                            </motion.div>
+                        ) : (
+                            <>
+                                {/* Sélection certification */}
+                                <div>
+                                    <p className="text-xs font-black uppercase tracking-widest mb-3" style={{ color: "#1a237e" }}>
+                                        Choisissez la certification
+                                    </p>
+                                    {available.length === 0 ? (
+                                        <div className="text-center py-8 text-sm text-gray-400">
+                                            Vous avez déjà candidaté à toutes les certifications disponibles.
+                                        </div>
+                                    ) : (
+                                        <ul className="space-y-2">
+                                            {available.map(cert => {
+                                                const isSelected = selected === cert;
+                                                return (
+                                                    <li key={cert}>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setSelected(cert)}
+                                                            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all"
+                                                            style={{
+                                                                backgroundColor: isSelected ? "#e8eaf6" : "#f8f9ff",
+                                                                border: `2px solid ${isSelected ? "#1a237e" : "#e8eaf6"}`,
+                                                            }}
+                                                        >
+                                                            <div
+                                                                className="h-5 w-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors"
+                                                                style={{
+                                                                    borderColor: isSelected ? "#1a237e" : "#d1d5db",
+                                                                    backgroundColor: isSelected ? "#1a237e" : "transparent",
+                                                                }}
+                                                            >
+                                                                {isSelected && (
+                                                                    <div className="h-2 w-2 rounded-full bg-white" />
+                                                                )}
+                                                            </div>
+                                                            <span
+                                                                className="text-sm font-semibold flex-1 leading-snug"
+                                                                style={{ color: isSelected ? "#1a237e" : "#374151" }}
+                                                            >
+                                                                {cert}
+                                                            </span>
+                                                        </button>
+                                                    </li>
+                                                );
+                                            })}
+                                        </ul>
+                                    )}
+                                </div>
+
+                                {/* Mode d'examen */}
+                                {available.length > 0 && (
+                                    <div>
+                                        <p className="text-xs font-black uppercase tracking-widest mb-3" style={{ color: "#1a237e" }}>
+                                            Mode d&apos;examen
+                                        </p>
+                                        <div className="flex gap-3">
+                                            {([
+                                                { value: "online",  label: "En ligne",     Icon: MonitorSmartphone },
+                                                { value: "onsite",  label: "Présentiel",   Icon: MapPin            },
+                                            ] as const).map(({ value, label, Icon }) => {
+                                                const isActive = examMode === value;
+                                                return (
+                                                    <button
+                                                        key={value}
+                                                        type="button"
+                                                        onClick={() => setExamMode(value)}
+                                                        className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold transition-all"
+                                                        style={{
+                                                            backgroundColor: isActive ? "#1a237e" : "#f8f9ff",
+                                                            color:           isActive ? "#fff"    : "#555",
+                                                            border:          `2px solid ${isActive ? "#1a237e" : "#e8eaf6"}`,
+                                                        }}
+                                                    >
+                                                        <Icon className="h-4 w-4" />
+                                                        {label}
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Erreur */}
+                                {error && (
+                                    <motion.div
+                                        initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }}
+                                        className="flex items-center gap-2 p-3 rounded-xl bg-red-50 border border-red-100 text-red-700 text-sm"
+                                    >
+                                        {error}
+                                    </motion.div>
+                                )}
+                            </>
+                        )}
+                    </div>
+
+                    {/* Footer */}
+                    {!done && available.length > 0 && (
+                        <div className="px-6 py-4 shrink-0 flex gap-3" style={{ borderTop: "2px solid #e8eaf6", backgroundColor: "#fafbff" }}>
+                            <button
+                                onClick={onClose}
+                                className="flex-1 py-3 rounded-xl text-sm font-bold border transition-colors hover:bg-gray-50"
+                                style={{ borderColor: "#e0e0e0", color: "#555" }}
+                            >
+                                Annuler
+                            </button>
+                            <button
+                                disabled={!selected || submitting}
+                                onClick={handleSubmit}
+                                className="flex-1 py-3 rounded-xl text-sm font-bold text-white transition-all hover:-translate-y-0.5 disabled:opacity-50 disabled:translate-y-0 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                                style={{ backgroundColor: "#2e7d32", boxShadow: selected ? "0 6px 16px rgba(46,125,50,0.25)" : "none" }}
+                            >
+                                {submitting
+                                    ? <><Loader2 className="h-4 w-4 animate-spin" />Envoi…</>
+                                    : "Valider ma candidature"
+                                }
                             </button>
                         </div>
-
-                        {/* Corps modal */}
-                        <div className="flex-1 overflow-y-auto p-6 space-y-5">
-                            {/* Info email */}
-                            <div className="flex items-start gap-3 p-3 rounded-xl" style={{ backgroundColor: "#e8eaf6", border: "1px solid #c5cae9" }}>
-                                <Info className="h-4 w-4 shrink-0 mt-0.5" style={{ color: "#1a237e" }} />
-                                <p className="text-xs leading-relaxed" style={{ color: "#1a237e" }}>
-                                    <strong>Important&nbsp;:</strong> Pour lier la nouvelle demande à ce compte, utilisez{" "}
-                                    <strong>exactement la même adresse email</strong>&nbsp;:{" "}
-                                    <span className="font-mono bg-white/60 px-1.5 py-0.5 rounded">{email || "votre email actuel"}</span>
-                                </p>
-                            </div>
-
-                            {/* Étapes */}
-                            <div>
-                                <h3 className="text-xs font-black uppercase tracking-widest mb-3" style={{ color: "#1a237e" }}>
-                                    Comment procéder
-                                </h3>
-                                <ol className="space-y-2.5">
-                                    {[
-                                        "Cliquez sur « Accéder au formulaire » ci-dessous.",
-                                        `Utilisez votre adresse email : ${email || "votre email actuel"}.`,
-                                        "Sélectionnez la nouvelle certification souhaitée et complétez le formulaire.",
-                                        "Vos identifiants actuels (ID et mot de passe) resteront inchangés.",
-                                    ].map((text, i) => (
-                                        <li key={i} className="flex items-start gap-3">
-                                            <div
-                                                className="h-5 w-5 rounded-full flex items-center justify-center text-[10px] font-black text-white shrink-0 mt-0.5"
-                                                style={{ backgroundColor: "#1a237e" }}
-                                            >
-                                                {i + 1}
-                                            </div>
-                                            <p className="text-sm text-gray-700 leading-relaxed">{text}</p>
-                                        </li>
-                                    ))}
-                                </ol>
-                            </div>
-
-                            {/* Certifications disponibles */}
-                            {available.length > 0 && (
-                                <div>
-                                    <div className="flex items-center justify-between mb-2">
-                                        <h3 className="text-xs font-black uppercase tracking-widest" style={{ color: "#1a237e" }}>
-                                            Certifications disponibles
-                                        </h3>
-                                        <span
-                                            className="text-[10px] font-black px-2 py-0.5 rounded-full text-white"
-                                            style={{ backgroundColor: "#1a237e" }}
-                                        >
-                                            {available.length}
-                                        </span>
-                                    </div>
-                                    <ul className="space-y-1">
-                                        {available.map(cert => (
-                                            <li
-                                                key={cert}
-                                                className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm text-gray-700 font-medium"
-                                                style={{ backgroundColor: "#f8f9ff" }}
-                                            >
-                                                <Award className="h-3.5 w-3.5 shrink-0" style={{ color: "#2e7d32" }} />
-                                                {cert}
-                                            </li>
-                                        ))}
-                                    </ul>
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Footer modal — CTA */}
-                        <div className="px-6 py-4 shrink-0" style={{ borderTop: "2px solid #e8eaf6", backgroundColor: "#fafbff" }}>
-                            <a
-                                href="/demande-certification"
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                onClick={onClose}
-                                className="w-full inline-flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold text-white transition-all hover:-translate-y-0.5"
-                                style={{ backgroundColor: "#2e7d32", boxShadow: "0 6px 16px rgba(46,125,50,0.25)" }}
-                            >
-                                <PlusCircle className="h-4 w-4" />
-                                Accéder au formulaire de demande
-                                <ArrowRight className="h-4 w-4" />
-                            </a>
-                        </div>
-                    </div>
-                </motion.div>
-            </>
-        </AnimatePresence>
+                    )}
+                </div>
+            </motion.div>
+        </>
     );
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
 export default function TableauDeBordPage() {
-    const { dossier, dossiers, loading } = useCandidate();
-    const [exams, setExams] = useState<CandidateExam[]>([]);
-    const [now,   setNow]   = useState(Date.now());
+    const { dossier, dossiers, loading, refresh } = useCandidate();
+    const [exams,     setExams]     = useState<CandidateExam[]>([]);
+    const [now,       setNow]       = useState(Date.now());
     const [showModal, setShowModal] = useState(false);
 
     useEffect(() => {
@@ -264,11 +357,15 @@ export default function TableauDeBordPage() {
     const validees  = dossiers.filter(d => d.status === "approved" || d.final_decision === "certified");
     const enAttente = dossiers.filter(d => d.status !== "approved" && d.final_decision !== "certified");
 
-    const email         = dossier.email || "";
     const displayName   = dossier.name  || "Candidat";
     const existingCerts = dossiers
         .map(d => d.answers?.["Certification souhaitée"])
         .filter(Boolean) as string[];
+
+    const handleModalSuccess = () => {
+        setShowModal(false);
+        refresh();
+    };
 
     return (
         <div className="space-y-8 py-4">
@@ -351,13 +448,15 @@ export default function TableauDeBordPage() {
             </motion.div>
 
             {/* ── Modal Nouvelle formation ── */}
-            {showModal && (
-                <NouvelleFormationModal
-                    email={email}
-                    existingCerts={existingCerts}
-                    onClose={() => setShowModal(false)}
-                />
-            )}
+            <AnimatePresence>
+                {showModal && (
+                    <NouvelleFormationModal
+                        existingCerts={existingCerts}
+                        onClose={() => setShowModal(false)}
+                        onSuccess={handleModalSuccess}
+                    />
+                )}
+            </AnimatePresence>
         </div>
     );
 }

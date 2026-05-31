@@ -1126,3 +1126,20 @@ export async function candidateResubmitDocument(documentName: string, fileUrl: s
     }
     return res.json();
 }
+
+/** Soumettre une nouvelle candidature depuis l'espace candidat. */
+export async function candidateNewApplication(
+    certification: string,
+    examMode: "online" | "onsite" = "online",
+): Promise<CandidateDossier> {
+    const res = await candidateFetch(url("candidate/new-application"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ certification, exam_mode: examMode }),
+    });
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || "Erreur lors de la soumission de la demande");
+    }
+    return res.json();
+}
