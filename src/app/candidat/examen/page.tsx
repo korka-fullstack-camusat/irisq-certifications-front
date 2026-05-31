@@ -242,6 +242,23 @@ export default function CandidatExamenPage() {
         return () => clearInterval(id);
     }, [phase, timeLeft]);
 
+    // ── Moniteur de deadline : auto-soumission si la date limite expire en cours d'examen ──
+    useEffect(() => {
+        if (phase !== "exam" || !exam?.deadline) return;
+        const deadlineMs = new Date(exam.deadline + "T23:59:59").getTime();
+        const remaining = deadlineMs - Date.now();
+        if (remaining <= 0) {
+            // Deadline déjà dépassée au lancement (ne devrait pas arriver, sécurité)
+            handleAutoSubmit();
+            return;
+        }
+        const id = setTimeout(() => {
+            handleAutoSubmit();
+        }, remaining);
+        return () => clearTimeout(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [phase, exam?.deadline]);
+
     // ── Camera monitor ──────────────────────────────────────────────────────
     useEffect(() => {
         if (phase !== "exam" || !mediaStream) return;
@@ -347,8 +364,11 @@ export default function CandidatExamenPage() {
         // Copie déjà soumise → on n'autorise pas un second démarrage
         if (dossier?.exam_status === "submitted" || dossier?.exam_status === "graded") return;
 
-        // Deadline dépassée → on n'enchaîne pas
-        if (examExpired) {
+        // Deadline dépassée — recalculée avec Date.now() frais (pas le state `now` stale)
+        const deadlineExpiredNow = exam.deadline
+            ? new Date(exam.deadline + "T23:59:59").getTime() < Date.now()
+            : false;
+        if (deadlineExpiredNow) {
             setShowExpiredModal(true);
             return;
         }
@@ -449,13 +469,21 @@ export default function CandidatExamenPage() {
             if (document.fullscreenElement) await document.exitFullscreen().catch(() => {});
             stopCamera();
         } catch (err: any) {
-            // Cas 409 : copie déjà soumise (double soumission détectée côté serveur)
             if (err?.status === 409 || err?.message?.includes("déjà été soumise")) {
+                // Copie déjà soumise → traiter comme un succès
                 sessionStorage.removeItem(EXAM_SESSION_KEY);
                 await refresh().catch(() => {});
                 setPhase("finished");
                 if (document.fullscreenElement) await document.exitFullscreen().catch(() => {});
                 stopCamera();
+            } else if (err?.status === 403 || err?.message?.includes("date limite")) {
+                // Deadline dépassée côté serveur
+                sessionStorage.removeItem(EXAM_SESSION_KEY);
+                await refresh().catch(() => {});
+                if (document.fullscreenElement) await document.exitFullscreen().catch(() => {});
+                stopCamera();
+                setShowExpiredModal(true);
+                setPhase("info");
             } else {
                 alert("Une erreur est survenue lors de la soumission. Veuillez réessayer.");
             }
