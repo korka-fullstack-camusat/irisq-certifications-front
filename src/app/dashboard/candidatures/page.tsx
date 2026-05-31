@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, Suspense } from "react";
+import { useEffect, useMemo, useRef, useState, Suspense } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -404,7 +404,9 @@ function CandidaturesInner() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [exporting, setExporting] = useState(false);
+    const [filterOpen, setFilterOpen] = useState(false);
     const [page, setPage] = useState(1);
+    const filterRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
         if (!isLoading && (!user || user.role !== "RH")) {
@@ -436,6 +438,17 @@ function CandidaturesInner() {
 
     // Réinitialiser la page quand les filtres changent
     useEffect(() => { setPage(1); }, [modeTab, examType, search]);
+
+    // Fermer le dropdown filtre au clic extérieur
+    useEffect(() => {
+        function handleClick(e: MouseEvent) {
+            if (filterRef.current && !filterRef.current.contains(e.target as Node)) {
+                setFilterOpen(false);
+            }
+        }
+        document.addEventListener("mousedown", handleClick);
+        return () => document.removeEventListener("mousedown", handleClick);
+    }, []);
 
     const filtered = useMemo(() => {
         let list = entries;
@@ -537,108 +550,158 @@ function CandidaturesInner() {
             </header>
 
             {/* ── Barre de filtres ── */}
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm px-4 py-3 flex flex-col gap-3">
+            {/* ── Barre de filtres ── */}
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm px-4 py-3 flex items-center gap-3">
 
-                {/* Ligne 1 : recherche + mode + compteur */}
-                <div className="flex items-center gap-3 flex-wrap">
-                    {/* Recherche */}
-                    <div className="flex items-center gap-2 flex-1 min-w-[180px]">
-                        <Search className="h-4 w-4 shrink-0 text-gray-400" />
-                        <input
-                            type="text"
-                            placeholder="Rechercher par nom, email ou certification…"
-                            value={search}
-                            onChange={e => setSearch(e.target.value)}
-                            className="flex-1 min-w-0 bg-[#f4f6f9] border border-[#e0e0e0] rounded-xl px-3 py-2 text-sm text-gray-700 placeholder:text-gray-400 focus:outline-none focus:border-[#1a237e]"
-                        />
-                    </div>
-
-                    {/* Mode (En ligne / Présentiel) */}
-                    <div className="flex items-center gap-1 shrink-0 bg-[#f4f6f9] rounded-xl p-1">
-                        {([
-                            { key: "all",    label: "Tous",       Icon: Users   },
-                            { key: "online", label: "En ligne",   Icon: Monitor },
-                            { key: "onsite", label: "Présentiel", Icon: MapPin  },
-                        ] as { key: ModeTab; label: string; Icon: React.ElementType }[]).map(({ key, label, Icon }) => (
-                            <button
-                                key={key}
-                                onClick={() => setModeTab(key)}
-                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all"
-                                style={{
-                                    backgroundColor: modeTab === key ? "#1a237e" : "transparent",
-                                    color: modeTab === key ? "#ffffff" : "#6b7280",
-                                }}
-                            >
-                                <Icon className="h-3 w-3" />
-                                {label}
-                                {!loading && (
-                                    <span
-                                        className="ml-0.5 text-[10px] px-1.5 py-0.5 rounded-full font-black"
-                                        style={{
-                                            backgroundColor: modeTab === key ? "rgba(255,255,255,0.2)" : "#e5e7eb",
-                                            color: modeTab === key ? "#ffffff" : "#374151",
-                                        }}
-                                    >
-                                        {countByMode[key]}
-                                    </span>
-                                )}
-                            </button>
-                        ))}
-                    </div>
-
-                    {/* Compteur résultats filtrés */}
-                    {!loading && (
-                        <span
-                            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold shrink-0"
-                            style={{ backgroundColor: "#e8eaf6", color: "#1a237e" }}
-                        >
-                            <Users className="h-3 w-3" />
-                            {filtered.length} candidat{filtered.length !== 1 ? "s" : ""}
-                        </span>
-                    )}
+                {/* Recherche */}
+                <div className="flex items-center gap-2 flex-1 min-w-0">
+                    <Search className="h-4 w-4 shrink-0 text-gray-400" />
+                    <input
+                        type="text"
+                        placeholder="Rechercher par nom, email ou certification…"
+                        value={search}
+                        onChange={e => setSearch(e.target.value)}
+                        className="flex-1 min-w-0 bg-[#f4f6f9] border border-[#e0e0e0] rounded-xl px-3 py-2 text-sm text-gray-700 placeholder:text-gray-400 focus:outline-none focus:border-[#1a237e]"
+                    />
                 </div>
 
-                {/* Séparateur */}
-                <div className="h-px bg-gray-100" />
+                {/* Bouton filtre + dropdown */}
+                <div className="relative shrink-0" ref={filterRef}>
+                    {/* Bouton */}
+                    <button
+                        onClick={() => setFilterOpen(v => !v)}
+                        className="relative inline-flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-bold border transition-all"
+                        style={{
+                            backgroundColor: (modeTab !== "all" || examType !== "all") ? "#1a237e" : "#ffffff",
+                            color:           (modeTab !== "all" || examType !== "all") ? "#ffffff" : "#374151",
+                            borderColor:     (modeTab !== "all" || examType !== "all") ? "#1a237e" : "#e0e0e0",
+                        }}
+                    >
+                        <ListFilter className="h-4 w-4" />
+                        Filtrer
+                        {/* Badge nb filtres actifs */}
+                        {(modeTab !== "all" || examType !== "all") && (
+                            <span className="absolute -top-1.5 -right-1.5 h-4 w-4 rounded-full text-[10px] font-black flex items-center justify-center"
+                                style={{ backgroundColor: "#c62828", color: "#fff" }}>
+                                {(modeTab !== "all" ? 1 : 0) + (examType !== "all" ? 1 : 0)}
+                            </span>
+                        )}
+                    </button>
 
-                {/* Ligne 2 : type d'examen */}
-                <div className="flex items-center gap-3 flex-wrap">
-                    <span className="inline-flex items-center gap-1.5 text-xs font-bold text-gray-400 shrink-0">
-                        <ListFilter className="h-3.5 w-3.5" />
-                        Type d&apos;examen
+                    {/* Dropdown panel */}
+                    <AnimatePresence>
+                        {filterOpen && (
+                            <motion.div
+                                initial={{ opacity: 0, y: 6, scale: 0.97 }}
+                                animate={{ opacity: 1, y: 0, scale: 1 }}
+                                exit={{ opacity: 0, y: 6, scale: 0.97 }}
+                                transition={{ duration: 0.15 }}
+                                className="absolute right-0 top-full mt-2 w-64 bg-white rounded-2xl border border-gray-100 shadow-xl z-30 overflow-hidden"
+                            >
+                                {/* Section Mode */}
+                                <div className="px-4 pt-4 pb-2">
+                                    <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">
+                                        Mode d&apos;examen
+                                    </p>
+                                    {([
+                                        { key: "all",    label: "Tous",       Icon: Users,   count: countByMode.all    },
+                                        { key: "online", label: "En ligne",   Icon: Monitor, count: countByMode.online },
+                                        { key: "onsite", label: "Présentiel", Icon: MapPin,  count: countByMode.onsite },
+                                    ] as { key: ModeTab; label: string; Icon: React.ElementType; count: number }[]).map(({ key, label, Icon, count }) => (
+                                        <button
+                                            key={key}
+                                            onClick={() => { setModeTab(key); }}
+                                            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm transition-all mb-0.5"
+                                            style={{
+                                                backgroundColor: modeTab === key ? "#e8eaf6" : "transparent",
+                                                color:           modeTab === key ? "#1a237e" : "#374151",
+                                                fontWeight:      modeTab === key ? 700 : 500,
+                                            }}
+                                        >
+                                            {/* Radio dot */}
+                                            <span className="h-3.5 w-3.5 rounded-full border-2 flex items-center justify-center shrink-0"
+                                                style={{ borderColor: modeTab === key ? "#1a237e" : "#d1d5db" }}>
+                                                {modeTab === key && (
+                                                    <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: "#1a237e" }} />
+                                                )}
+                                            </span>
+                                            <Icon className="h-3.5 w-3.5 shrink-0" />
+                                            <span className="flex-1 text-left">{label}</span>
+                                            <span className="text-xs font-bold px-1.5 py-0.5 rounded-full"
+                                                style={{ backgroundColor: "#f3f4f6", color: "#6b7280" }}>
+                                                {count}
+                                            </span>
+                                        </button>
+                                    ))}
+                                </div>
+
+                                {/* Séparateur */}
+                                <div className="mx-4 h-px bg-gray-100" />
+
+                                {/* Section Type d'examen */}
+                                <div className="px-4 pt-3 pb-2">
+                                    <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">
+                                        Type d&apos;examen
+                                    </p>
+                                    {([
+                                        { key: "all",             label: "Tous",             Icon: Users,         count: countByExamType.all            },
+                                        { key: "direct",          label: "Examen direct",    Icon: BookOpen,      count: countByExamType.direct         },
+                                        { key: "after_formation", label: "Formation IRISQ",  Icon: GraduationCap, count: countByExamType.after_formation },
+                                    ] as { key: ExamTypeTab; label: string; Icon: React.ElementType; count: number }[]).map(({ key, label, Icon, count }) => (
+                                        <button
+                                            key={key}
+                                            onClick={() => { setExamType(key); }}
+                                            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm transition-all mb-0.5"
+                                            style={{
+                                                backgroundColor: examType === key ? "#f3e8ff" : "transparent",
+                                                color:           examType === key ? "#7b1fa2" : "#374151",
+                                                fontWeight:      examType === key ? 700 : 500,
+                                            }}
+                                        >
+                                            <span className="h-3.5 w-3.5 rounded-full border-2 flex items-center justify-center shrink-0"
+                                                style={{ borderColor: examType === key ? "#7b1fa2" : "#d1d5db" }}>
+                                                {examType === key && (
+                                                    <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: "#7b1fa2" }} />
+                                                )}
+                                            </span>
+                                            <Icon className="h-3.5 w-3.5 shrink-0" />
+                                            <span className="flex-1 text-left">{label}</span>
+                                            <span className="text-xs font-bold px-1.5 py-0.5 rounded-full"
+                                                style={{ backgroundColor: "#f3f4f6", color: "#6b7280" }}>
+                                                {count}
+                                            </span>
+                                        </button>
+                                    ))}
+                                </div>
+
+                                {/* Réinitialiser */}
+                                {(modeTab !== "all" || examType !== "all") && (
+                                    <>
+                                        <div className="mx-4 h-px bg-gray-100" />
+                                        <div className="px-4 py-3">
+                                            <button
+                                                onClick={() => { setModeTab("all"); setExamType("all"); setFilterOpen(false); }}
+                                                className="w-full py-2 rounded-xl text-xs font-bold transition-all hover:opacity-80"
+                                                style={{ backgroundColor: "#ffebee", color: "#c62828" }}
+                                            >
+                                                Réinitialiser les filtres
+                                            </button>
+                                        </div>
+                                    </>
+                                )}
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
+                </div>
+
+                {/* Compteur résultats */}
+                {!loading && (
+                    <span className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold shrink-0"
+                        style={{ backgroundColor: "#e8eaf6", color: "#1a237e" }}>
+                        <Users className="h-3 w-3" />
+                        {filtered.length} candidat{filtered.length !== 1 ? "s" : ""}
                     </span>
-                    <div className="flex items-center gap-1 bg-[#f4f6f9] rounded-xl p-1">
-                        {([
-                            { key: "all",             label: "Tous",              Icon: Users          },
-                            { key: "direct",          label: "Examen direct",     Icon: BookOpen       },
-                            { key: "after_formation", label: "Formation IRISQ",   Icon: GraduationCap  },
-                        ] as { key: ExamTypeTab; label: string; Icon: React.ElementType }[]).map(({ key, label, Icon }) => (
-                            <button
-                                key={key}
-                                onClick={() => setExamType(key)}
-                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all"
-                                style={{
-                                    backgroundColor: examType === key ? "#7b1fa2" : "transparent",
-                                    color: examType === key ? "#ffffff" : "#6b7280",
-                                }}
-                            >
-                                <Icon className="h-3 w-3" />
-                                {label}
-                                {!loading && (
-                                    <span
-                                        className="ml-0.5 text-[10px] px-1.5 py-0.5 rounded-full font-black"
-                                        style={{
-                                            backgroundColor: examType === key ? "rgba(255,255,255,0.2)" : "#e5e7eb",
-                                            color: examType === key ? "#ffffff" : "#374151",
-                                        }}
-                                    >
-                                        {countByExamType[key]}
-                                    </span>
-                                )}
-                            </button>
-                        ))}
-                    </div>
-                </div>
+                )}
 
             </div>
 
