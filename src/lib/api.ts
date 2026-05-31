@@ -1077,6 +1077,22 @@ export async function deleteAdminDocument(docId: string): Promise<void> {
     }
 }
 
+export async function sendTestEmail(toEmail: string): Promise<{ success: boolean; message: string; sender: string }> {
+    const res = await apiFetch(url("admin/test-email"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ to_email: toEmail }),
+        redirect: "follow",
+    });
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        const detail = err.detail;
+        if (typeof detail === "object" && detail?.error) throw new Error(detail.error + (detail.brevo_response ? ` — ${detail.brevo_response}` : ""));
+        throw new Error(typeof detail === "string" ? detail : "Erreur lors du test email");
+    }
+    return res.json();
+}
+
 export async function candidateResubmitDocument(documentName: string, fileUrl: string): Promise<CandidateDossier> {
     const res = await candidateFetch(url("candidate/resubmit-document"), {
         method: "POST",

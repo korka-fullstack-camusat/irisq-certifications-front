@@ -14,6 +14,8 @@ import {
     Tag,
     FolderOpen,
     Eye,
+    Mail,
+    CheckCircle2,
 } from "lucide-react";
 
 import {
@@ -21,6 +23,7 @@ import {
     createAdminDocument,
     deleteAdminDocument,
     uploadFiles,
+    sendTestEmail,
     type AdminDocument,
 } from "@/lib/api";
 import { FilePreviewModal } from "@/components/FilePreviewModal";
@@ -68,6 +71,26 @@ export default function DashboardDocumentsPage() {
 
     // Preview
     const [preview, setPreview] = useState<{ url: string; title?: string } | null>(null);
+
+    // Test email
+    const [testEmailOpen, setTestEmailOpen] = useState(false);
+    const [testEmailAddr, setTestEmailAddr] = useState("");
+    const [testEmailLoading, setTestEmailLoading] = useState(false);
+    const [testEmailResult, setTestEmailResult] = useState<{ ok: boolean; msg: string } | null>(null);
+
+    async function handleTestEmail() {
+        if (!testEmailAddr.trim()) return;
+        try {
+            setTestEmailLoading(true);
+            setTestEmailResult(null);
+            const r = await sendTestEmail(testEmailAddr.trim());
+            setTestEmailResult({ ok: true, msg: r.message });
+        } catch (e) {
+            setTestEmailResult({ ok: false, msg: e instanceof Error ? e.message : "Erreur inconnue" });
+        } finally {
+            setTestEmailLoading(false);
+        }
+    }
 
     async function load() {
         try {
@@ -151,15 +174,98 @@ export default function DashboardDocumentsPage() {
                         Publiez ici les documents que les candidats pourront consulter et télécharger depuis leur espace.
                     </p>
                 </div>
-                <button
-                    onClick={() => { resetForm(); setFormOpen(true); }}
-                    className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold text-white transition-all hover:-translate-y-0.5"
-                    style={{ backgroundColor: "#1a237e", boxShadow: "0 6px 16px rgba(26,35,126,0.25)" }}
-                >
-                    <Plus className="h-4 w-4" />
-                    Ajouter un document
-                </button>
+                <div className="flex items-center gap-2 flex-wrap">
+                    <button
+                        onClick={() => { setTestEmailResult(null); setTestEmailAddr(""); setTestEmailOpen(true); }}
+                        className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold border transition-all hover:-translate-y-0.5"
+                        style={{ borderColor: "#c5cae9", color: "#1a237e", backgroundColor: "#e8eaf6" }}
+                    >
+                        <Mail className="h-4 w-4" />
+                        Tester l&apos;email
+                    </button>
+                    <button
+                        onClick={() => { resetForm(); setFormOpen(true); }}
+                        className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold text-white transition-all hover:-translate-y-0.5"
+                        style={{ backgroundColor: "#1a237e", boxShadow: "0 6px 16px rgba(26,35,126,0.25)" }}
+                    >
+                        <Plus className="h-4 w-4" />
+                        Ajouter un document
+                    </button>
+                </div>
             </div>
+
+            {/* ── Modal test email ── */}
+            {testEmailOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+                    <motion.div
+                        initial={{ scale: 0.93, opacity: 0, y: 12 }}
+                        animate={{ scale: 1, opacity: 1, y: 0 }}
+                        className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden"
+                    >
+                        <div className="px-6 py-4 flex items-center justify-between" style={{ backgroundColor: "#1a237e" }}>
+                            <div className="flex items-center gap-2">
+                                <Mail className="h-4 w-4 text-white/80" />
+                                <span className="text-sm font-bold uppercase tracking-widest text-white">Test de l&apos;email</span>
+                            </div>
+                            <button onClick={() => setTestEmailOpen(false)} className="text-white/60 hover:text-white">
+                                <X className="h-4 w-4" />
+                            </button>
+                        </div>
+                        <div className="px-6 py-6 space-y-4">
+                            <p className="text-sm text-gray-500">
+                                Envoyez un email de test pour vérifier que la configuration Brevo fonctionne correctement.
+                            </p>
+                            <div>
+                                <label className="text-xs font-bold text-gray-600 uppercase tracking-wider mb-1.5 block">
+                                    Adresse email de test
+                                </label>
+                                <input
+                                    type="email"
+                                    value={testEmailAddr}
+                                    onChange={e => setTestEmailAddr(e.target.value)}
+                                    placeholder="ex: admin@irisq.sn"
+                                    className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2"
+                                    style={{ "--tw-ring-color": "#c5cae9" } as React.CSSProperties}
+                                    onKeyDown={e => { if (e.key === "Enter") handleTestEmail(); }}
+                                />
+                            </div>
+                            {testEmailResult && (
+                                <div
+                                    className="rounded-xl p-3 text-sm flex items-start gap-2"
+                                    style={{
+                                        backgroundColor: testEmailResult.ok ? "#e8f5e9" : "#ffebee",
+                                        color: testEmailResult.ok ? "#2e7d32" : "#c62828",
+                                    }}
+                                >
+                                    {testEmailResult.ok
+                                        ? <CheckCircle2 className="h-4 w-4 shrink-0 mt-0.5" />
+                                        : <X className="h-4 w-4 shrink-0 mt-0.5" />
+                                    }
+                                    <span>{testEmailResult.msg}</span>
+                                </div>
+                            )}
+                            <div className="flex gap-3 pt-2">
+                                <button
+                                    onClick={() => setTestEmailOpen(false)}
+                                    className="flex-1 py-2.5 rounded-xl text-sm font-bold border hover:bg-gray-50 transition-colors"
+                                    style={{ borderColor: "#e0e0e0", color: "#555" }}
+                                >
+                                    Fermer
+                                </button>
+                                <button
+                                    onClick={handleTestEmail}
+                                    disabled={testEmailLoading || !testEmailAddr.trim()}
+                                    className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white inline-flex items-center justify-center gap-2 disabled:opacity-50"
+                                    style={{ backgroundColor: "#1a237e" }}
+                                >
+                                    {testEmailLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
+                                    {testEmailLoading ? "Envoi…" : "Envoyer"}
+                                </button>
+                            </div>
+                        </div>
+                    </motion.div>
+                </div>
+            )}
 
             {/* ── Modal ajout document ── */}
             {formOpen && (
