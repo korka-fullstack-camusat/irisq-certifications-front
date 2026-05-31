@@ -10,7 +10,7 @@ import {
     ChevronRight, Send, X, Trophy,
 } from "lucide-react";
 import { useCandidate } from "@/lib/candidate-context";
-import { fetchCandidateExam, fetchCandidateExams, ensureExamContent, uploadFiles, submitExamWithAntiCheat, type CandidateExam, type CandidateDossier } from "@/lib/api";
+import { API_URL, fetchCandidateExam, fetchCandidateExams, ensureExamContent, uploadFiles, submitExamWithAntiCheat, type CandidateExam, type CandidateDossier } from "@/lib/api";
 import RichTextEditor from "@/components/RichTextEditor";
 
 
@@ -19,6 +19,14 @@ const EXAM_SESSION_KEY = "irisq_exam_active";
 const QUESTIONS_PER_PAGE = 3;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
+/** Convertit un chemin relatif (/api/files/…) en URL absolue vers le backend. */
+function resolveDocUrl(raw: string | undefined | null): string {
+    if (!raw) return "";
+    if (raw.startsWith("http://") || raw.startsWith("https://")) return raw;
+    const base = API_URL.replace(/\/api\/?$/, "");
+    return `${base}${raw.startsWith("/") ? "" : "/"}${raw}`;
+}
+
 function formatDateTime(iso: string) {
     try {
         return new Date(iso).toLocaleString("fr-FR", {
@@ -106,6 +114,9 @@ export default function CandidatExamenPage() {
     const [showExpiredModal, setShowExpiredModal] = useState(false);
     // Re-parsing automatique si exam_content_html est vide (document non converti)
     const [isReparsing, setIsReparsing] = useState(false);
+    // Fallback Blob URL pour afficher le PDF en inline (cas PDF scanné sans texte extractible)
+    const [docBlobUrl, setDocBlobUrl] = useState<string | null>(null);
+    const [docBlobLoading, setDocBlobLoading] = useState(false);
 
     // ── Blocage par rechargement désactivé ─────────────────────────────────
     // Le blocage anti-rechargement est temporairement désactivé pour permettre
@@ -134,6 +145,58 @@ export default function CandidatExamenPage() {
             .finally(() => setIsReparsing(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [phase, exam?._id]);
+
+    // ── Fallback Blob URL — charge le document PDF en mémoire pour affichage inline ──
+    // Déclenché quand : phase="exam" ET le reparse est terminé ET exam_content_html
+    // est toujours vide (PDF scanné sans texte extractible) ET document_url existe.
+    // Technique : on télécharge le fichier avec le JWT candidat, on crée un Blob URL
+    // same-origin → le navigateur l'affiche dans un <iframe> sans déclencher de DL.
+    useEffect(() => {
+        if (
+            phase !== "exam" ||
+            isReparsing ||
+            exam?.exam_content_html ||
+            !exam?.document_url ||
+            docBlobUrl
+        ) return;
+
+        const resolvedUrl = resolveDocUrl(exam.document_url);
+        if (!resolvedUrl) return;
+
+        let cancelled = false;
+        setDocBlobLoading(true);
+
+        const token =
+            typeof window !== "undefined"
+                ? localStorage.getItem("candidate_token")
+                : null;
+
+        fetch(resolvedUrl, {
+            headers: token ? { Authorization: `Bearer ${token}` } : {},
+        })
+            .then(res => {
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                return res.blob();
+            })
+            .then(blob => {
+                if (cancelled) return;
+                const objectUrl = URL.createObjectURL(blob);
+                setDocBlobUrl(objectUrl);
+            })
+            .catch(() => { /* silencieux — le message d'erreur s'affiche en fallback */ })
+            .finally(() => { if (!cancelled) setDocBlobLoading(false); });
+
+        return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [phase, isReparsing, exam?.exam_content_html, exam?.document_url]);
+
+    // ── Nettoyage du Blob URL à la destruction du composant ───────────────
+    useEffect(() => {
+        return () => {
+            if (docBlobUrl) URL.revokeObjectURL(docBlobUrl);
+        };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [docBlobUrl]);
 
     // ── Auto-arrêt caméra + plein écran si la copie est déjà soumise ───────
     // Se déclenche si exam_status passe à "submitted"/"graded" pendant l'examen
@@ -1085,17 +1148,17 @@ export default function CandidatExamenPage() {
                             )}
                         </div>
 
-                        {/* ── Sujet d'examen — affiché en HTML, jamais de téléchargement ── */}
+                        {/* ── Sujet d'examen — HTML prioritaire, sinon PDF inline via Blob URL ── */}
                         <div className="shrink-0 border-b" style={{ borderColor: "#e8eaf6" }}>
-                            {isReparsing ? (
-                                /* Conversion du document en cours */
+                            {isReparsing || docBlobLoading ? (
+                                /* Chargement en cours (reparse OU téléchargement blob) */
                                 <div className="flex items-center justify-center gap-3 py-10 text-sm text-gray-400"
                                     style={{ backgroundColor: "#fafafa" }}>
                                     <Loader2 className="h-5 w-5 animate-spin" style={{ color: "#1a237e" }} />
                                     <span>Chargement du sujet d&apos;examen…</span>
                                 </div>
                             ) : exam.exam_content_html ? (
-                                /* Contenu HTML converti depuis le document (DOCX / PDF / TXT) */
+                                /* Contenu HTML converti depuis le document (DOCX / PDF texte / TXT) */
                                 <div
                                     className="overflow-y-auto px-5 py-4 exam-subject"
                                     style={{
@@ -1106,8 +1169,19 @@ export default function CandidatExamenPage() {
                                     }}
                                     dangerouslySetInnerHTML={{ __html: exam.exam_content_html }}
                                 />
+                            ) : docBlobUrl ? (
+                                /* PDF scanné (pas de texte extractible) — affiché via Blob URL inline */
+                                <iframe
+                                    src={docBlobUrl}
+                                    title="Sujet d'examen"
+                                    className="w-full border-0 block"
+                                    style={{
+                                        height: questions.length > 0 ? "380px" : "560px",
+                                        backgroundColor: "#fafafa",
+                                    }}
+                                />
                             ) : (
-                                /* Document non converti — message explicatif */
+                                /* Aucun contenu disponible — message d'erreur */
                                 <div className="flex flex-col items-center justify-center gap-3 py-10 text-center px-6"
                                     style={{ backgroundColor: "#fafafa" }}>
                                     <FileText className="h-8 w-8 text-gray-300" />
