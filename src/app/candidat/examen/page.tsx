@@ -189,16 +189,21 @@ export default function CandidatExamenPage() {
         fetchCandidateExams().then(setAllExams).catch(() => setAllExams([]));
     }, []);
 
-    // ── Load exam data (for active dossier) — re-runs when examKey bumps ────
+    // ── Load exam data (fallback via API) — re-runs when examKey bumps ─────
+    // Normalement, l'examen est résolu directement depuis allExams dans
+    // handleAccessExam (pas de réseau, pas de décalage). Ce useEffect sert de
+    // fallback pour la phase "blocked" (rechargement de page en cours d'examen)
+    // où allExams peut ne pas encore être chargé.
     useEffect(() => {
-        if (phase === "select") return; // don't fetch until user picks a dossier
+        if (phase === "select") return; // pas de fetch tant que le candidat n'a pas sélectionné
+        if (exam !== undefined) return; // déjà résolu (depuis allExams ou fetch précédent)
         setExamLoading(true);
         fetchCandidateExam()
             .then(setExam)
             .catch(() => setExam(null))
             .finally(() => setExamLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [examKey]);
+    }, [examKey, phase]);
 
     // Clock for countdown to exam start
     useEffect(() => {
@@ -430,8 +435,15 @@ export default function CandidatExamenPage() {
 
     // ── Handle "Accéder à l'examen" from overview ───────────────────────────
     const handleAccessExam = (d: CandidateDossier) => {
+        // Résoudre l'examen directement depuis les données déjà chargées (allExams)
+        // pour éviter un appel réseau supplémentaire et le problème de désynchronisation
+        // entre le JWT du candidat et le dossier actif sélectionné.
+        const cert = d.answers?.["Certification souhaitée"] || d.public_id || "";
+        const found = allExams.find(e => e.certification === cert) ?? null;
+
         setActiveDossierId(d._id);
-        setExamKey(k => k + 1); // trigger re-fetch of exam data
+        setExam(found);
+        setExamLoading(false);
         setPhase("info");
     };
 
@@ -658,14 +670,14 @@ export default function CandidatExamenPage() {
                         <Lock className="h-8 w-8" style={{ color: "#c62828" }} />
                     </div>
                     <h2 className="text-2xl font-black mb-2" style={{ color: "#c62828" }}>
-                        Accès refusé
+                        Copie déjà soumise
                     </h2>
                     <p className="text-gray-600 text-sm leading-relaxed mb-5">
                         Vous avez déjà soumis votre copie d&apos;examen.<br />
                         Il vous est <strong>impossible de repasser cet examen</strong>.
                     </p>
                     <div
-                        className="rounded-xl p-4 text-xs text-left flex items-start gap-2"
+                        className="rounded-xl p-4 text-xs text-left flex items-start gap-2 mb-5"
                         style={{ backgroundColor: "#fff8e1", border: "1px solid #ffe082", color: "#b45309" }}
                     >
                         <Clock className="h-4 w-4 shrink-0 mt-0.5" style={{ color: "#b45309" }} />
@@ -673,6 +685,14 @@ export default function CandidatExamenPage() {
                             Votre copie est en cours de correction. Vous recevrez vos résultats par email dès que l&apos;évaluation sera terminée.
                         </span>
                     </div>
+                    <button
+                        onClick={() => setPhase("select")}
+                        className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold border transition-colors hover:bg-gray-50"
+                        style={{ borderColor: "#e0e0e0", color: "#555" }}
+                    >
+                        <ChevronLeft className="h-4 w-4" />
+                        Retour à mes candidatures
+                    </button>
                 </motion.div>
             </div>
         );
@@ -746,7 +766,14 @@ export default function CandidatExamenPage() {
     // ── Pas d'examen ────────────────────────────────────────────────────────
     if (!exam) {
         return (
-            <div className="space-y-6">
+            <div className="space-y-4">
+                <button
+                    onClick={() => setPhase("select")}
+                    className="inline-flex items-center gap-1.5 text-sm font-semibold text-gray-500 hover:text-gray-800 transition-colors"
+                >
+                    <ChevronLeft className="h-4 w-4" />
+                    Retour à mes candidatures
+                </button>
                 <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="bg-white rounded-2xl p-8 border border-gray-100 shadow-sm text-center">
                     <div className="h-16 w-16 rounded-2xl flex items-center justify-center mx-auto mb-4" style={{ backgroundColor: "#e8eaf6" }}>
                         <BookOpen className="h-8 w-8" style={{ color: "#1a237e" }} />
@@ -774,33 +801,42 @@ export default function CandidatExamenPage() {
     // ── Deadline dépassée ───────────────────────────────────────────────────
     if (examExpired) {
         return (
-            <div className="flex items-center justify-center min-h-[60vh]">
-                <motion.div
-                    initial={{ scale: 0.9, opacity: 0 }}
-                    animate={{ scale: 1, opacity: 1 }}
-                    className="bg-white rounded-2xl p-10 max-w-md w-full text-center border-t-4 shadow-xl"
-                    style={{ borderTopColor: "#c62828" }}
+            <div className="space-y-4">
+                <button
+                    onClick={() => setPhase("select")}
+                    className="inline-flex items-center gap-1.5 text-sm font-semibold text-gray-500 hover:text-gray-800 transition-colors"
                 >
-                    <div className="h-16 w-16 rounded-full flex items-center justify-center mx-auto mb-6"
-                        style={{ backgroundColor: "#ffebee" }}>
-                        <CalendarDays className="h-8 w-8" style={{ color: "#c62828" }} />
-                    </div>
-                    <h2 className="text-2xl font-black mb-3" style={{ color: "#c62828" }}>
-                        Date limite dépassée
-                    </h2>
-                    <p className="text-gray-500 text-sm leading-relaxed mb-4">
-                        La date limite de dépôt pour cet examen était le{" "}
-                        <strong>
-                            {new Date(deadline! + "T00:00:00").toLocaleDateString("fr-FR", {
-                                day: "2-digit", month: "long", year: "numeric",
-                            })}
-                        </strong>.
-                    </p>
-                    <p className="text-gray-400 text-sm">
-                        Vous ne pouvez plus accéder à cette épreuve.<br />
-                        Contactez le responsable IRISQ si vous pensez qu&apos;il s&apos;agit d&apos;une erreur.
-                    </p>
-                </motion.div>
+                    <ChevronLeft className="h-4 w-4" />
+                    Retour à mes candidatures
+                </button>
+                <div className="flex items-center justify-center">
+                    <motion.div
+                        initial={{ scale: 0.9, opacity: 0 }}
+                        animate={{ scale: 1, opacity: 1 }}
+                        className="bg-white rounded-2xl p-10 max-w-md w-full text-center border-t-4 shadow-xl"
+                        style={{ borderTopColor: "#c62828" }}
+                    >
+                        <div className="h-16 w-16 rounded-full flex items-center justify-center mx-auto mb-6"
+                            style={{ backgroundColor: "#ffebee" }}>
+                            <CalendarDays className="h-8 w-8" style={{ color: "#c62828" }} />
+                        </div>
+                        <h2 className="text-2xl font-black mb-3" style={{ color: "#c62828" }}>
+                            Date limite dépassée
+                        </h2>
+                        <p className="text-gray-500 text-sm leading-relaxed mb-4">
+                            La date limite de dépôt pour cet examen était le{" "}
+                            <strong>
+                                {new Date(deadline! + "T00:00:00").toLocaleDateString("fr-FR", {
+                                    day: "2-digit", month: "long", year: "numeric",
+                                })}
+                            </strong>.
+                        </p>
+                        <p className="text-gray-400 text-sm">
+                            Vous ne pouvez plus accéder à cette épreuve.<br />
+                            Contactez le responsable IRISQ si vous pensez qu&apos;il s&apos;agit d&apos;une erreur.
+                        </p>
+                    </motion.div>
+                </div>
             </div>
         );
     }
@@ -809,7 +845,16 @@ export default function CandidatExamenPage() {
     if (phase === "info") {
         return (
             <>
-                <div className="space-y-6">
+                <div className="space-y-4">
+                    {/* Bouton retour */}
+                    <button
+                        onClick={() => setPhase("select")}
+                        className="inline-flex items-center gap-1.5 text-sm font-semibold text-gray-500 hover:text-gray-800 transition-colors"
+                    >
+                        <ChevronLeft className="h-4 w-4" />
+                        Retour à mes candidatures
+                    </button>
+
                     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="bg-white rounded-2xl overflow-hidden border border-gray-100 shadow-sm">
                         <div className="px-6 py-4 flex items-center gap-3" style={{ backgroundColor: "#1a237e" }}>
                             <div className="h-9 w-9 rounded-xl flex items-center justify-center" style={{ backgroundColor: "rgba(255,255,255,0.15)" }}>
