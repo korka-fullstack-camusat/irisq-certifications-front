@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
     LogOut, X, MonitorSmartphone,
-    LayoutDashboard, FolderOpen, Award, FileText, BookOpen, PlusCircle,
+    LayoutDashboard, FolderOpen, Award, FileText, BookOpen, AlertTriangle,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import Image from "next/image";
@@ -34,12 +34,12 @@ export default function CandidateLayout({ children }: { children: React.ReactNod
 
 // ── Navigation items ──────────────────────────────────────────────────────────
 const NAV_ITEMS = [
-    { href: "/candidat",                      label: "Tableau de bord",     icon: LayoutDashboard },
-    { href: "/candidat/dossiers",             label: "Mon dossier",         icon: FolderOpen      },
-    { href: "/candidat/certifications",       label: "Certifications",      icon: Award           },
-    { href: "/candidat/documents",            label: "Documents officiels", icon: FileText        },
-    { href: "/candidat/examen",               label: "Examen",              icon: BookOpen        },
-    { href: "/candidat/nouvelle-demande",     label: "Nouvelle demande",    icon: PlusCircle      },
+    { href: "/candidat",                         label: "Tableau de bord",     icon: LayoutDashboard },
+    { href: "/candidat/dossiers",                label: "Mon dossier",         icon: FolderOpen      },
+    { href: "/candidat/certifications",          label: "Certifications",      icon: Award           },
+    { href: "/candidat/documents",               label: "Documents officiels", icon: FileText        },
+    { href: "/candidat/examen",                  label: "Examen",              icon: BookOpen        },
+    { href: "/candidat/documents-signales",      label: "Docs signalés",       icon: AlertTriangle   },
 ];
 
 // ── Shell ─────────────────────────────────────────────────────────────────────
@@ -48,28 +48,11 @@ function Shell({ children }: { children: React.ReactNode }) {
     const pathname  = usePathname();
     const [showLogoutModal, setShowLogoutModal] = useState(false);
 
-    const examDone =
-        dossier?.exam_status === "submitted" ||
-        dossier?.exam_status === "graded"    ||
-        dossier?.final_decision === "certified";
-
     const initials    = (dossier?.name || dossier?.public_id || "??").substring(0, 2).toUpperCase();
     const displayName = dossier?.name || dossier?.public_id || "Candidat";
 
     const isActive = (href: string) =>
         href === "/candidat" ? pathname === "/candidat" : pathname.startsWith(href);
-
-    // ── Lock icon SVG ─────────────────────────────────────────────────────────
-    const LockBadge = () => (
-        <span
-            className="absolute -top-1 -right-1 h-3.5 w-3.5 rounded-full flex items-center justify-center"
-            style={{ backgroundColor: "#c62828" }}
-        >
-            <svg width="7" height="7" viewBox="0 0 10 10" fill="white">
-                <path d="M3 4V3a2 2 0 1 1 4 0v1h.5a.5.5 0 0 1 .5.5v4a.5.5 0 0 1-.5.5h-5a.5.5 0 0 1-.5-.5v-4A.5.5 0 0 1 2.5 4H3z" />
-            </svg>
-        </span>
-    );
 
     return (
         <div className={`flex min-h-screen font-sans${examActive ? " overflow-hidden" : ""}`} style={{ backgroundColor: "#f4f6f9" }}>
@@ -221,20 +204,18 @@ function Shell({ children }: { children: React.ReactNode }) {
                 <div className="flex-1 overflow-y-auto p-4">
                     <nav className="space-y-0.5">
                         {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
-                            const active       = isActive(href);
-                            const isExamLocked = href === "/candidat/examen" && examDone;
+                            const active = isActive(href);
                             return (
                                 <Link
                                     key={href}
                                     href={href}
-                                    title={isExamLocked ? "Examen déjà soumis — accès bloqué" : undefined}
                                     className="relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all"
                                     style={{
-                                        color:           isExamLocked ? "#d1d5db" : active ? "#ffffff" : "#555",
+                                        color:           active ? "#ffffff" : "#555",
                                         backgroundColor: active ? "#1a237e" : "transparent",
                                     }}
                                     onMouseEnter={e => {
-                                        if (!active && !isExamLocked) (e.currentTarget as HTMLElement).style.backgroundColor = "#e8eaf6";
+                                        if (!active) (e.currentTarget as HTMLElement).style.backgroundColor = "#e8eaf6";
                                     }}
                                     onMouseLeave={e => {
                                         if (!active) (e.currentTarget as HTMLElement).style.backgroundColor = "transparent";
@@ -253,9 +234,8 @@ function Shell({ children }: { children: React.ReactNode }) {
                                     <div className="relative shrink-0">
                                         <Icon
                                             className="h-5 w-5"
-                                            style={{ color: isExamLocked ? "#d1d5db" : active ? "#ffffff" : "#2e7d32" }}
+                                            style={{ color: active ? "#ffffff" : "#2e7d32" }}
                                         />
-                                        {isExamLocked && <LockBadge />}
                                     </div>
                                     {label}
                                 </Link>
@@ -329,17 +309,15 @@ function Shell({ children }: { children: React.ReactNode }) {
                 style={{ backgroundColor: "#ffffff", borderTop: "2px solid #e8eaf6", height: "64px" }}
             >
                 {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
-                    const active       = isActive(href);
-                    const isExamLocked = href === "/candidat/examen" && examDone;
+                    const active = isActive(href);
                     return (
                         <Link
                             key={href}
                             href={href}
                             className="flex flex-col items-center gap-1 p-3 transition-colors relative shrink-0"
-                            style={{ color: isExamLocked ? "#d1d5db" : active ? "#1a237e" : "#9ca3af" }}
-                            title={isExamLocked ? "Examen déjà soumis — accès bloqué" : undefined}
+                            style={{ color: active ? "#1a237e" : "#9ca3af" }}
                         >
-                            {active && !isExamLocked && (
+                            {active && (
                                 <motion.div
                                     layoutId="candidate-mobile-nav-active"
                                     className="absolute -top-[2px] left-1/2 -translate-x-1/2 w-6 h-1 rounded-b-full"
@@ -350,7 +328,6 @@ function Shell({ children }: { children: React.ReactNode }) {
                             )}
                             <div className="relative">
                                 <Icon className="h-5 w-5" />
-                                {isExamLocked && <LockBadge />}
                             </div>
                             <span className="text-[10px] font-bold text-center leading-tight">{label}</span>
                         </Link>
