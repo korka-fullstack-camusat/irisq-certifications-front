@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
     LogOut, X, MonitorSmartphone,
-    Home, Award, FileText, BookOpen,
+    LayoutDashboard, FolderOpen, Award, FileText, BookOpen, PlusCircle,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import Image from "next/image";
@@ -34,10 +34,12 @@ export default function CandidateLayout({ children }: { children: React.ReactNod
 
 // ── Navigation items ──────────────────────────────────────────────────────────
 const NAV_ITEMS = [
-    { href: "/candidat",                label: "Accueil",        icon: Home      },
-    { href: "/candidat/certifications", label: "Certifications", icon: Award     },
-    { href: "/candidat/documents",      label: "Documents",      icon: FileText  },
-    { href: "/candidat/examen",         label: "Examen",         icon: BookOpen  },
+    { href: "/candidat",                      label: "Tableau de bord",     icon: LayoutDashboard },
+    { href: "/candidat/dossiers",             label: "Mon dossier",         icon: FolderOpen      },
+    { href: "/candidat/certifications",       label: "Certifications",      icon: Award           },
+    { href: "/candidat/documents",            label: "Documents officiels", icon: FileText        },
+    { href: "/candidat/examen",               label: "Examen",              icon: BookOpen        },
+    { href: "/candidat/nouvelle-demande",     label: "Nouvelle demande",    icon: PlusCircle      },
 ];
 
 // ── Shell ─────────────────────────────────────────────────────────────────────

@@ -10,7 +10,7 @@ import {
     ChevronRight, Send, X, PhoneCall, Trophy,
 } from "lucide-react";
 import { useCandidate } from "@/lib/candidate-context";
-import { fetchCandidateExam, uploadFiles, submitExamWithAntiCheat, reportExamBlocked, candidateMe, type CandidateExam } from "@/lib/api";
+import { fetchCandidateExam, fetchCandidateExams, uploadFiles, submitExamWithAntiCheat, reportExamBlocked, candidateMe, type CandidateExam, type CandidateDossier } from "@/lib/api";
 import RichTextEditor from "@/components/RichTextEditor";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -64,16 +64,25 @@ function Countdown({ targetIso }: { targetIso: string }) {
 }
 
 // ── Types ─────────────────────────────────────────────────────────────────────
-type Phase = "info" | "exam" | "finished" | "blocked" | "submitted";
+type Phase = "select" | "info" | "exam" | "finished" | "blocked" | "submitted";
 
 // ═════════════════════════════════════════════════════════════════════════════
 export default function CandidatExamenPage() {
-    const { dossier, loading: dossierLoading, setExamActive } = useCandidate();
+    const { dossier, dossiers, loading: dossierLoading, setExamActive, setActiveDossierId } = useCandidate();
 
     const [exam, setExam] = useState<CandidateExam | null | undefined>(undefined);
     const [examLoading, setExamLoading] = useState(true);
+    const [allExams, setAllExams] = useState<CandidateExam[]>([]);
     const [now, setNow] = useState(Date.now());
-    const [phase, setPhase] = useState<Phase>("info");
+    // Start at "select" (overview listing); refresh detection may override to "blocked"
+    const [phase, setPhase] = useState<Phase>(() => {
+        if (typeof sessionStorage !== "undefined" && sessionStorage.getItem(EXAM_SESSION_KEY) === "1") {
+            return "blocked";
+        }
+        return "select";
+    });
+    // Bump to force a re-fetch of the active exam
+    const [examKey, setExamKey] = useState(0);
 
     // Anti-cheat
     const [isFullscreen, setIsFullscreen] = useState(false);
@@ -101,16 +110,7 @@ export default function CandidatExamenPage() {
     const [showSubmitModal, setShowSubmitModal] = useState(false);
     const [showExpiredModal, setShowExpiredModal] = useState(false);
 
-    // ── Detect refresh during exam ──────────────────────────────────────────
-    // On détecte le rechargement via sessionStorage. On ne signale PAS encore
-    // le blocage au serveur — il faut d'abord vérifier si l'évaluateur a déjà
-    // débloqué cet accès (exam_blocked === false) pour éviter le cycle de
-    // re-blocage : débloque → candidat recharge → reportExamBlocked → re-bloque.
-    useEffect(() => {
-        if (typeof sessionStorage !== "undefined" && sessionStorage.getItem(EXAM_SESSION_KEY) === "1") {
-            setPhase("blocked");
-        }
-    }, []);
+    // ── Refresh detection est géré dans initialPhase() (useState(() => ...)) ──
 
     // ── Reconciliation blocage local / état serveur ─────────────────────────
     // Règle : ne signaler le blocage au serveur QUE SI l'évaluateur n'a pas
@@ -184,13 +184,21 @@ export default function CandidatExamenPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [mediaStream]);
 
-    // ── Load exam data ──────────────────────────────────────────────────────
+    // ── Load all exams (for overview listing) ────────────────────────────────
     useEffect(() => {
+        fetchCandidateExams().then(setAllExams).catch(() => setAllExams([]));
+    }, []);
+
+    // ── Load exam data (for active dossier) — re-runs when examKey bumps ────
+    useEffect(() => {
+        if (phase === "select") return; // don't fetch until user picks a dossier
+        setExamLoading(true);
         fetchCandidateExam()
             .then(setExam)
             .catch(() => setExam(null))
             .finally(() => setExamLoading(false));
-    }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [examKey]);
 
     // Clock for countdown to exam start
     useEffect(() => {
@@ -420,16 +428,184 @@ export default function CandidatExamenPage() {
     // Auto-submit when timer hits 0
     const handleAutoSubmit = () => { doSubmit(); };
 
+    // ── Handle "Accéder à l'examen" from overview ───────────────────────────
+    const handleAccessExam = (d: CandidateDossier) => {
+        setActiveDossierId(d._id);
+        setExamKey(k => k + 1); // trigger re-fetch of exam data
+        setPhase("info");
+    };
+
     // ═══════════════════════════════════════════════════════════
     // RENDER
     // ═══════════════════════════════════════════════════════════
 
-    const isLoading = dossierLoading || examLoading;
-
-    if (isLoading) {
+    if (dossierLoading && phase === "select") {
         return (
             <div className="flex items-center justify-center py-20">
                 <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+            </div>
+        );
+    }
+
+    const isLoading = dossierLoading || examLoading;
+
+    if (isLoading && phase !== "select") {
+        return (
+            <div className="flex items-center justify-center py-20">
+                <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+            </div>
+        );
+    }
+
+    // ── Vue d'ensemble des candidatures — phase "select" ──────────────────
+    if (phase === "select") {
+        // Candidatures qui ont été approuvées OU qui ont un exam_token
+        const eligibles = dossiers.filter(d =>
+            d.status === "approved" || !!d.exam_token
+        );
+
+        return (
+            <div className="space-y-6">
+                <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+                    <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-gray-400">Espace candidat</p>
+                    <h1 className="text-2xl font-black" style={{ color: "#1a237e" }}>Examen</h1>
+                    <p className="text-sm text-gray-500 mt-1">
+                        Vos candidatures validées et leur période d&apos;examen.
+                    </p>
+                </motion.div>
+
+                {eligibles.length === 0 ? (
+                    <motion.div
+                        initial={{ opacity: 0, y: 8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.06 }}
+                        className="bg-white rounded-2xl border border-gray-100 shadow-sm p-10 text-center"
+                    >
+                        <div className="h-14 w-14 rounded-2xl flex items-center justify-center mx-auto mb-4" style={{ backgroundColor: "#e8eaf6" }}>
+                            <BookOpen className="h-7 w-7" style={{ color: "#1a237e" }} />
+                        </div>
+                        <p className="font-bold text-gray-700">Aucune candidature validée</p>
+                        <p className="text-sm text-gray-400 mt-1 leading-relaxed">
+                            Vos examens apparaîtront ici dès que votre candidature sera validée par l&apos;administration.
+                        </p>
+                    </motion.div>
+                ) : (
+                    <div className="space-y-3">
+                        {eligibles.map((d, i) => {
+                            const cert = d.answers?.["Certification souhaitée"] || d.public_id || "Certification";
+                            const matchedExam = allExams.find(e => e.certification === cert);
+                            const hasToken    = !!d.exam_token;
+                            const expired     = matchedExam?.deadline
+                                ? new Date(matchedExam.deadline + "T23:59:59").getTime() < now
+                                : false;
+                            const alreadyDone = d.exam_status === "submitted" || d.exam_status === "graded" || d.final_decision === "certified";
+                            const canStart    = hasToken && !!matchedExam && !expired && !alreadyDone;
+
+                            return (
+                                <motion.div
+                                    key={d._id}
+                                    initial={{ opacity: 0, y: 8 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    transition={{ delay: i * 0.06 }}
+                                    className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden"
+                                >
+                                    {/* En-tête */}
+                                    <div className="px-5 py-4 flex items-start gap-4">
+                                        <div className="h-11 w-11 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: "#e8eaf6" }}>
+                                            <BookOpen className="h-5 w-5" style={{ color: "#1a237e" }} />
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <p className="font-black text-gray-800 text-sm leading-snug">{cert}</p>
+                                            {d.public_id && (
+                                                <p className="text-[10px] text-gray-400 font-mono mt-0.5">{d.public_id}</p>
+                                            )}
+                                        </div>
+                                        {/* Badge statut examen */}
+                                        {alreadyDone ? (
+                                            <span className="shrink-0 text-[10px] font-bold px-2.5 py-1 rounded-full" style={{ backgroundColor: "#e8eaf6", color: "#1a237e" }}>
+                                                {d.final_decision === "certified" ? "Certifié ✓" : d.exam_status === "graded" ? "Noté" : "Soumis"}
+                                            </span>
+                                        ) : canStart ? (
+                                            <span className="shrink-0 text-[10px] font-bold px-2.5 py-1 rounded-full animate-pulse" style={{ backgroundColor: "#e8f5e9", color: "#2e7d32" }}>
+                                                Disponible
+                                            </span>
+                                        ) : expired ? (
+                                            <span className="shrink-0 text-[10px] font-bold px-2.5 py-1 rounded-full" style={{ backgroundColor: "#ffebee", color: "#c62828" }}>
+                                                Expiré
+                                            </span>
+                                        ) : (
+                                            <span className="shrink-0 text-[10px] font-bold px-2.5 py-1 rounded-full" style={{ backgroundColor: "#f3f4f6", color: "#6b7280" }}>
+                                                Pas encore disponible
+                                            </span>
+                                        )}
+                                    </div>
+
+                                    {/* Infos période */}
+                                    <div className="px-5 pb-4 space-y-2">
+                                        {matchedExam ? (
+                                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                                                {matchedExam.duration_minutes && (
+                                                    <div className="flex items-center gap-2 p-2.5 rounded-xl" style={{ backgroundColor: "#f4f6f9" }}>
+                                                        <Clock className="h-4 w-4 shrink-0" style={{ color: "#2e7d32" }} />
+                                                        <div>
+                                                            <p className="text-[9px] font-bold uppercase tracking-widest text-gray-400">Durée</p>
+                                                            <p className="text-xs font-bold text-gray-800">{matchedExam.duration_minutes} min</p>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                                {matchedExam.deadline && (
+                                                    <div className="flex items-center gap-2 p-2.5 rounded-xl" style={{ backgroundColor: expired ? "#ffebee" : "#f4f6f9" }}>
+                                                        <CalendarDays className="h-4 w-4 shrink-0" style={{ color: expired ? "#c62828" : "#1a237e" }} />
+                                                        <div>
+                                                            <p className="text-[9px] font-bold uppercase tracking-widest text-gray-400">Date limite</p>
+                                                            <p className="text-xs font-bold" style={{ color: expired ? "#c62828" : "#374151" }}>
+                                                                {new Date(matchedExam.deadline).toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" })}
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                                <div className="flex items-center gap-2 p-2.5 rounded-xl" style={{ backgroundColor: "#f4f6f9" }}>
+                                                    <ShieldCheck className="h-4 w-4 shrink-0" style={{ color: "#1a237e" }} />
+                                                    <div>
+                                                        <p className="text-[9px] font-bold uppercase tracking-widest text-gray-400">Certification</p>
+                                                        <p className="text-[10px] font-bold text-gray-800 truncate">{matchedExam.certification}</p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <div className="flex items-center gap-2 p-3 rounded-xl text-sm" style={{ backgroundColor: "#f4f6f9", color: "#6b7280" }}>
+                                                <CalendarDays className="h-4 w-4 shrink-0" />
+                                                <span>Période d&apos;examen pas encore disponible.</span>
+                                            </div>
+                                        )}
+
+                                        {/* Bouton accès */}
+                                        {canStart && (
+                                            <button
+                                                onClick={() => handleAccessExam(d)}
+                                                className="w-full mt-1 inline-flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold text-white transition-all hover:-translate-y-0.5"
+                                                style={{ backgroundColor: "#2e7d32", boxShadow: "0 6px 16px rgba(46,125,50,0.3)" }}
+                                            >
+                                                <PlayCircle className="h-4 w-4" />
+                                                Accéder à l&apos;examen
+                                            </button>
+                                        )}
+                                        {alreadyDone && (
+                                            <div className="flex items-center gap-2 p-3 rounded-xl text-xs font-medium" style={{ backgroundColor: "#e8eaf6", color: "#1a237e" }}>
+                                                <ShieldCheck className="h-4 w-4 shrink-0" />
+                                                {d.final_decision === "certified"
+                                                    ? "Félicitations ! Votre certification a été validée."
+                                                    : d.exam_status === "graded"
+                                                        ? "Votre copie a été corrigée. Résultats communiqués par email."
+                                                        : "Votre copie a été soumise et est en cours de correction."}
+                                            </div>
+                                        )}
+                                    </div>
+                                </motion.div>
+                            );
+                        })}
+                    </div>
+                )}
             </div>
         );
     }

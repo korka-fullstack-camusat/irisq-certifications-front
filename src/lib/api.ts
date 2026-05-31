@@ -1093,6 +1093,27 @@ export async function sendTestEmail(toEmail: string): Promise<{ success: boolean
     return res.json();
 }
 
+// ── Nouvelle demande (candidat authentifié) ───────────────────────────────────
+export async function candidateApply(data: {
+    form_id: string;
+    session_id?: string | null;
+    exam_mode: string;
+    exam_type?: string | null;
+    answers?: Record<string, any>;
+}): Promise<any> {
+    const res = await candidateFetch(url("candidate/apply"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+        redirect: "follow",
+    });
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || "Erreur lors de la soumission de la demande");
+    }
+    return res.json();
+}
+
 export async function candidateResubmitDocument(documentName: string, fileUrl: string): Promise<CandidateDossier> {
     const res = await candidateFetch(url("candidate/resubmit-document"), {
         method: "POST",
