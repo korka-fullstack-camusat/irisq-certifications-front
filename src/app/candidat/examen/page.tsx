@@ -1122,13 +1122,7 @@ export default function CandidatExamenPage() {
                             )}
                         </div>
 
-                        {/* ── Sujet d'examen ────────────────────────────────────────────────────
-                             Priorité 1 : HTML extrait (DOCX / PDF texte) → rendu riche
-                             Priorité 2 : URL directe du fichier dans une iframe
-                                          (le backend envoie Content-Disposition: inline →
-                                           le navigateur affiche le PDF sans télécharger)
-                             Priorité 3 : Message d'erreur si aucune ressource disponible
-                        ─────────────────────────────────────────────────────────────────── */}
+                        {/* Sujet d'examen : HTML (DOCX/PDF texte) ou iframe PDF (PDF scanne) */}
                         <div className="shrink-0 border-b" style={{ borderColor: "#e8eaf6" }}>
                             {isReparsing ? (
                                 /* Conversion du document en cours */
@@ -1150,13 +1144,6 @@ export default function CandidatExamenPage() {
                                     dangerouslySetInnerHTML={{ __html: exam.exam_content_html! }}
                                 />
                             ) : exam.document_url ? (
-                                /* PDF (scanné ou texte) — affiché nativement par le navigateur.
-                                   L'URL absolue est obligatoire (resolveDocUrl) sinon le navigateur
-                                   chercherait le fichier sur le frontend (irisq-certifications.online)
-                                   au lieu du backend (irisq-certifications-api.onrender.com).
-                                   L'iframe n'est PAS soumise au CORS — elle charge l'URL comme
-                                   une navigation normale. Le backend répond avec
-                                   Content-Disposition: inline → affichage inline garanti. */}
                                 <iframe
                                     src={resolveDocUrl(exam.document_url)}
                                     title="Sujet d'examen"

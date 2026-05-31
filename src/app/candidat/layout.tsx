@@ -305,8 +305,13 @@ function Shell({ children }: { children: React.ReactNode }) {
                     </button>
                 </header>
 
-                {/* Contenu — masqué pendant l'examen (la page exam monte en fixed z-[200]) */}
-                <div className={`flex-1 w-full pt-20 md:pt-8 p-4 md:p-8 transition-opacity duration-300 ${examActive ? "opacity-0 pointer-events-none" : "opacity-100"}`}>
+                {/* Contenu principal.
+                    NOTE : on NE masque PAS ce conteneur avec opacity-0 pendant l'examen,
+                    car opacity:0 sur le parent rend aussi invisible les enfants en
+                    position:fixed (comme l'overlay d'examen z-[200]).
+                    L'overlay couvre tout nativement grâce à fixed inset-0 z-[200]
+                    + fond solide — pas besoin de cacher le contenu en dessous. */}
+                <div className="flex-1 w-full pt-20 md:pt-8 p-4 md:p-8">
                     <div className="max-w-4xl mx-auto pb-20">
                         {children}
                     </div>
