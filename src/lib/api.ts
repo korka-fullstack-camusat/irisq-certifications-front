@@ -203,6 +203,9 @@ export interface MultiCandidatureDossier {
     final_appreciation?: string;
     submitted_at?: string;
     certification?: string;
+    /** null = dossier soumis via l'espace candidat (pas de session associée) */
+    session_id?: string | null;
+    session_name?: string | null;
     answers?: Record<string, any>;
     documents_validation?: Record<string, DocumentValidationEntry>;
 }

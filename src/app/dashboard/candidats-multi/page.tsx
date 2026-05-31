@@ -19,8 +19,8 @@ import {
     Hash,
     Users,
     Hourglass,
-    Folder,
     FolderRoot,
+    Globe,
 } from "lucide-react";
 
 import {
@@ -101,7 +101,19 @@ function DossierSubFolder({
                             </span>
                         )}
                     </div>
-                    <div className="mt-1 flex items-center gap-4 text-xs text-gray-500 flex-wrap">
+                    <div className="mt-1 flex items-center gap-3 text-xs text-gray-500 flex-wrap">
+                        {/* Badge origine : portail ou session */}
+                        {!dossier.session_id ? (
+                            <span className="inline-flex items-center gap-1 font-bold px-2 py-0.5 rounded-full"
+                                style={{ backgroundColor: "#e8eaf6", color: "#1a237e" }}>
+                                <Globe className="h-3 w-3" /> Espace candidat
+                            </span>
+                        ) : dossier.session_name ? (
+                            <span className="inline-flex items-center gap-1 font-bold px-2 py-0.5 rounded-full"
+                                style={{ backgroundColor: "#f3f4f6", color: "#374151" }}>
+                                <CalendarDays className="h-3 w-3" /> {dossier.session_name}
+                            </span>
+                        ) : null}
                         {dossier.exam_mode === "online" && (
                             <span className="inline-flex items-center gap-1">
                                 <Monitor className="h-3 w-3" /> En ligne
@@ -295,8 +307,8 @@ export default function CandidatsMultiPage() {
                     Candidats multi-formations
                 </h1>
                 <p className="text-sm text-gray-500 mt-1">
-                    Candidats ayant postulé à plusieurs certifications dans la même session.
-                    Déployez le dossier racine pour consulter les sous-dossiers de chaque formation.
+                    Candidats ayant plusieurs demandes de certification (via le formulaire public ou l&apos;espace candidat).
+                    Déployez le dossier racine pour consulter et valider chaque sous-dossier.
                 </p>
             </header>
 
