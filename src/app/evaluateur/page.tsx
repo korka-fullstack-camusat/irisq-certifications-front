@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  Search, File as FileIcon, X, Eye, Loader2,
+  Search, File as FileIcon, X, Eye,
   CheckCircle2, Filter, ChevronLeft, ChevronRight,
   CalendarDays, FileText, ShieldCheck,
   Award, Calendar, ClipboardCheck, Mail,
@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import {
   fetchSessionResponses, fetchCertifications,
-  fetchResponse, submitFinalEvaluation, API_URL,
+  fetchResponse, API_URL,
 } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import Image from "next/image";
@@ -37,20 +37,15 @@ function CandidateModal({
   responseId: string;
   onClose: () => void;
 }) {
-  const [candidate, setCandidate]                 = useState<any>(null);
-  const [isLoading, setIsLoading]                 = useState(true);
-  const [finalGrade, setFinalGrade]               = useState("");
-  const [finalAppreciation, setFinalAppreciation] = useState("");
-  const [isSubmitting, setIsSubmitting]           = useState(false);
-  const [previewFile, setPreviewFile]             = useState<{ url: string; title?: string } | null>(null);
+  const [candidate, setCandidate] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [previewFile, setPreviewFile] = useState<{ url: string; title?: string } | null>(null);
 
   const load = useCallback(async () => {
     setIsLoading(true);
     try {
       const data = await fetchResponse(responseId);
       setCandidate(data);
-      setFinalGrade(data.final_grade || "");
-      setFinalAppreciation(data.final_appreciation || "");
     } catch (e) {
       console.error(e);
     } finally {
@@ -59,16 +54,6 @@ function CandidateModal({
   }, [responseId]);
 
   useEffect(() => { load(); }, [load]);
-
-  const handleSubmitEval = async () => {
-    if (!candidate || !finalGrade || !finalAppreciation) return;
-    setIsSubmitting(true);
-    try {
-      await submitFinalEvaluation(candidate._id, { final_grade: finalGrade, final_appreciation: finalAppreciation });
-      setCandidate({ ...candidate, final_grade: finalGrade, final_appreciation: finalAppreciation });
-    } catch (e) { console.error(e); }
-    finally { setIsSubmitting(false); }
-  };
 
   const fullUrl = (path: string) =>
     path.startsWith("http") ? path : `${API_URL.replace("/api", "")}${path}`;
@@ -209,67 +194,6 @@ function CandidateModal({
                     </div>
                   </div>
                 </div>
-
-                {/* ── Décision finale ── */}
-                {candidate.exam_document && (
-                  <>
-                    <div className="flex items-center gap-3">
-                      <div className="flex-1 h-px bg-gray-100" />
-                      <span className="w-2 h-2 rotate-45 shrink-0" style={{ backgroundColor: "#2e7d32", display: "inline-block" }} />
-                      <div className="flex-1 h-px bg-gray-100" />
-                    </div>
-
-                    <div>
-                      <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-3">
-                        Décision finale
-                      </p>
-
-                      {/* Avis correcteur */}
-                      {(candidate.exam_grade || candidate.exam_comments) && (
-                        <div className="bg-[#f4f6f9] rounded-xl p-3 mb-3 space-y-1">
-                          <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Avis du correcteur</p>
-                          <p className="text-base font-black text-[#1a237e]">{candidate.exam_grade}</p>
-                          {candidate.exam_comments && (
-                            <p className="text-xs text-gray-500 italic">"{candidate.exam_comments}"</p>
-                          )}
-                        </div>
-                      )}
-
-                      {candidate.final_grade ? (
-                        <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4">
-                          <p className="text-[9px] font-bold text-emerald-600 uppercase tracking-widest">Décision enregistrée</p>
-                          <p className="text-2xl font-black text-emerald-800 mt-1">{candidate.final_grade}</p>
-                          <p className="text-xs text-emerald-700 mt-1">{candidate.final_appreciation}</p>
-                        </div>
-                      ) : (
-                        <div className="space-y-2">
-                          <input
-                            type="text"
-                            placeholder="Note finale (ex : Admis, 18/20…)"
-                            value={finalGrade}
-                            onChange={e => setFinalGrade(e.target.value)}
-                            className="w-full bg-[#f4f6f9] border border-gray-200 text-sm px-3 py-2.5 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1a237e]/20"
-                          />
-                          <textarea
-                            placeholder="Appréciation globale du comité…"
-                            value={finalAppreciation}
-                            onChange={e => setFinalAppreciation(e.target.value)}
-                            rows={3}
-                            className="w-full bg-[#f4f6f9] border border-gray-200 text-sm px-3 py-2.5 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1a237e]/20 resize-none"
-                          />
-                          <button
-                            onClick={handleSubmitEval}
-                            disabled={!finalGrade || !finalAppreciation || isSubmitting}
-                            className="w-full py-2.5 text-white text-xs font-bold rounded-xl disabled:opacity-50 flex justify-center items-center gap-2 transition-all"
-                            style={{ backgroundColor: "#2e7d32" }}
-                          >
-                            {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Sceller l'évaluation finale"}
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  </>
-                )}
 
                 {/* ── Bouton copie PDF ── */}
                 {candidate.exam_document && (
