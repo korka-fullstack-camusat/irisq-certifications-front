@@ -39,6 +39,12 @@ function getEligibleCertifications(yearsStr: string): string[] {
     return CERTIFICATIONS; // n >= 5
 }
 
+/** Extrait la norme ISO d'un libellé de certification (ex: "9001", "17025"). */
+function extractNorm(cert: string): string {
+    const m = cert.match(/\b(17025|9001|14001|45001)\b/);
+    return m ? m[1] : cert;
+}
+
 const FORM_TITLE = "Fiche de demande - IRISQ CERTIFICATION";
 
 const STEPS = [
@@ -264,6 +270,8 @@ export default function DemandeCertificationPage() {
         setCertifications(prev => {
             if (prev.includes(cert)) return prev.filter(c => c !== cert);
             if (prev.length >= 2) return prev; // max 2
+            // Empêcher deux certifications de la même norme ISO
+            if (prev.some(c => extractNorm(c) === extractNorm(cert))) return prev;
             return [...prev, cert];
         });
         setValidationError("");
@@ -1120,15 +1128,16 @@ export default function DemandeCertificationPage() {
                                                         {(hasYears ? eligible : CERTIFICATIONS).map((cert) => {
                                                             const selected = certifications.includes(cert);
                                                             const maxReached = certifications.length >= 2 && !selected;
+                                                            const normConflict = !selected && certifications.some(c => extractNorm(c) === extractNorm(cert));
                                                             const color = cert.includes("17025") ? "#1a237e" : cert.includes("9001") ? "#2e7d32" : cert.includes("45001") ? "#7b1fa2" : "#b45309";
-                                                            const isDisabled = (hasYears && !eligible.includes(cert)) || maxReached;
+                                                            const isDisabled = (hasYears && !eligible.includes(cert)) || maxReached || normConflict;
                                                             return (
                                                                 <label
                                                                     key={cert}
-                                                                    className={`flex items-center gap-4 p-3.5 rounded-xl border transition-all ${isDisabled ? "opacity-30 cursor-not-allowed" : "cursor-pointer"}`}
+                                                                    className={`flex items-center gap-4 p-3.5 rounded-xl border transition-all ${isDisabled ? "cursor-not-allowed" : "cursor-pointer"} ${normConflict ? "opacity-50" : isDisabled ? "opacity-30" : ""}`}
                                                                     style={{
-                                                                        borderColor: selected ? color : "#e0e0e0",
-                                                                        backgroundColor: selected ? `${color}10` : "#f4f6f9",
+                                                                        borderColor: selected ? color : normConflict ? "#fb923c" : "#e0e0e0",
+                                                                        backgroundColor: selected ? `${color}10` : normConflict ? "#fff7ed" : "#f4f6f9",
                                                                     }}
                                                                 >
                                                                     <input
@@ -1143,13 +1152,18 @@ export default function DemandeCertificationPage() {
                                                                         {selected && (
                                                                             <span className="w-2 h-2 rotate-45 shrink-0" style={{ backgroundColor: "#c62828", display: "inline-block" }} />
                                                                         )}
-                                                                        <span className="text-sm font-semibold" style={{ color: selected ? color : isDisabled ? "#bbb" : "#555" }}>
+                                                                        <span className="text-sm font-semibold" style={{ color: selected ? color : normConflict ? "#b45309" : isDisabled ? "#bbb" : "#555" }}>
                                                                             {cert}
                                                                         </span>
                                                                     </div>
                                                                     {selected && (
                                                                         <span className="text-xs font-medium px-1.5 py-0.5 rounded" style={{ backgroundColor: `${color}20`, color }}>
                                                                             Sélectionnée
+                                                                        </span>
+                                                                    )}
+                                                                    {normConflict && (
+                                                                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full whitespace-nowrap" style={{ backgroundColor: "#fff7ed", color: "#b45309", border: "1px solid #fed7aa" }}>
+                                                                            Même norme
                                                                         </span>
                                                                     )}
                                                                 </label>
@@ -1164,6 +1178,16 @@ export default function DemandeCertificationPage() {
                                                         className="mt-2 text-xs font-medium text-[#c62828]"
                                                     >
                                                         Maximum atteint. Désélectionnez une formation pour en choisir une autre.
+                                                    </motion.p>
+                                                )}
+                                                {certifications.length < 2 && certifications.some(c => extractNorm(c) !== "") && (hasYears ? eligible : CERTIFICATIONS).some(cert => !certifications.includes(cert) && certifications.some(c => extractNorm(c) === extractNorm(cert))) && (
+                                                    <motion.p
+                                                        initial={{ opacity: 0, y: -4 }}
+                                                        animate={{ opacity: 1, y: 0 }}
+                                                        className="mt-2 text-xs font-medium"
+                                                        style={{ color: "#b45309" }}
+                                                    >
+                                                        Deux certifications de la même norme ISO ne peuvent pas être combinées.
                                                     </motion.p>
                                                 )}
                                             </div>
