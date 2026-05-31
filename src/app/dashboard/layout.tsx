@@ -2,19 +2,16 @@
 
 import { Suspense, useState } from "react";
 import Link from "next/link";
-import { usePathname, useSearchParams } from "next/navigation";
+import { usePathname } from "next/navigation";
 import {
     LayoutDashboard,
     LogOut,
     X,
     CalendarDays,
-    Monitor,
-    MapPin,
     ShieldCheck,
     Trophy,
     History,
     XCircle,
-    Layers,
     FolderOpen,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -23,23 +20,19 @@ import { useAuth } from "@/lib/auth";
 
 function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
     const pathname = usePathname();
-    const searchParams = useSearchParams();
-    const currentMode = searchParams.get("mode");
     const [showLogoutModal, setShowLogoutModal] = useState(false);
 
     const { user, logout, isLoading } = useAuth();
 
     const navItems = [
-        { name: "Tableau de bord",        href: "/dashboard",                           icon: LayoutDashboard, mode: null      as string | null },
-        { name: "Gestion sessions",       href: "/dashboard/sessions",                  icon: CalendarDays,    mode: null      as string | null },
-        { name: "Candidature en ligne",   href: "/dashboard/candidatures?mode=online",  icon: Monitor,         mode: "online"  as string | null },
-        { name: "Candidature présentiel", href: "/dashboard/candidatures?mode=onsite",  icon: MapPin,          mode: "onsite"  as string | null },
-        { name: "Candidatures validées",   href: "/dashboard/candidatures-validees",    icon: ShieldCheck,  mode: null      as string | null },
-        { name: "Multi-Demandes",         href: "/dashboard/candidats-multi",          icon: Layers,       mode: null      as string | null },
-        { name: "Candidats certifiés",    href: "/dashboard/candidats-certifies",      icon: Trophy,       mode: null      as string | null },
-        { name: "Candidats non certifiés",href: "/dashboard/candidats-non-certifies",  icon: XCircle,      mode: null      as string | null },
-        { name: "Documents",              href: "/dashboard/documents",                icon: FolderOpen,   mode: null      as string | null },
-        { name: "Historiques",            href: "/dashboard/historique",               icon: History,      mode: null      as string | null },
+        { name: "Tableau de bord",         href: "/dashboard",                        icon: LayoutDashboard, mode: null as string | null },
+        { name: "Gestion sessions",        href: "/dashboard/sessions",               icon: CalendarDays,    mode: null as string | null },
+        { name: "Candidatures",            href: "/dashboard/candidatures",           icon: FolderOpen,      mode: null as string | null },
+        { name: "Candidatures validées",   href: "/dashboard/candidatures-validees",  icon: ShieldCheck,     mode: null as string | null },
+        { name: "Candidats certifiés",     href: "/dashboard/candidats-certifies",    icon: Trophy,          mode: null as string | null },
+        { name: "Candidats non certifiés", href: "/dashboard/candidats-non-certifies",icon: XCircle,         mode: null as string | null },
+        { name: "Documents",               href: "/dashboard/documents",              icon: FolderOpen,      mode: null as string | null },
+        { name: "Historiques",             href: "/dashboard/historique",             icon: History,         mode: null as string | null },
     ];
 
     const handleLogout = () => {
@@ -48,12 +41,9 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
     };
 
     function isItemActive(item: { href: string; mode: string | null }) {
-        const url = new URL(item.href, "http://x");
-        if (item.mode) {
-            return pathname === url.pathname && currentMode === item.mode;
-        }
-        if (url.pathname === "/dashboard") return pathname === "/dashboard";
-        return pathname.startsWith(url.pathname) && !currentMode;
+        const itemPath = item.href.split("?")[0];
+        if (itemPath === "/dashboard") return pathname === "/dashboard";
+        return pathname.startsWith(itemPath);
     }
 
     if (isLoading || !user) return null;

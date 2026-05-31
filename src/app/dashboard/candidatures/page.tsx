@@ -1,122 +1,369 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, Suspense } from "react";
+import { useEffect, useMemo, useState, Suspense } from "react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import {
-    Folder,
-    CalendarDays,
-    FolderOpen,
     Loader2,
-    ChevronRight,
-    ChevronDown,
-    Users,
-    Download,
+    CalendarDays,
+    Mail,
+    Layers,
+    CheckCircle2,
+    Clock,
+    XCircle,
     Monitor,
     MapPin,
-    Mail,
-    Clock,
-    CheckCircle2,
-    XCircle,
-    Hourglass,
-    AlertTriangle,
     Search,
-    SlidersHorizontal,
+    ChevronRight,
+    AlertTriangle,
+    Hash,
+    Users,
+    Hourglass,
+    FolderRoot,
+    Globe,
+    Download,
 } from "lucide-react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 
 import {
+    fetchMultiCandidatures,
     fetchSessions,
-    fetchSessionResponses,
     downloadSessionDossiersZip,
+    type MultiCandidatureEntry,
+    type MultiCandidatureDossier,
     type Session,
 } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { Pagination } from "@/components/Pagination";
 
-interface CandidatureRow {
-    _id: string;
-    public_id?: string;
-    candidate_id?: string;
-    name?: string;
-    email?: string;
-    status?: string;
-    submitted_at?: string;
-    exam_mode?: string;
-    exam_type?: string;
-    answers?: Record<string, any>;
-    documents_validation?: Record<string, { valid?: boolean; resubmit_requested?: boolean }>;
-}
-
-const FORMATION_FIELD = "Certification souhaitée";
-const UNCATEGORIZED = "Sans formation renseignée";
+// ── Types ──────────────────────────────────────────────────────────────────
 
 type ModeTab = "all" | "online" | "onsite";
-type ExamTypeTab = "all" | "direct" | "after_formation";
 
-function getExamMode(r: CandidatureRow): "online" | "onsite" | "" {
-    const raw = (r.exam_mode || "").toString().toLowerCase().trim();
+// ── Helpers ────────────────────────────────────────────────────────────────
+
+function getDossierMode(d: MultiCandidatureDossier): "online" | "onsite" | "" {
+    const raw = (d.exam_mode || "").toLowerCase().trim();
     if (raw === "online" || raw === "onsite") return raw;
-    const fromAnswers = (r.answers?.["Mode d'examen"] || "").toString().toLowerCase().trim();
+    const fromAnswers = ((d.answers?.["Mode d'examen"] as string | undefined) || "").toLowerCase();
     if (fromAnswers.includes("ligne")) return "online";
     if (fromAnswers.includes("présent") || fromAnswers.includes("present")) return "onsite";
     return "";
 }
 
-function getExamType(r: CandidatureRow): "direct" | "after_formation" | "" {
-    const raw = (r.exam_type as string | undefined || "").toString().toLowerCase().trim();
-    if (raw === "direct") return "direct";
-    if (raw === "after_formation") return "after_formation";
-    const fromAnswers = (r.answers?.["Type d'examen"] || "").toString().trim();
-    if (fromAnswers.toLowerCase().includes("direct")) return "direct";
-    if (fromAnswers.toLowerCase().includes("formation")) return "after_formation";
-    return "";
-}
-
-function validationState(row: CandidatureRow): "all_valid" | "has_issue" | "pending" {
-    const v = row.documents_validation || {};
-    const entries = Object.values(v);
+function validationState(dossier: MultiCandidatureDossier): "all_valid" | "has_issue" | "pending" {
+    const entries = Object.values(dossier.documents_validation || {});
     if (entries.length === 0) return "pending";
     if (entries.some(e => e.resubmit_requested)) return "has_issue";
     if (entries.every(e => e.valid === true)) return "all_valid";
     return "pending";
 }
 
-const PREDEFINED_FORMATIONS = [
-    "Implementor ISO/IEC17025:2017",
-    "Lead Implementor ISO/IEC17025:2017",
-    "Junior Implementor ISO 9001:2015",
-    "Implementor ISO 9001:2015",
-    "Lead Implementor ISO 9001:2015",
-    "Junior Implementor ISO 14001:2015",
-    "Implementor ISO 14001:2015",
-    "Lead Implementor ISO 14001:2015",
-];
+function certColor(cert: string) {
+    if (cert.includes("17025")) return "#1a237e";
+    if (cert.includes("9001")) return "#2e7d32";
+    if (cert.includes("45001")) return "#7b1fa2";
+    return "#b45309";
+}
+
+function entryMatchesMode(entry: MultiCandidatureEntry, mode: ModeTab): boolean {
+    if (mode === "all") return true;
+    return entry.dossiers.some(d => getDossierMode(d) === mode);
+}
+
+// ── Status badge ───────────────────────────────────────────────────────────
+
+function StatusBadge({ status }: { status?: string }) {
+    if (status === "approved") return (
+        <span className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full shrink-0"
+            style={{ backgroundColor: "#e8f5e9", color: "#2e7d32", border: "1px solid #c8e6c9" }}>
+            <CheckCircle2 className="h-3.5 w-3.5" /> Validée
+        </span>
+    );
+    if (status === "rejected") return (
+        <span className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full shrink-0"
+            style={{ backgroundColor: "#ffebee", color: "#c62828", border: "1px solid #ffcdd2" }}>
+            <XCircle className="h-3.5 w-3.5" /> Rejetée
+        </span>
+    );
+    return (
+        <span className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full shrink-0"
+            style={{ backgroundColor: "#fff8e1", color: "#b26a00", border: "1px solid #ffe0b2" }}>
+            <Hourglass className="h-3.5 w-3.5" /> En attente
+        </span>
+    );
+}
+
+// ── Dossier sub-row (inside a multi-folder) ────────────────────────────────
+
+function DossierSubRow({ dossier }: { dossier: MultiCandidatureDossier }) {
+    const docState = validationState(dossier);
+    const color = certColor(dossier.certification || "");
+    const certLabel = dossier.certification || "Certification inconnue";
+    const mode = getDossierMode(dossier);
+
+    return (
+        <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}>
+            <Link
+                href={`/dashboard/candidatures/${dossier._id}?from=candidatures`}
+                className="group flex items-center gap-4 p-4 rounded-2xl bg-white border border-gray-100 shadow-sm hover:shadow-md hover:border-indigo-200 transition-all"
+            >
+                <div
+                    className="h-11 w-11 rounded-xl flex items-center justify-center shrink-0 text-white text-sm font-black"
+                    style={{ backgroundColor: color }}
+                >
+                    {certLabel.substring(0, 2).toUpperCase()}
+                </div>
+
+                <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-bold text-gray-800 truncate">{certLabel}</span>
+                        {dossier.public_id && (
+                            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-gray-100 text-gray-500">
+                                {dossier.public_id}
+                            </span>
+                        )}
+                        {docState === "all_valid" && (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700">
+                                <CheckCircle2 className="h-3 w-3" /> Docs OK
+                            </span>
+                        )}
+                        {docState === "has_issue" && (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700">
+                                <AlertTriangle className="h-3 w-3" /> Relance
+                            </span>
+                        )}
+                    </div>
+                    <div className="mt-1 flex items-center gap-3 text-xs text-gray-500 flex-wrap">
+                        {!dossier.session_id ? (
+                            <span className="inline-flex items-center gap-1 font-bold px-2 py-0.5 rounded-full"
+                                style={{ backgroundColor: "#e8eaf6", color: "#1a237e" }}>
+                                <Globe className="h-3 w-3" /> Espace candidat
+                            </span>
+                        ) : dossier.session_name ? (
+                            <span className="inline-flex items-center gap-1 font-bold px-2 py-0.5 rounded-full"
+                                style={{ backgroundColor: "#f3f4f6", color: "#374151" }}>
+                                <CalendarDays className="h-3 w-3" /> {dossier.session_name}
+                            </span>
+                        ) : null}
+                        {mode === "online" && (
+                            <span className="inline-flex items-center gap-1">
+                                <Monitor className="h-3 w-3" /> En ligne
+                            </span>
+                        )}
+                        {mode === "onsite" && (
+                            <span className="inline-flex items-center gap-1">
+                                <MapPin className="h-3 w-3" /> Présentiel
+                            </span>
+                        )}
+                        {dossier.submitted_at && (
+                            <span className="inline-flex items-center gap-1">
+                                <Clock className="h-3 w-3" />
+                                {new Date(dossier.submitted_at).toLocaleDateString("fr-FR")}
+                            </span>
+                        )}
+                    </div>
+                </div>
+
+                <StatusBadge status={dossier.status} />
+                <ChevronRight className="h-5 w-5 text-gray-300 group-hover:text-indigo-500 transition-colors shrink-0" />
+            </Link>
+        </motion.div>
+    );
+}
+
+// ── Single dossier card (candidate with exactly 1 application) ────────────
+
+function SingleDossierCard({ entry }: { entry: MultiCandidatureEntry }) {
+    const dossier = entry.dossiers[0];
+    const docState = validationState(dossier);
+    const mode = getDossierMode(dossier);
+    const certLabel = dossier.certification || "Certification inconnue";
+
+    return (
+        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
+            <Link
+                href={`/dashboard/candidatures/${dossier._id}?from=candidatures`}
+                className="group flex items-center gap-4 p-4 rounded-2xl bg-white border border-gray-100 shadow-sm hover:shadow-md hover:border-indigo-200 transition-all"
+            >
+                {/* Avatar initiales nom */}
+                <div
+                    className="h-11 w-11 rounded-xl flex items-center justify-center shrink-0 text-white text-sm font-black"
+                    style={{ backgroundColor: "#1a237e" }}
+                >
+                    {(entry.name || entry.email || "?").substring(0, 2).toUpperCase()}
+                </div>
+
+                <div className="flex-1 min-w-0">
+                    {/* Ligne 1 : nom + ID + docs */}
+                    <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-bold text-gray-800 truncate">{entry.name || "Candidat"}</span>
+                        {dossier.public_id && (
+                            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-gray-100 text-gray-500">
+                                {dossier.public_id}
+                            </span>
+                        )}
+                        {docState === "all_valid" && (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700">
+                                <CheckCircle2 className="h-3 w-3" /> Docs OK
+                            </span>
+                        )}
+                        {docState === "has_issue" && (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700">
+                                <AlertTriangle className="h-3 w-3" /> Relance
+                            </span>
+                        )}
+                    </div>
+
+                    {/* Ligne 2 : certification + origine + mode + date */}
+                    <div className="mt-1 flex items-center gap-3 text-xs text-gray-500 flex-wrap">
+                        <span className="font-medium text-gray-600 truncate max-w-[200px]">{certLabel}</span>
+                        {entry.email && (
+                            <span className="inline-flex items-center gap-1">
+                                <Mail className="h-3 w-3" /> {entry.email}
+                            </span>
+                        )}
+                        {!dossier.session_id ? (
+                            <span className="inline-flex items-center gap-1 font-bold px-2 py-0.5 rounded-full"
+                                style={{ backgroundColor: "#e8eaf6", color: "#1a237e" }}>
+                                <Globe className="h-3 w-3" /> Espace candidat
+                            </span>
+                        ) : dossier.session_name ? (
+                            <span className="inline-flex items-center gap-1 font-bold px-2 py-0.5 rounded-full"
+                                style={{ backgroundColor: "#f3f4f6", color: "#374151" }}>
+                                <CalendarDays className="h-3 w-3" /> {dossier.session_name}
+                            </span>
+                        ) : null}
+                        {mode === "online" && (
+                            <span className="inline-flex items-center gap-1">
+                                <Monitor className="h-3 w-3" /> En ligne
+                            </span>
+                        )}
+                        {mode === "onsite" && (
+                            <span className="inline-flex items-center gap-1">
+                                <MapPin className="h-3 w-3" /> Présentiel
+                            </span>
+                        )}
+                        {dossier.submitted_at && (
+                            <span className="inline-flex items-center gap-1">
+                                <Clock className="h-3 w-3" />
+                                {new Date(dossier.submitted_at).toLocaleDateString("fr-FR")}
+                            </span>
+                        )}
+                    </div>
+                </div>
+
+                <StatusBadge status={dossier.status} />
+                <ChevronRight className="h-5 w-5 text-gray-300 group-hover:text-indigo-500 transition-colors shrink-0" />
+            </Link>
+        </motion.div>
+    );
+}
+
+// ── Multi dossier folder (candidate with 2+ applications) ─────────────────
+
+function MultiDossierFolder({ entry }: { entry: MultiCandidatureEntry }) {
+    const [open, setOpen] = useState(true);
+    const publicId = entry.dossiers[0]?.public_id;
+
+    return (
+        <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden"
+        >
+            <button
+                type="button"
+                onClick={() => setOpen(o => !o)}
+                className="w-full px-5 py-4 flex items-center gap-4 flex-wrap text-left transition-colors hover:bg-gray-50"
+                style={{ borderBottom: open ? "2px solid #e8eaf6" : "none" }}
+            >
+                <div
+                    className="h-10 w-10 rounded-xl flex items-center justify-center text-white font-black text-sm shrink-0"
+                    style={{ backgroundColor: "#1a237e" }}
+                >
+                    {(entry.name || entry.email || "?").substring(0, 2).toUpperCase()}
+                </div>
+
+                <FolderRoot
+                    className="h-5 w-5 shrink-0 transition-colors"
+                    style={{ color: open ? "#1a237e" : "#9ca3af" }}
+                />
+
+                <div className="flex-1 min-w-0">
+                    <p className="font-black text-gray-800 truncate">{entry.name || "—"}</p>
+                    <p className="text-xs text-gray-500 flex items-center gap-1 mt-0.5">
+                        <Mail className="h-3 w-3 shrink-0" /> {entry.email}
+                    </p>
+                </div>
+
+                <div className="flex items-center gap-2 flex-wrap">
+                    {publicId && (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-mono px-2 py-1 rounded-lg bg-gray-100 text-gray-600">
+                            <Hash className="h-3 w-3" /> {publicId}
+                        </span>
+                    )}
+                    <span className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full"
+                        style={{ backgroundColor: "#e8f5e9", color: "#2e7d32" }}>
+                        <Layers className="h-3 w-3" /> {entry.candidatures_count} demandes
+                    </span>
+                </div>
+
+                <ChevronRight
+                    className="h-4 w-4 shrink-0 text-gray-400 transition-transform ml-auto"
+                    style={{ transform: open ? "rotate(90deg)" : "rotate(0deg)" }}
+                />
+            </button>
+
+            <AnimatePresence initial={false}>
+                {open && (
+                    <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: "auto" }}
+                        exit={{ opacity: 0, height: 0 }}
+                        transition={{ duration: 0.2 }}
+                        className="overflow-hidden"
+                    >
+                        <div className="px-5 pt-4 pb-5 space-y-2 relative">
+                            <div
+                                className="absolute left-9 top-4 bottom-5 w-px bg-gray-200"
+                                style={{ pointerEvents: "none" }}
+                            />
+                            {entry.dossiers.map(d => (
+                                <DossierSubRow key={d._id} dossier={d} />
+                            ))}
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+        </motion.div>
+    );
+}
+
+// ── Unified card: dispatch single vs multi ─────────────────────────────────
+
+function CandidatureCard({ entry }: { entry: MultiCandidatureEntry }) {
+    if (entry.dossiers.length === 1) return <SingleDossierCard entry={entry} />;
+    return <MultiDossierFolder entry={entry} />;
+}
+
+// ── Page ───────────────────────────────────────────────────────────────────
 
 function CandidaturesInner() {
     const { user, isLoading } = useAuth();
     const router = useRouter();
-    const searchParams = useSearchParams();
-    const modeParam = searchParams.get("mode") as ModeTab | null;
-    const modeTab: ModeTab = modeParam === "online" || modeParam === "onsite" ? modeParam : "all";
 
+    const PAGE_SIZE = 15;
+
+    const [entries, setEntries] = useState<MultiCandidatureEntry[]>([]);
     const [sessions, setSessions] = useState<Session[]>([]);
-    const [selectedId, setSelectedId] = useState<string>("");
-    const [rows, setRows] = useState<CandidatureRow[]>([]);
-    const [loadingSessions, setLoadingSessions] = useState(true);
-    const [loadingRows, setLoadingRows] = useState(false);
+    const [selectedSession, setSelectedSession] = useState<string>("");
+    const [search, setSearch] = useState("");
+    const [modeTab, setModeTab] = useState<ModeTab>("all");
+    const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [exporting, setExporting] = useState(false);
-    const [examTypeTab, setExamTypeTab] = useState<ExamTypeTab>("all");
-    const [searchQuery, setSearchQuery] = useState("");
-    const [examTypeOpen, setExamTypeOpen] = useState(false);
-    const filterRef = useRef<HTMLDivElement>(null);
-
-    // Pagination
-    const LIST_PAGE_SIZE = 15;
-    const FOLDER_PAGE_SIZE = 12;
-    const [listPage, setListPage] = useState(1);
-    const [folderPage, setFolderPage] = useState(1);
+    const [page, setPage] = useState(1);
 
     useEffect(() => {
         if (!isLoading && (!user || user.role !== "RH")) {
@@ -124,124 +371,58 @@ function CandidaturesInner() {
         }
     }, [isLoading, user, router]);
 
+    // Charger les sessions
     useEffect(() => {
-        (async () => {
-            try {
-                setLoadingSessions(true);
-                const list = await fetchSessions();
+        fetchSessions()
+            .then(list => {
                 setSessions(list);
-                const firstActive = list.find(s => s.status === "active") || list[0];
-                if (firstActive) setSelectedId(firstActive._id);
-            } catch (e) {
-                setError(e instanceof Error ? e.message : "Erreur");
-            } finally {
-                setLoadingSessions(false);
-            }
-        })();
+                const active = list.find(s => s.status === "active") || list[0];
+                if (active) setSelectedSession(active._id);
+            })
+            .catch(() => {});
     }, []);
 
+    // Charger toutes les candidatures (min_count=1 = tout le monde)
     useEffect(() => {
-        if (!selectedId) { setRows([]); return; }
-        (async () => {
-            try {
-                setLoadingRows(true);
-                setRows(await fetchSessionResponses(selectedId));
-            } catch (e) {
-                setError(e instanceof Error ? e.message : "Erreur");
-            } finally {
-                setLoadingRows(false);
-            }
-        })();
-    }, [selectedId]);
+        setLoading(true);
+        setError(null);
+        setPage(1);
+        fetchMultiCandidatures(selectedSession || undefined, 1)
+            .then(setEntries)
+            .catch(() => setError("Impossible de charger les données."))
+            .finally(() => setLoading(false));
+    }, [selectedSession]);
 
-    // Reset filters when switching between modes
-    useEffect(() => {
-        setExamTypeTab("all");
-        setSearchQuery("");
-        setExamTypeOpen(false);
-        setListPage(1);
-    }, [modeTab]);
+    // Réinitialiser la page quand les filtres changent
+    useEffect(() => { setPage(1); }, [modeTab, search]);
 
-    // Reset list page when session or filters change
-    useEffect(() => { setListPage(1); }, [selectedId, examTypeTab, searchQuery]);
-    useEffect(() => { setFolderPage(1); }, [selectedId]);
-
-    // Close exam type dropdown on outside click
-    useEffect(() => {
-        function handleClick(e: MouseEvent) {
-            if (filterRef.current && !filterRef.current.contains(e.target as Node)) {
-                setExamTypeOpen(false);
-            }
+    const filtered = useMemo(() => {
+        let list = entries;
+        if (modeTab !== "all") {
+            list = list.filter(e => entryMatchesMode(e, modeTab));
         }
-        document.addEventListener("mousedown", handleClick);
-        return () => document.removeEventListener("mousedown", handleClick);
-    }, []);
-
-    const selectedSession = useMemo(
-        () => sessions.find(s => s._id === selectedId) || null,
-        [sessions, selectedId],
-    );
-
-    // Emails qui ont plusieurs candidatures dans la même session → exclus ici,
-    // ils s'affichent uniquement dans /dashboard/candidats-multi.
-    const multiEmails = useMemo(() => {
-        const counts = new Map<string, number>();
-        for (const r of rows) {
-            const key = (r.email || "").toLowerCase().trim();
-            if (key) counts.set(key, (counts.get(key) || 0) + 1);
-        }
-        return new Set([...counts.entries()].filter(([, n]) => n > 1).map(([e]) => e));
-    }, [rows]);
-
-    // Liste plate filtrée par mode, type d'examen, et recherche textuelle
-    const filteredCandidates = useMemo(() => {
-        if (modeTab === "all") return rows.filter(r => !multiEmails.has((r.email || "").toLowerCase().trim()));
-        let list = rows
-            .filter(r => !multiEmails.has((r.email || "").toLowerCase().trim()))
-            .filter(r => getExamMode(r) === modeTab);
-        if (examTypeTab !== "all") list = list.filter(r => getExamType(r) === examTypeTab);
-        if (searchQuery.trim()) {
-            const q = searchQuery.toLowerCase().trim();
-            list = list.filter(r =>
-                (r.name || "").toLowerCase().includes(q) ||
-                (r.email || "").toLowerCase().includes(q) ||
-                (r.public_id || "").toLowerCase().includes(q)
+        if (search.trim()) {
+            const q = search.toLowerCase();
+            list = list.filter(e =>
+                (e.name || "").toLowerCase().includes(q) ||
+                (e.email || "").toLowerCase().includes(q) ||
+                e.dossiers.some(d => (d.certification || "").toLowerCase().includes(q))
             );
         }
         return list;
-    }, [rows, modeTab, examTypeTab, searchQuery, multiEmails]);
+    }, [entries, modeTab, search]);
 
-    // Dossiers formations (vue "Toutes les demandes" uniquement) — exclut les multi-formations
-    const formations = useMemo(() => {
-        const map = new Map<string, CandidatureRow[]>();
-        for (const name of PREDEFINED_FORMATIONS) map.set(name, []);
-        for (const r of rows) {
-            if (multiEmails.has((r.email || "").toLowerCase().trim())) continue;
-            const raw = r.answers?.[FORMATION_FIELD];
-            const name = (typeof raw === "string" && raw.trim()) ? raw.trim() : UNCATEGORIZED;
-            if (!map.has(name)) map.set(name, []);
-            map.get(name)!.push(r);
-        }
-        return Array.from(map.entries()).map(([name, items]) => ({ name, items }));
-    }, [rows, multiEmails]);
-
-    // Paginated slices
-    const pagedCandidates = useMemo(() => {
-        const start = (listPage - 1) * LIST_PAGE_SIZE;
-        return filteredCandidates.slice(start, start + LIST_PAGE_SIZE);
-    }, [filteredCandidates, listPage]);
-
-    const pagedFormations = useMemo(() => {
-        const nonEmpty = formations.filter(f => f.items.length > 0);
-        const start = (folderPage - 1) * FOLDER_PAGE_SIZE;
-        return nonEmpty.slice(start, start + FOLDER_PAGE_SIZE);
-    }, [formations, folderPage]);
+    const paged = useMemo(() => {
+        const start = (page - 1) * PAGE_SIZE;
+        return filtered.slice(start, start + PAGE_SIZE);
+    }, [filtered, page]);
 
     async function handleExport() {
-        if (!selectedId || exporting) return;
+        if (!selectedSession || exporting) return;
         try {
             setExporting(true);
-            await downloadSessionDossiersZip(selectedId, selectedSession?.name);
+            const sess = sessions.find(s => s._id === selectedSession);
+            await downloadSessionDossiersZip(selectedSession, sess?.name);
         } catch (e) {
             alert(e instanceof Error ? e.message : "Erreur lors de l'export");
         } finally {
@@ -251,338 +432,163 @@ function CandidaturesInner() {
 
     if (isLoading || !user) return null;
 
-    const modeConfig = {
-        all:    { label: "Toutes les demandes",  icon: Users,   color: "#1a237e", desc: "Vue globale" },
-        online: { label: "Candidats en ligne",   icon: Monitor, color: "#1a237e", desc: "Examen à distance" },
-        onsite: { label: "Candidats présentiel", icon: MapPin,  color: "#1a237e", desc: "Examen sur site" },
-    } as const;
-    const { label: modeLabel, icon: ModeIcon, color: modeColor } = modeConfig[modeTab];
+    // Compteurs pour les onglets mode
+    const countByMode = useMemo(() => ({
+        all: entries.length,
+        online: entries.filter(e => entryMatchesMode(e, "online")).length,
+        onsite: entries.filter(e => entryMatchesMode(e, "onsite")).length,
+    }), [entries]);
 
     return (
         <div className="space-y-6">
-            {/* En-tête */}
-            <div className="flex items-start justify-between gap-4 flex-wrap">
+            {/* ── Header ── */}
+            <header className="flex items-start justify-between gap-4 flex-wrap">
                 <div>
-                    <h1 className="text-2xl font-black flex items-center gap-2" style={{ color: "#1a237e" }}>
-                        <FolderOpen className="h-6 w-6" />
-                        Revue des demandes
+                    <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-gray-400">
+                        Administration
+                    </p>
+                    <h1 className="text-2xl font-black" style={{ color: "#1a237e" }}>
+                        Revue des candidatures
                     </h1>
-                    <div className="flex items-center gap-2 mt-1">
-                        <ModeIcon className="h-3.5 w-3.5" style={{ color: modeColor }} />
-                        <p className="text-sm font-semibold" style={{ color: modeColor }}>
-                            {modeLabel}
-                        </p>
-                        {modeTab !== "all" && (
-                            <Link
-                                href="/dashboard/candidatures"
-                                className="text-xs text-gray-400 hover:text-gray-600 underline underline-offset-2"
-                            >
-                                Tout voir
-                            </Link>
-                        )}
-                    </div>
+                    <p className="text-sm text-gray-500 mt-1">
+                        Toutes les demandes de certification — formulaire public et espace candidat.
+                        Cliquez sur une demande unique pour l&apos;ouvrir, ou déployez le dossier d&apos;un candidat multi-formations.
+                    </p>
                 </div>
-                {selectedId && (
-                    <button
-                        onClick={handleExport}
-                        disabled={exporting || rows.length === 0}
-                        className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold text-white transition-all hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0"
-                        style={{ backgroundColor: "#2e7d32", boxShadow: "0 6px 16px rgba(46,125,50,0.25)" }}
-                    >
-                        {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-                        {exporting ? "Préparation…" : "Exporter (ZIP)"}
-                    </button>
-                )}
-            </div>
 
-            {/* Session picker */}
-            <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
-                {loadingSessions ? (
-                    <div className="flex items-center gap-2 text-sm text-gray-400">
-                        <Loader2 className="h-4 w-4 animate-spin" /> Chargement des sessions…
-                    </div>
-                ) : sessions.length === 0 ? (
-                    <div className="text-sm text-gray-500">
-                        Aucune session créée.{" "}
-                        <Link href="/dashboard/sessions" className="font-bold text-indigo-600 hover:underline">
-                            Créer une session
-                        </Link>
-                    </div>
-                ) : (
-                    <div className="flex items-center gap-3 flex-wrap">
-                        <label className="text-xs font-bold uppercase tracking-widest text-gray-500 inline-flex items-center gap-1">
-                            <CalendarDays className="h-3 w-3" /> Session
-                        </label>
+                {/* Session + Export */}
+                <div className="flex items-center gap-3 flex-wrap shrink-0 mt-1">
+                    <div className="flex items-center gap-2">
+                        <CalendarDays className="h-4 w-4 shrink-0" style={{ color: "#1a237e" }} />
                         <select
-                            value={selectedId}
-                            onChange={e => setSelectedId(e.target.value)}
-                            className="rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 min-w-[240px]"
+                            value={selectedSession}
+                            onChange={e => setSelectedSession(e.target.value)}
+                            className="bg-white border border-[#e0e0e0] rounded-xl px-3 py-2 text-sm text-gray-700 shadow-sm focus:outline-none focus:border-[#1a237e] min-w-[180px]"
                         >
+                            <option value="">Toutes les sessions</option>
                             {sessions.map(s => (
-                                <option key={s._id} value={s._id}>
-                                    {s.name} {s.status === "active" ? "• active" : "• fermée"}
-                                </option>
+                                <option key={s._id} value={s._id}>{s.name}</option>
                             ))}
                         </select>
-                        {selectedSession && (
-                            <span
-                                className="inline-flex items-center gap-1 text-[10px] uppercase tracking-widest font-bold px-2 py-1 rounded-full"
-                                style={{
-                                    backgroundColor: selectedSession.status === "active" ? "#e8f5e9" : "#ffebee",
-                                    color: selectedSession.status === "active" ? "#2e7d32" : "#c62828",
-                                }}
-                            >
-                                {selectedSession.status}
-                            </span>
-                        )}
-                        <span className="text-xs text-gray-400 ml-auto">
-                            {filteredCandidates.length} dossier{filteredCandidates.length > 1 ? "s" : ""}
-                        </span>
                     </div>
+                    {selectedSession && (
+                        <button
+                            onClick={handleExport}
+                            disabled={exporting || entries.length === 0}
+                            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold text-white transition-all hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0"
+                            style={{ backgroundColor: "#2e7d32", boxShadow: "0 4px 12px rgba(46,125,50,0.25)" }}
+                        >
+                            {exporting
+                                ? <Loader2 className="h-4 w-4 animate-spin" />
+                                : <Download className="h-4 w-4" />}
+                            {exporting ? "Export…" : "Exporter ZIP"}
+                        </button>
+                    )}
+                </div>
+            </header>
+
+            {/* ── Barre de filtres ── */}
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm px-4 py-3 flex items-center gap-3 flex-wrap">
+                {/* Recherche */}
+                <div className="flex items-center gap-2 flex-1 min-w-[180px]">
+                    <Search className="h-4 w-4 shrink-0 text-gray-400" />
+                    <input
+                        type="text"
+                        placeholder="Rechercher par nom, email ou certification…"
+                        value={search}
+                        onChange={e => setSearch(e.target.value)}
+                        className="flex-1 min-w-0 bg-[#f4f6f9] border border-[#e0e0e0] rounded-xl px-3 py-2 text-sm text-gray-700 placeholder:text-gray-400 focus:outline-none focus:border-[#1a237e]"
+                    />
+                </div>
+
+                {/* Mode tabs */}
+                <div className="flex items-center gap-1 shrink-0 bg-[#f4f6f9] rounded-xl p-1">
+                    {([
+                        { key: "all",    label: "Tous",        Icon: Users   },
+                        { key: "online", label: "En ligne",    Icon: Monitor },
+                        { key: "onsite", label: "Présentiel",  Icon: MapPin  },
+                    ] as { key: ModeTab; label: string; Icon: React.ElementType }[]).map(({ key, label, Icon }) => (
+                        <button
+                            key={key}
+                            onClick={() => setModeTab(key)}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all"
+                            style={{
+                                backgroundColor: modeTab === key ? "#1a237e" : "transparent",
+                                color: modeTab === key ? "#ffffff" : "#6b7280",
+                            }}
+                        >
+                            <Icon className="h-3 w-3" />
+                            {label}
+                            {!loading && (
+                                <span
+                                    className="ml-0.5 text-[10px] px-1.5 py-0.5 rounded-full font-black"
+                                    style={{
+                                        backgroundColor: modeTab === key ? "rgba(255,255,255,0.2)" : "#e5e7eb",
+                                        color: modeTab === key ? "#ffffff" : "#374151",
+                                    }}
+                                >
+                                    {countByMode[key]}
+                                </span>
+                            )}
+                        </button>
+                    ))}
+                </div>
+
+                {/* Compteur résultats filtrés */}
+                {!loading && (
+                    <span
+                        className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold shrink-0"
+                        style={{ backgroundColor: "#e8eaf6", color: "#1a237e" }}
+                    >
+                        <Users className="h-3 w-3" />
+                        {filtered.length} candidat{filtered.length !== 1 ? "s" : ""}
+                    </span>
                 )}
             </div>
 
-            {error && (
-                <div className="p-4 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm">{error}</div>
-            )}
-
-            {loadingRows ? (
-                <div className="p-8 text-center text-gray-400 text-sm flex items-center justify-center gap-2">
-                    <Loader2 className="h-4 w-4 animate-spin" /> Chargement…
+            {/* ── Contenu ── */}
+            {loading ? (
+                <div className="flex items-center justify-center py-20">
+                    <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
                 </div>
-            ) : !selectedId ? null : modeTab !== "all" ? (
-                /* ── VUE LISTE : En ligne ou Présentiel ── */
-                <div className="space-y-4">
-                    {/* Barre de recherche + filtre Type d'examen */}
-                    {(() => {
-                        const examTypeLabels: Record<ExamTypeTab, string> = {
-                            all: "Tous",
-                            direct: "Examen direct",
-                            after_formation: "Après formation IRISQ",
-                        };
-                        return (
-                            <div className="flex items-center gap-3">
-                                {/* Search */}
-                                <div className="relative flex-1">
-                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
-                                    <input
-                                        type="text"
-                                        value={searchQuery}
-                                        onChange={e => setSearchQuery(e.target.value)}
-                                        placeholder="Rechercher par nom, email ou ID…"
-                                        className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 bg-white"
-                                    />
-                                </div>
-                                {/* Filter dropdown */}
-                                <div className="relative shrink-0" ref={filterRef}>
-                                    <button
-                                        onClick={() => setExamTypeOpen(v => !v)}
-                                        className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border text-sm font-semibold transition-all whitespace-nowrap"
-                                        style={{
-                                            backgroundColor: examTypeTab !== "all" ? "#1a237e" : "#ffffff",
-                                            color: examTypeTab !== "all" ? "#ffffff" : "#555",
-                                            borderColor: examTypeTab !== "all" ? "#1a237e" : "#e0e0e0",
-                                        }}
-                                    >
-                                        <SlidersHorizontal className="h-4 w-4" />
-                                        {examTypeLabels[examTypeTab]}
-                                        <ChevronDown
-                                            className="h-3.5 w-3.5"
-                                            style={{ transform: examTypeOpen ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 0.15s" }}
-                                        />
-                                    </button>
-                                    {examTypeOpen && (
-                                        <div className="absolute right-0 top-full mt-1.5 w-52 bg-white rounded-xl border border-gray-100 shadow-lg z-20 overflow-hidden py-1">
-                                            {(["all", "direct", "after_formation"] as ExamTypeTab[]).map(tab => (
-                                                <button
-                                                    key={tab}
-                                                    onClick={() => { setExamTypeTab(tab); setExamTypeOpen(false); }}
-                                                    className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-left transition-colors hover:bg-gray-50"
-                                                    style={{
-                                                        color: examTypeTab === tab ? "#1a237e" : "#555",
-                                                        fontWeight: examTypeTab === tab ? 700 : 500,
-                                                    }}
-                                                >
-                                                    <span
-                                                        className="w-1.5 h-1.5 rounded-full shrink-0"
-                                                        style={{ backgroundColor: examTypeTab === tab ? "#1a237e" : "transparent", border: examTypeTab === tab ? "none" : "1.5px solid #ccc" }}
-                                                    />
-                                                    {examTypeLabels[tab]}
-                                                </button>
-                                            ))}
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        );
-                    })()}
-
-                    {filteredCandidates.length === 0 ? (
-                        <div className="p-12 text-center rounded-2xl bg-white border border-dashed border-gray-200">
-                            <ModeIcon className="h-10 w-10 mx-auto mb-3 text-gray-300" />
-                            <p className="text-gray-500 text-sm">
-                                Aucun candidat {modeTab === "online" ? "en ligne" : "en présentiel"} pour cette session.
-                            </p>
-                        </div>
-                    ) : (
-                    <div className="grid gap-3">
-                        {pagedCandidates.map((r, i) => {
-                            const status = (r.status || "pending") as "pending" | "approved" | "rejected";
-                            const docState = validationState(r);
-                            const formation = r.answers?.[FORMATION_FIELD] || "—";
-                            return (
-                                <motion.div
-                                    key={r._id}
-                                    initial={{ opacity: 0, y: 8 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    transition={{ delay: i * 0.03 }}
-                                >
-                                    <Link
-                                        href={`/dashboard/candidatures/${r._id}?from=${modeTab}`}
-                                        className="group flex items-center gap-4 p-4 rounded-2xl bg-white border border-gray-100 shadow-sm hover:shadow-md hover:border-indigo-200 transition-all"
-                                    >
-                                        {/* Avatar */}
-                                        <div
-                                            className="h-11 w-11 rounded-xl flex items-center justify-center shrink-0 text-white text-sm font-black"
-                                            style={{ backgroundColor: "#1a237e" }}
-                                        >
-                                            {(r.name || "?").substring(0, 2).toUpperCase()}
-                                        </div>
-
-                                        {/* Infos */}
-                                        <div className="flex-1 min-w-0">
-                                            <div className="flex items-center gap-2 flex-wrap">
-                                                <span className="font-bold text-gray-800 truncate">{r.name || "Candidat"}</span>
-                                                {r.public_id && (
-                                                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-gray-100 text-gray-500">
-                                                        {r.public_id}
-                                                    </span>
-                                                )}
-                                                {docState === "all_valid" && (
-                                                    <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700">
-                                                        <CheckCircle2 className="h-3 w-3" /> Docs OK
-                                                    </span>
-                                                )}
-                                                {docState === "has_issue" && (
-                                                    <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700">
-                                                        <AlertTriangle className="h-3 w-3" /> Relance
-                                                    </span>
-                                                )}
-                                            </div>
-                                            <div className="mt-1 flex items-center gap-4 text-xs text-gray-500 flex-wrap">
-                                                <span className="truncate max-w-[180px] font-medium text-gray-600">{formation}</span>
-                                                {r.email && (
-                                                    <span className="inline-flex items-center gap-1">
-                                                        <Mail className="h-3 w-3" /> {r.email}
-                                                    </span>
-                                                )}
-                                                {r.submitted_at && (
-                                                    <span className="inline-flex items-center gap-1">
-                                                        <Clock className="h-3 w-3" /> {new Date(r.submitted_at).toLocaleDateString("fr-FR")}
-                                                    </span>
-                                                )}
-                                            </div>
-                                        </div>
-
-                                        {/* Statut */}
-                                        {status === "approved" && (
-                                            <span className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full shrink-0"
-                                                style={{ backgroundColor: "#e8f5e9", color: "#2e7d32", border: "1px solid #c8e6c9" }}>
-                                                <CheckCircle2 className="h-3.5 w-3.5" /> Validée
-                                            </span>
-                                        )}
-                                        {status === "rejected" && (
-                                            <span className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full shrink-0"
-                                                style={{ backgroundColor: "#ffebee", color: "#c62828", border: "1px solid #ffcdd2" }}>
-                                                <XCircle className="h-3.5 w-3.5" /> Rejetée
-                                            </span>
-                                        )}
-                                        {status === "pending" && (
-                                            <span className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full shrink-0"
-                                                style={{ backgroundColor: "#fff8e1", color: "#b26a00", border: "1px solid #ffe0b2" }}>
-                                                <Hourglass className="h-3.5 w-3.5" /> En attente
-                                            </span>
-                                        )}
-                                        <ChevronRight className="h-5 w-5 text-gray-300 group-hover:text-indigo-500 transition-colors shrink-0" />
-                                    </Link>
-                                </motion.div>
-                            );
-                        })}
+            ) : error ? (
+                <div className="bg-red-50 border border-red-200 rounded-2xl p-6 text-center text-red-700 text-sm">
+                    {error}
+                </div>
+            ) : filtered.length === 0 ? (
+                <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="bg-white rounded-2xl border border-gray-100 shadow-sm p-12 text-center"
+                >
+                    <div className="h-14 w-14 rounded-2xl flex items-center justify-center mx-auto mb-4"
+                        style={{ backgroundColor: "#e8eaf6" }}>
+                        <Users className="h-7 w-7" style={{ color: "#1a237e" }} />
                     </div>
-                    )}
-                    {filteredCandidates.length > LIST_PAGE_SIZE && (
+                    <p className="font-bold text-gray-700">Aucune candidature trouvée</p>
+                    <p className="text-sm text-gray-400 mt-1">
+                        {search ? "Essayez un autre terme de recherche." : "Aucune demande pour cette sélection."}
+                    </p>
+                </motion.div>
+            ) : (
+                <div className="space-y-3">
+                    {paged.map((entry, i) => (
+                        <CandidatureCard
+                            key={`${entry.email}-${entry.session_id}-${i}`}
+                            entry={entry}
+                        />
+                    ))}
+                    {filtered.length > PAGE_SIZE && (
                         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm px-4 py-2">
                             <Pagination
-                                total={filteredCandidates.length}
-                                page={listPage}
-                                pageSize={LIST_PAGE_SIZE}
-                                onPageChange={setListPage}
+                                total={filtered.length}
+                                page={page}
+                                pageSize={PAGE_SIZE}
+                                onPageChange={setPage}
                             />
                         </div>
                     )}
                 </div>
-            ) : (
-                /* ── VUE DOSSIERS : Toutes les demandes ── */
-                (() => {
-                    const nonEmptyFormations = formations.filter(f => f.items.length > 0);
-                    if (nonEmptyFormations.length === 0) return (
-                        <div className="p-12 text-center rounded-2xl bg-white border border-dashed border-gray-200">
-                            <Folder className="h-10 w-10 mx-auto mb-3 text-gray-300" />
-                            <p className="text-gray-500 text-sm">Aucun dossier disponible pour cette session.</p>
-                        </div>
-                    );
-                    return (
-                        <div className="space-y-4">
-                            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                                {pagedFormations.map((f, i) => {
-                                    const pending = f.items.filter(r => !r.status || r.status === "pending").length;
-                                    const approved = f.items.filter(r => r.status === "approved").length;
-                                    return (
-                                        <motion.div
-                                            key={f.name}
-                                            initial={{ opacity: 0, y: 8 }}
-                                            animate={{ opacity: 1, y: 0 }}
-                                            transition={{ delay: i * 0.03 }}
-                                        >
-                                            <Link
-                                                href={`/dashboard/candidatures/formation?session=${encodeURIComponent(selectedId)}&name=${encodeURIComponent(f.name)}`}
-                                                className="group flex items-start gap-4 p-5 rounded-2xl bg-white border border-gray-100 shadow-sm hover:shadow-md hover:border-indigo-200 transition-all h-full"
-                                            >
-                                                <div
-                                                    className="h-12 w-12 rounded-xl flex items-center justify-center shrink-0"
-                                                    style={{ backgroundColor: "#fff8e1" }}
-                                                >
-                                                    <Folder className="h-5 w-5" style={{ color: "#f59e0b" }} />
-                                                </div>
-                                                <div className="flex-1 min-w-0">
-                                                    <h3 className="font-bold text-gray-800 leading-snug line-clamp-2">{f.name}</h3>
-                                                    <div className="mt-2 flex items-center gap-3 text-xs text-gray-500 flex-wrap">
-                                                        <span className="inline-flex items-center gap-1">
-                                                            <Users className="h-3 w-3" /> {f.items.length} candidat{f.items.length > 1 ? "s" : ""}
-                                                        </span>
-                                                        {pending > 0 && <span className="text-amber-700">{pending} en attente</span>}
-                                                        {approved > 0 && <span className="text-green-700">{approved} validé{approved > 1 ? "s" : ""}</span>}
-                                                    </div>
-                                                </div>
-                                                <ChevronRight className="h-5 w-5 text-gray-300 group-hover:text-indigo-500 transition-colors shrink-0" />
-                                            </Link>
-                                        </motion.div>
-                                    );
-                                })}
-                            </div>
-                            {nonEmptyFormations.length > FOLDER_PAGE_SIZE && (
-                                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm px-4 py-2">
-                                    <Pagination
-                                        total={nonEmptyFormations.length}
-                                        page={folderPage}
-                                        pageSize={FOLDER_PAGE_SIZE}
-                                        onPageChange={setFolderPage}
-                                    />
-                                </div>
-                            )}
-                        </div>
-                    );
-                })()
             )}
         </div>
     );

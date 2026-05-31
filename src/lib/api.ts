@@ -220,8 +220,11 @@ export interface MultiCandidatureEntry {
     dossiers: MultiCandidatureDossier[];
 }
 
-export async function fetchMultiCandidatures(sessionId?: string): Promise<MultiCandidatureEntry[]> {
-    const qs = sessionId ? `?session_id=${encodeURIComponent(sessionId)}` : "";
+export async function fetchMultiCandidatures(sessionId?: string, minCount: number = 1): Promise<MultiCandidatureEntry[]> {
+    const params = new URLSearchParams();
+    if (sessionId) params.set("session_id", sessionId);
+    if (minCount !== 1) params.set("min_count", String(minCount));
+    const qs = params.toString() ? `?${params}` : "";
     const res = await apiFetch(url(`responses/multi-candidatures${qs}`), { redirect: "follow" });
     if (!res.ok) throw new Error("Failed to fetch multi-candidatures");
     return res.json();
