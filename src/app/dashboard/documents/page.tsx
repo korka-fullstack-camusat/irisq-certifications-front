@@ -212,45 +212,20 @@ export default function DashboardDocumentsPage() {
                                 />
                             </div>
 
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                {/* Catégorie */}
-                                <div>
-                                    <label className="text-xs font-bold uppercase tracking-widest text-gray-500 block mb-1">
-                                        Catégorie
-                                    </label>
-                                    <select
-                                        value={category}
-                                        onChange={e => setCategory(e.target.value)}
-                                        className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 bg-white"
-                                    >
-                                        {CATEGORIES.map(c => (
-                                            <option key={c} value={c}>{c}</option>
-                                        ))}
-                                    </select>
-                                </div>
-
-                                {/* Fichier */}
-                                <div>
-                                    <label className="text-xs font-bold uppercase tracking-widest text-gray-500 block mb-1">
-                                        Fichier <span className="text-red-500">*</span>
-                                    </label>
-                                    <div
-                                        className="flex items-center gap-2 rounded-xl border border-dashed border-gray-300 px-4 py-2.5 cursor-pointer hover:border-indigo-400 transition-colors"
-                                        onClick={() => fileInputRef.current?.click()}
-                                    >
-                                        <Upload className="h-4 w-4 text-gray-400 shrink-0" />
-                                        <span className="text-sm text-gray-500 truncate">
-                                            {fileObj ? fileObj.name : "PDF, DOCX…"}
-                                        </span>
-                                        <input
-                                            ref={fileInputRef}
-                                            type="file"
-                                            className="hidden"
-                                            accept="application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/msword,image/jpeg,image/png"
-                                            onChange={e => setFileObj(e.target.files?.[0] || null)}
-                                        />
-                                    </div>
-                                </div>
+                            {/* Catégorie */}
+                            <div>
+                                <label className="text-xs font-bold uppercase tracking-widest text-gray-500 block mb-1">
+                                    Catégorie
+                                </label>
+                                <select
+                                    value={category}
+                                    onChange={e => setCategory(e.target.value)}
+                                    className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 bg-white"
+                                >
+                                    {CATEGORIES.map(c => (
+                                        <option key={c} value={c}>{c}</option>
+                                    ))}
+                                </select>
                             </div>
 
                             {/* Description */}
@@ -265,6 +240,54 @@ export default function DashboardDocumentsPage() {
                                     placeholder="Courte description visible par les candidats…"
                                     className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm resize-none focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
                                 />
+                            </div>
+
+                            {/* Fichier — zone large en bas */}
+                            <div>
+                                <label className="text-xs font-bold uppercase tracking-widest text-gray-500 block mb-1.5">
+                                    Fichier <span className="text-red-500">*</span>
+                                </label>
+                                <div
+                                    className="flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed px-6 py-6 cursor-pointer transition-colors"
+                                    style={{
+                                        borderColor: fileObj ? "#1a237e" : "#d1d5db",
+                                        backgroundColor: fileObj ? "#e8eaf6" : "#fafafa",
+                                    }}
+                                    onClick={() => fileInputRef.current?.click()}
+                                    onMouseEnter={e => { if (!fileObj) (e.currentTarget as HTMLElement).style.borderColor = "#6366f1"; }}
+                                    onMouseLeave={e => { if (!fileObj) (e.currentTarget as HTMLElement).style.borderColor = "#d1d5db"; }}
+                                >
+                                    <div
+                                        className="h-10 w-10 rounded-xl flex items-center justify-center"
+                                        style={{ backgroundColor: fileObj ? "#c5cae9" : "#e5e7eb" }}
+                                    >
+                                        <Upload className="h-5 w-5" style={{ color: fileObj ? "#1a237e" : "#9ca3af" }} />
+                                    </div>
+                                    {fileObj ? (
+                                        <>
+                                            <p className="text-sm font-bold text-center" style={{ color: "#1a237e" }}>
+                                                {fileObj.name}
+                                            </p>
+                                            <p className="text-xs text-gray-400">
+                                                {(fileObj.size / 1024).toFixed(0)} Ko · Cliquez pour changer
+                                            </p>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <p className="text-sm font-semibold text-gray-600">
+                                                Cliquez pour sélectionner un fichier
+                                            </p>
+                                            <p className="text-xs text-gray-400">PDF, DOCX, JPG, PNG — max 15 Mo</p>
+                                        </>
+                                    )}
+                                    <input
+                                        ref={fileInputRef}
+                                        type="file"
+                                        className="hidden"
+                                        accept="application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/msword,image/jpeg,image/png"
+                                        onChange={e => setFileObj(e.target.files?.[0] || null)}
+                                    />
+                                </div>
                             </div>
 
                             {/* Actions */}
