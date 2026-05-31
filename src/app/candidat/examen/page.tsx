@@ -465,19 +465,38 @@ export default function CandidatExamenPage() {
         );
     }
 
-    // ── Déjà soumis (depuis le serveur) ────────────────────────────────────
+    // ── Déjà soumis (depuis le serveur) — accès définitivement bloqué ─────────
     if (dossier?.exam_status === "submitted" || dossier?.exam_status === "graded") {
         return (
             <div className="flex items-center justify-center min-h-[60vh]">
-                <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="bg-white rounded-2xl p-10 max-w-md w-full text-center border shadow-xl" style={{ borderColor: "#e0e0e0" }}>
-                    <div className="h-16 w-16 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-6">
-                        <CheckCircle2 className="h-8 w-8" />
+                <motion.div
+                    initial={{ scale: 0.9, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    className="bg-white rounded-2xl p-10 max-w-md w-full text-center border-t-4 shadow-xl"
+                    style={{ borderTopColor: "#c62828" }}
+                >
+                    <div
+                        className="h-16 w-16 rounded-full flex items-center justify-center mx-auto mb-6"
+                        style={{ backgroundColor: "#ffebee" }}
+                    >
+                        <Lock className="h-8 w-8" style={{ color: "#c62828" }} />
                     </div>
-                    <h2 className="text-2xl font-black mb-3" style={{ color: "#1a237e" }}>Copie déjà soumise</h2>
-                    <p className="text-gray-500 text-sm leading-relaxed">
-                        Votre copie a bien été transmise au correcteur.<br />
-                        Merci de patienter — vous recevrez vos résultats par email dès que la correction sera terminée.
+                    <h2 className="text-2xl font-black mb-2" style={{ color: "#c62828" }}>
+                        Accès refusé
+                    </h2>
+                    <p className="text-gray-600 text-sm leading-relaxed mb-5">
+                        Vous avez déjà soumis votre copie d&apos;examen.<br />
+                        Il vous est <strong>impossible de repasser cet examen</strong>.
                     </p>
+                    <div
+                        className="rounded-xl p-4 text-xs text-left flex items-start gap-2"
+                        style={{ backgroundColor: "#fff8e1", border: "1px solid #ffe082", color: "#b45309" }}
+                    >
+                        <Clock className="h-4 w-4 shrink-0 mt-0.5" style={{ color: "#b45309" }} />
+                        <span>
+                            Votre copie est en cours de correction. Vous recevrez vos résultats par email dès que l&apos;évaluation sera terminée.
+                        </span>
+                    </div>
                 </motion.div>
             </div>
         );

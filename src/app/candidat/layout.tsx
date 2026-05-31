@@ -42,6 +42,12 @@ function Shell({ children }: { children: React.ReactNode }) {
     const pathname = usePathname();
     const [showLogoutModal, setShowLogoutModal] = useState(false);
 
+    // Examen déjà soumis ou certifié → on grise le lien "Examen" dans la nav
+    const examDone =
+        dossier?.exam_status === "submitted" ||
+        dossier?.exam_status === "graded" ||
+        dossier?.final_decision === "certified";
+
     const initials    = (dossier?.name || dossier?.public_id || "??").substring(0, 2).toUpperCase();
     const displayName = dossier?.name || dossier?.public_id || "Candidat";
 
@@ -208,25 +214,37 @@ function Shell({ children }: { children: React.ReactNode }) {
             >
                 {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
                     const active = isActive(href);
+                    const isExamLocked = href === "/candidat/examen" && examDone;
                     return (
                         <Link
                             key={href}
                             href={href}
                             className="flex flex-col items-center gap-0.5 px-4 py-2 rounded-xl transition-colors group"
+                            title={isExamLocked ? "Examen déjà soumis — accès bloqué" : undefined}
                         >
                             <div
-                                className="h-8 w-8 flex items-center justify-center rounded-xl transition-colors"
+                                className="h-8 w-8 flex items-center justify-center rounded-xl transition-colors relative"
                                 style={{ backgroundColor: active ? "#e8eaf6" : "transparent" }}
                             >
                                 <Icon
                                     className="h-4.5 w-4.5 transition-colors"
-                                    style={{ color: active ? "#1a237e" : "#9e9e9e" }}
+                                    style={{ color: isExamLocked ? "#d1d5db" : active ? "#1a237e" : "#9e9e9e" }}
                                     size={18}
                                 />
+                                {isExamLocked && (
+                                    <span
+                                        className="absolute -top-1 -right-1 h-3.5 w-3.5 rounded-full flex items-center justify-center"
+                                        style={{ backgroundColor: "#c62828" }}
+                                    >
+                                        <svg width="7" height="7" viewBox="0 0 10 10" fill="white">
+                                            <path d="M3 4V3a2 2 0 1 1 4 0v1h.5a.5.5 0 0 1 .5.5v4a.5.5 0 0 1-.5.5h-5a.5.5 0 0 1-.5-.5v-4A.5.5 0 0 1 2.5 4H3z"/>
+                                        </svg>
+                                    </span>
+                                )}
                             </div>
                             <span
                                 className="text-[10px] font-bold uppercase tracking-wide transition-colors"
-                                style={{ color: active ? "#1a237e" : "#9e9e9e" }}
+                                style={{ color: isExamLocked ? "#d1d5db" : active ? "#1a237e" : "#9e9e9e" }}
                             >
                                 {label}
                             </span>
