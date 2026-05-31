@@ -477,7 +477,13 @@ export async function submitExamWithAntiCheat(
         body: JSON.stringify(data),
         redirect: "follow",
     });
-    if (!res.ok) throw new Error("Failed to submit exam with anti-cheat data");
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        const msg = typeof err.detail === "string" ? err.detail : "Failed to submit exam with anti-cheat data";
+        const e: any = new Error(msg);
+        e.status = res.status;
+        throw e;
+    }
     return res.json();
 }
 

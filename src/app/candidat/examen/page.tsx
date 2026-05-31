@@ -89,7 +89,7 @@ type Phase = "select" | "info" | "exam" | "finished" | "blocked" | "submitted";
 
 // ═════════════════════════════════════════════════════════════════════════════
 export default function CandidatExamenPage() {
-    const { dossier, dossiers, loading: dossierLoading, setExamActive, setActiveDossierId } = useCandidate();
+    const { dossier, dossiers, loading: dossierLoading, setExamActive, setActiveDossierId, refresh } = useCandidate();
 
     const [exam, setExam] = useState<CandidateExam | null | undefined>(undefined);
     const [examLoading, setExamLoading] = useState(true);
@@ -442,11 +442,23 @@ export default function CandidatExamenPage() {
                 candidate_photos: photos,
             });
             sessionStorage.removeItem(EXAM_SESSION_KEY);
+            // Rafraîchir le contexte immédiatement : exam_status devient "submitted"
+            // → toute tentative de retour à l'examen sera bloquée localement
+            await refresh().catch(() => {});
             setPhase("finished");
             if (document.fullscreenElement) await document.exitFullscreen().catch(() => {});
             stopCamera();
-        } catch {
-            alert("Une erreur est survenue lors de la soumission. Veuillez réessayer.");
+        } catch (err: any) {
+            // Cas 409 : copie déjà soumise (double soumission détectée côté serveur)
+            if (err?.status === 409 || err?.message?.includes("déjà été soumise")) {
+                sessionStorage.removeItem(EXAM_SESSION_KEY);
+                await refresh().catch(() => {});
+                setPhase("finished");
+                if (document.fullscreenElement) await document.exitFullscreen().catch(() => {});
+                stopCamera();
+            } else {
+                alert("Une erreur est survenue lors de la soumission. Veuillez réessayer.");
+            }
         } finally {
             setIsSubmitting(false);
         }
