@@ -7,7 +7,7 @@ import {
     BookOpen, Clock, CalendarDays, ShieldCheck, Loader2,
     PlayCircle, Lock, AlertTriangle, ShieldAlert, Maximize,
     FileText, CheckCircle2, Monitor, Play, ChevronLeft,
-    ChevronRight, Send, X, PhoneCall,
+    ChevronRight, Send, X, PhoneCall, Trophy,
 } from "lucide-react";
 import { useCandidate } from "@/lib/candidate-context";
 import { fetchCandidateExam, uploadFiles, submitExamWithAntiCheat, reportExamBlocked, candidateMe, type CandidateExam } from "@/lib/api";
@@ -430,6 +430,37 @@ export default function CandidatExamenPage() {
         return (
             <div className="flex items-center justify-center py-20">
                 <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+            </div>
+        );
+    }
+
+    // ── Certifié — décision finale du comité ───────────────────────────────
+    if (dossier?.final_decision === "certified") {
+        return (
+            <div className="flex items-center justify-center min-h-[60vh]">
+                <motion.div
+                    initial={{ scale: 0.9, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    className="bg-white rounded-2xl p-10 max-w-md w-full text-center border-t-4 shadow-xl"
+                    style={{ borderTopColor: "#2e7d32" }}
+                >
+                    <div
+                        className="h-16 w-16 rounded-full flex items-center justify-center mx-auto mb-6"
+                        style={{ backgroundColor: "#e8f5e9" }}
+                    >
+                        <Trophy className="h-8 w-8" style={{ color: "#2e7d32" }} />
+                    </div>
+                    <h2 className="text-2xl font-black mb-2" style={{ color: "#1a237e" }}>
+                        Certification obtenue
+                    </h2>
+                    <p className="text-sm font-semibold mb-4" style={{ color: "#2e7d32" }}>
+                        Félicitations&nbsp;!
+                    </p>
+                    <p className="text-gray-500 text-sm leading-relaxed">
+                        Vous avez déjà passé votre examen et votre certification a été validée par le comité IRISQ.<br />
+                        Vous n&apos;avez plus accès à cette épreuve.
+                    </p>
+                </motion.div>
             </div>
         );
     }

@@ -28,6 +28,7 @@ const DOC_LABELS: Record<string, string> = {
 
 // ── Types de notification ──────────────────────────────────────
 type Notif =
+    | { type: "certified"; cert: string; grade?: string | null; appreciation?: string | null }
     | { type: "available"; exam: CandidateExam; cert: string }
     | { type: "done";      cert: string; graded: boolean; grade?: string | null; appreciation?: string | null }
     | { type: "expired";   cert: string }
@@ -73,6 +74,17 @@ export default function CandidateDashboardPage() {
         const exam   = exams.find(e => e.certification === cert) ?? null;
         const alreadyDone = d.exam_status === "submitted" || d.exam_status === "graded";
         const isGraded    = d.exam_status === "graded";
+
+        // Certifié par le comité — priorité maximale
+        if (d.final_decision === "certified") {
+            notifications.push({
+                type: "certified",
+                cert,
+                grade: d.final_grade ?? (d as any).exam_grade ?? null,
+                appreciation: d.final_appreciation ?? (d as any).exam_appreciation ?? null,
+            });
+            continue;
+        }
 
         if (alreadyDone) {
             notifications.push({
@@ -149,6 +161,37 @@ export default function CandidateDashboardPage() {
                                 exit={{ opacity: 0, y: -8 }}
                                 transition={{ delay: i * 0.05 }}
                             >
+
+                                {/* Certifié par le comité */}
+                                {n.type === "certified" && (
+                                    <div className="flex items-center gap-4 px-5 py-4 rounded-2xl border-2 shadow-sm" style={{ backgroundColor: "#e8f5e9", borderColor: "#2e7d32" }}>
+                                        <div className="h-10 w-10 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: "#c8e6c9" }}>
+                                            <Trophy className="h-5 w-5" style={{ color: "#1b5e20" }} />
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <p className="text-[10px] font-bold uppercase tracking-widest mb-0.5" style={{ color: "#1b5e20" }}>
+                                                Certification validée 🎉
+                                            </p>
+                                            <p className="font-bold text-gray-800 text-sm leading-snug truncate">
+                                                {n.cert}
+                                            </p>
+                                            {n.grade != null && (
+                                                <p className="text-xs mt-0.5 font-semibold" style={{ color: "#2e7d32" }}>
+                                                    Note&nbsp;: <span className="font-black">{n.grade}</span>
+                                                    {n.appreciation && (
+                                                        <span className="font-normal italic ml-1">— {n.appreciation}</span>
+                                                    )}
+                                                </p>
+                                            )}
+                                            <p className="text-xs mt-0.5" style={{ color: "#388e3c" }}>
+                                                Vous avez déjà passé votre examen. Félicitations&nbsp;!
+                                            </p>
+                                        </div>
+                                        <span className="shrink-0 text-[10px] font-bold px-3 py-1.5 rounded-lg" style={{ backgroundColor: "#2e7d32", color: "#fff" }}>
+                                            Certifié
+                                        </span>
+                                    </div>
+                                )}
 
                                 {/* Examen disponible */}
                                 {n.type === "available" && (
