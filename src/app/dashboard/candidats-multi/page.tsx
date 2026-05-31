@@ -299,27 +299,28 @@ export default function CandidatsMultiPage() {
 
     return (
         <div className="space-y-6">
-            <header>
-                <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-gray-400">
-                    Administration
-                </p>
-                <h1 className="text-2xl font-black" style={{ color: "#1a237e" }}>
-                    Candidats multi-formations
-                </h1>
-                <p className="text-sm text-gray-500 mt-1">
-                    Candidats ayant plusieurs demandes de certification (via le formulaire public ou l&apos;espace candidat).
-                    Déployez le dossier racine pour consulter et valider chaque sous-dossier.
-                </p>
-            </header>
+            {/* ── Header + sélecteur de session ── */}
+            <header className="flex items-start justify-between gap-4 flex-wrap">
+                <div>
+                    <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-gray-400">
+                        Administration
+                    </p>
+                    <h1 className="text-2xl font-black" style={{ color: "#1a237e" }}>
+                        Candidats multi-formations
+                    </h1>
+                    <p className="text-sm text-gray-500 mt-1">
+                        Candidats ayant plusieurs demandes de certification (formulaire public ou espace candidat).
+                        Déployez le dossier racine pour consulter et valider chaque sous-dossier.
+                    </p>
+                </div>
 
-            {/* Filtres */}
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex flex-wrap gap-3 items-center">
-                <div className="flex items-center gap-2 min-w-[200px] flex-1">
+                {/* Sélecteur session — top right */}
+                <div className="flex items-center gap-2 shrink-0 mt-1">
                     <CalendarDays className="h-4 w-4 shrink-0" style={{ color: "#1a237e" }} />
                     <select
                         value={selectedSession}
                         onChange={e => setSelectedSession(e.target.value)}
-                        className="flex-1 bg-[#f4f6f9] border border-[#e0e0e0] rounded-xl px-3 py-2 text-sm text-gray-700 focus:outline-none focus:border-[#2e7d32]"
+                        className="bg-white border border-[#e0e0e0] rounded-xl px-3 py-2 text-sm text-gray-700 shadow-sm focus:outline-none focus:border-[#1a237e] min-w-[180px]"
                     >
                         <option value="">Toutes les sessions</option>
                         {sessions.map(s => (
@@ -327,21 +328,28 @@ export default function CandidatsMultiPage() {
                         ))}
                     </select>
                 </div>
+            </header>
 
-                <div className="flex items-center gap-2 flex-1 min-w-[200px]">
+            {/* ── Barre de recherche + compteur ── */}
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm px-4 py-3 flex items-center gap-3">
+                {/* Recherche — prend tout l'espace disponible */}
+                <div className="flex items-center gap-2 flex-1 min-w-0">
                     <Search className="h-4 w-4 shrink-0 text-gray-400" />
                     <input
                         type="text"
-                        placeholder="Nom, email ou certification…"
+                        placeholder="Rechercher par nom, email ou certification…"
                         value={search}
                         onChange={e => setSearch(e.target.value)}
-                        className="flex-1 bg-[#f4f6f9] border border-[#e0e0e0] rounded-xl px-3 py-2 text-sm text-gray-700 placeholder:text-gray-400 focus:outline-none focus:border-[#2e7d32]"
+                        className="flex-1 min-w-0 bg-[#f4f6f9] border border-[#e0e0e0] rounded-xl px-3 py-2 text-sm text-gray-700 placeholder:text-gray-400 focus:outline-none focus:border-[#1a237e]"
                     />
                 </div>
 
+                {/* Compteur — droite */}
                 {!loading && (
-                    <span className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold shrink-0"
-                        style={{ backgroundColor: "#e8eaf6", color: "#1a237e" }}>
+                    <span
+                        className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold shrink-0"
+                        style={{ backgroundColor: "#e8eaf6", color: "#1a237e" }}
+                    >
                         <Users className="h-3 w-3" />
                         {filtered.length} candidat{filtered.length !== 1 ? "s" : ""}
                     </span>
