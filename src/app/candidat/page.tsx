@@ -1,18 +1,19 @@
 "use client";
 
 import { motion, AnimatePresence } from "framer-motion";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {
     Loader2, BookOpen,
     Layers, PlusCircle, Award, ShieldCheck, X, CheckCircle2,
-    MonitorSmartphone, MapPin,
+    MonitorSmartphone, MapPin, FileText, Upload, Eye,
 } from "lucide-react";
 
 import { useCandidate } from "@/lib/candidate-context";
 import {
     fetchCandidateExams,
     candidateNewApplication,
+    uploadFiles,
     type CandidateExam,
     type CandidateDossier,
 } from "@/lib/api";
@@ -101,35 +102,72 @@ function DossierCard({
     );
 }
 
-// ── Modal Nouvelle formation ───────────────────────────────────────────────
+// ── Clés et labels des documents ──────────────────────────────────────────
+const DOC_FIELDS: { key: string; label: string }[] = [
+    { key: "CV",                          label: "Curriculum Vitae"           },
+    { key: "Pièce d'identité",            label: "Pièce d'identité"           },
+    { key: "Justificatif d'expérience",   label: "Justificatif d'expérience"  },
+    { key: "Diplômes",                    label: "Diplômes / attestations"    },
+];
+
+// ── Modal Nouvelle demande de certification ────────────────────────────────
 function NouvelleFormationModal({
     existingCerts,
+    currentDossier,
     onClose,
     onSuccess,
 }: {
     existingCerts: string[];
+    currentDossier: CandidateDossier | null;
     onClose: () => void;
     onSuccess: () => void;
 }) {
     const available = CERTIFICATIONS.filter(c => !existingCerts.includes(c));
 
-    const [selected,  setSelected]  = useState<string | null>(null);
-    const [examMode,  setExamMode]  = useState<"online" | "onsite">("online");
-    const [submitting, setSubmitting] = useState(false);
-    const [error,     setError]     = useState<string | null>(null);
-    const [done,      setDone]      = useState(false);
+    const [selected,    setSelected]   = useState<string | null>(null);
+    const [examMode,    setExamMode]   = useState<"online" | "onsite">("online");
+    // docOverrides: URL remplacement uploadé par le candidat pour ce doc
+    const [docOverrides, setDocOverrides] = useState<Record<string, string>>({});
+    const [uploadingDoc, setUploadingDoc] = useState<string | null>(null);
+    const [submitting,  setSubmitting]  = useState(false);
+    const [error,       setError]       = useState<string | null>(null);
+    const [done,        setDone]        = useState(false);
+
+    const fileRefs = useRef<Record<string, HTMLInputElement | null>>({});
+
+    // URLs effectives : priorité à l'override, sinon le doc du dossier actif
+    const effectiveUrl = (key: string): string | null =>
+        docOverrides[key] || (currentDossier?.answers?.[key] as string | undefined) || null;
+
+    const handleFileChange = async (key: string, file: File) => {
+        try {
+            setUploadingDoc(key);
+            const form = new FormData();
+            form.append("files", file);
+            const { file_urls } = await uploadFiles(form);
+            if (!file_urls?.[0]) throw new Error("Upload incomplet");
+            setDocOverrides(prev => ({ ...prev, [key]: file_urls[0] }));
+        } catch {
+            setError("Erreur lors de l'upload du document");
+        } finally {
+            setUploadingDoc(null);
+        }
+    };
 
     const handleSubmit = async () => {
         if (!selected) return;
         try {
             setSubmitting(true);
             setError(null);
-            await candidateNewApplication(selected, examMode);
+            // Construire le dict documents : URL effective de chaque champ
+            const documents: Record<string, string> = {};
+            for (const { key } of DOC_FIELDS) {
+                const u = effectiveUrl(key);
+                if (u) documents[key] = u;
+            }
+            await candidateNewApplication(selected, examMode, documents);
             setDone(true);
-            // Laisser 1.5 s d'affichage du succès puis fermer + refresh
-            setTimeout(() => {
-                onSuccess();
-            }, 1500);
+            setTimeout(() => { onSuccess(); }, 1600);
         } catch (e) {
             setError(e instanceof Error ? e.message : "Erreur lors de la soumission");
         } finally {
@@ -157,7 +195,7 @@ function NouvelleFormationModal({
                 className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none"
             >
                 <div
-                    className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-hidden flex flex-col pointer-events-auto"
+                    className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[92vh] overflow-hidden flex flex-col pointer-events-auto"
                     style={{ border: "2px solid #e8eaf6" }}
                 >
                     {/* Header */}
@@ -174,19 +212,16 @@ function NouvelleFormationModal({
                     </div>
 
                     {/* Corps */}
-                    <div className="flex-1 overflow-y-auto p-6 space-y-5">
+                    <div className="flex-1 overflow-y-auto p-6 space-y-6">
 
-                        {/* Écran succès */}
+                        {/* ── Écran succès ── */}
                         {done ? (
                             <motion.div
                                 initial={{ opacity: 0, scale: 0.92 }}
                                 animate={{ opacity: 1, scale: 1 }}
-                                className="py-8 flex flex-col items-center gap-4 text-center"
+                                className="py-10 flex flex-col items-center gap-4 text-center"
                             >
-                                <div
-                                    className="h-16 w-16 rounded-full flex items-center justify-center"
-                                    style={{ backgroundColor: "#e8f5e9" }}
-                                >
+                                <div className="h-16 w-16 rounded-full flex items-center justify-center" style={{ backgroundColor: "#e8f5e9" }}>
                                     <CheckCircle2 className="h-8 w-8" style={{ color: "#2e7d32" }} />
                                 </div>
                                 <div>
@@ -200,10 +235,10 @@ function NouvelleFormationModal({
                             </motion.div>
                         ) : (
                             <>
-                                {/* Sélection certification */}
+                                {/* ── 1. Sélection certification ── */}
                                 <div>
                                     <p className="text-xs font-black uppercase tracking-widest mb-3" style={{ color: "#1a237e" }}>
-                                        Choisissez la certification
+                                        1 · Choisissez la certification
                                     </p>
                                     {available.length === 0 ? (
                                         <div className="text-center py-8 text-sm text-gray-400">
@@ -212,7 +247,7 @@ function NouvelleFormationModal({
                                     ) : (
                                         <ul className="space-y-2">
                                             {available.map(cert => {
-                                                const isSelected = selected === cert;
+                                                const isSel = selected === cert;
                                                 return (
                                                     <li key={cert}>
                                                         <button
@@ -220,25 +255,20 @@ function NouvelleFormationModal({
                                                             onClick={() => setSelected(cert)}
                                                             className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all"
                                                             style={{
-                                                                backgroundColor: isSelected ? "#e8eaf6" : "#f8f9ff",
-                                                                border: `2px solid ${isSelected ? "#1a237e" : "#e8eaf6"}`,
+                                                                backgroundColor: isSel ? "#e8eaf6" : "#f8f9ff",
+                                                                border: `2px solid ${isSel ? "#1a237e" : "#e8eaf6"}`,
                                                             }}
                                                         >
                                                             <div
-                                                                className="h-5 w-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors"
+                                                                className="h-5 w-5 rounded-full border-2 flex items-center justify-center shrink-0"
                                                                 style={{
-                                                                    borderColor: isSelected ? "#1a237e" : "#d1d5db",
-                                                                    backgroundColor: isSelected ? "#1a237e" : "transparent",
+                                                                    borderColor: isSel ? "#1a237e" : "#d1d5db",
+                                                                    backgroundColor: isSel ? "#1a237e" : "transparent",
                                                                 }}
                                                             >
-                                                                {isSelected && (
-                                                                    <div className="h-2 w-2 rounded-full bg-white" />
-                                                                )}
+                                                                {isSel && <div className="h-2 w-2 rounded-full bg-white" />}
                                                             </div>
-                                                            <span
-                                                                className="text-sm font-semibold flex-1 leading-snug"
-                                                                style={{ color: isSelected ? "#1a237e" : "#374151" }}
-                                                            >
+                                                            <span className="text-sm font-semibold flex-1 leading-snug" style={{ color: isSel ? "#1a237e" : "#374151" }}>
                                                                 {cert}
                                                             </span>
                                                         </button>
@@ -249,47 +279,134 @@ function NouvelleFormationModal({
                                     )}
                                 </div>
 
-                                {/* Mode d'examen */}
                                 {available.length > 0 && (
-                                    <div>
-                                        <p className="text-xs font-black uppercase tracking-widest mb-3" style={{ color: "#1a237e" }}>
-                                            Mode d&apos;examen
-                                        </p>
-                                        <div className="flex gap-3">
-                                            {([
-                                                { value: "online",  label: "En ligne",     Icon: MonitorSmartphone },
-                                                { value: "onsite",  label: "Présentiel",   Icon: MapPin            },
-                                            ] as const).map(({ value, label, Icon }) => {
-                                                const isActive = examMode === value;
-                                                return (
-                                                    <button
-                                                        key={value}
-                                                        type="button"
-                                                        onClick={() => setExamMode(value)}
-                                                        className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold transition-all"
-                                                        style={{
-                                                            backgroundColor: isActive ? "#1a237e" : "#f8f9ff",
-                                                            color:           isActive ? "#fff"    : "#555",
-                                                            border:          `2px solid ${isActive ? "#1a237e" : "#e8eaf6"}`,
-                                                        }}
-                                                    >
-                                                        <Icon className="h-4 w-4" />
-                                                        {label}
-                                                    </button>
-                                                );
-                                            })}
+                                    <>
+                                        {/* ── 2. Mode d'examen ── */}
+                                        <div>
+                                            <p className="text-xs font-black uppercase tracking-widest mb-3" style={{ color: "#1a237e" }}>
+                                                2 · Mode d&apos;examen
+                                            </p>
+                                            <div className="flex gap-3">
+                                                {([
+                                                    { value: "online", label: "En ligne",   Icon: MonitorSmartphone },
+                                                    { value: "onsite", label: "Présentiel", Icon: MapPin            },
+                                                ] as const).map(({ value, label, Icon }) => {
+                                                    const isAct = examMode === value;
+                                                    return (
+                                                        <button
+                                                            key={value}
+                                                            type="button"
+                                                            onClick={() => setExamMode(value)}
+                                                            className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold transition-all"
+                                                            style={{
+                                                                backgroundColor: isAct ? "#1a237e" : "#f8f9ff",
+                                                                color:           isAct ? "#fff"    : "#555",
+                                                                border:          `2px solid ${isAct ? "#1a237e" : "#e8eaf6"}`,
+                                                            }}
+                                                        >
+                                                            <Icon className="h-4 w-4" />{label}
+                                                        </button>
+                                                    );
+                                                })}
+                                            </div>
                                         </div>
-                                    </div>
-                                )}
 
-                                {/* Erreur */}
-                                {error && (
-                                    <motion.div
-                                        initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }}
-                                        className="flex items-center gap-2 p-3 rounded-xl bg-red-50 border border-red-100 text-red-700 text-sm"
-                                    >
-                                        {error}
-                                    </motion.div>
+                                        {/* ── 3. Documents ── */}
+                                        <div>
+                                            <p className="text-xs font-black uppercase tracking-widest mb-1" style={{ color: "#1a237e" }}>
+                                                3 · Documents
+                                            </p>
+                                            <p className="text-xs text-gray-400 mb-3">
+                                                Vos documents actuels sont repris automatiquement. Vous pouvez en remplacer un si nécessaire.
+                                            </p>
+                                            <ul className="space-y-2">
+                                                {DOC_FIELDS.map(({ key, label }) => {
+                                                    const url        = effectiveUrl(key);
+                                                    const isNew      = !!docOverrides[key];
+                                                    const isUploading = uploadingDoc === key;
+
+                                                    return (
+                                                        <li
+                                                            key={key}
+                                                            className="flex items-center gap-3 px-4 py-3 rounded-xl"
+                                                            style={{
+                                                                backgroundColor: isNew ? "#f0fdf4" : "#f8f9ff",
+                                                                border: `1.5px solid ${isNew ? "#86efac" : "#e8eaf6"}`,
+                                                            }}
+                                                        >
+                                                            {/* Icône */}
+                                                            <div
+                                                                className="h-8 w-8 rounded-lg flex items-center justify-center shrink-0"
+                                                                style={{ backgroundColor: url ? (isNew ? "#dcfce7" : "#e8eaf6") : "#f3f4f6" }}
+                                                            >
+                                                                <FileText
+                                                                    className="h-4 w-4"
+                                                                    style={{ color: url ? (isNew ? "#16a34a" : "#1a237e") : "#9ca3af" }}
+                                                                />
+                                                            </div>
+
+                                                            {/* Infos */}
+                                                            <div className="flex-1 min-w-0">
+                                                                <p className="text-sm font-semibold text-gray-800 truncate">{label}</p>
+                                                                <p className="text-[10px] mt-0.5 font-medium" style={{ color: isNew ? "#16a34a" : url ? "#6b7280" : "#9ca3af" }}>
+                                                                    {isNew ? "Nouveau fichier chargé ✓" : url ? "Fichier actuel conservé" : "Aucun fichier"}
+                                                                </p>
+                                                            </div>
+
+                                                            {/* Actions */}
+                                                            <div className="flex items-center gap-1.5 shrink-0">
+                                                                {url && (
+                                                                    <a
+                                                                        href={url}
+                                                                        target="_blank"
+                                                                        rel="noreferrer"
+                                                                        title="Voir le fichier"
+                                                                        className="p-1.5 rounded-lg text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
+                                                                    >
+                                                                        <Eye className="h-3.5 w-3.5" />
+                                                                    </a>
+                                                                )}
+                                                                <input
+                                                                    ref={el => { fileRefs.current[key] = el; }}
+                                                                    type="file"
+                                                                    className="hidden"
+                                                                    accept="application/pdf,image/jpeg,image/png,.docx"
+                                                                    onChange={e => {
+                                                                        const f = e.target.files?.[0];
+                                                                        if (f) handleFileChange(key, f);
+                                                                        e.currentTarget.value = "";
+                                                                    }}
+                                                                />
+                                                                <button
+                                                                    type="button"
+                                                                    disabled={isUploading}
+                                                                    onClick={() => fileRefs.current[key]?.click()}
+                                                                    className="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1.5 rounded-lg text-white disabled:opacity-50 transition-colors"
+                                                                    style={{ backgroundColor: isNew ? "#16a34a" : "#1a237e" }}
+                                                                >
+                                                                    {isUploading
+                                                                        ? <Loader2 className="h-3 w-3 animate-spin" />
+                                                                        : <Upload className="h-3 w-3" />
+                                                                    }
+                                                                    {isUploading ? "…" : isNew ? "Changer" : url ? "Remplacer" : "Ajouter"}
+                                                                </button>
+                                                            </div>
+                                                        </li>
+                                                    );
+                                                })}
+                                            </ul>
+                                        </div>
+
+                                        {/* ── Erreur ── */}
+                                        {error && (
+                                            <motion.div
+                                                initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }}
+                                                className="flex items-center gap-2 p-3 rounded-xl bg-red-50 border border-red-100 text-red-700 text-sm"
+                                            >
+                                                {error}
+                                            </motion.div>
+                                        )}
+                                    </>
                                 )}
                             </>
                         )}
@@ -306,7 +423,7 @@ function NouvelleFormationModal({
                                 Annuler
                             </button>
                             <button
-                                disabled={!selected || submitting}
+                                disabled={!selected || submitting || !!uploadingDoc}
                                 onClick={handleSubmit}
                                 className="flex-1 py-3 rounded-xl text-sm font-bold text-white transition-all hover:-translate-y-0.5 disabled:opacity-50 disabled:translate-y-0 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                                 style={{ backgroundColor: "#2e7d32", boxShadow: selected ? "0 6px 16px rgba(46,125,50,0.25)" : "none" }}
@@ -435,6 +552,7 @@ export default function TableauDeBordPage() {
                 {showModal && (
                     <NouvelleFormationModal
                         existingCerts={existingCerts}
+                        currentDossier={dossier}
                         onClose={() => setShowModal(false)}
                         onSuccess={handleModalSuccess}
                     />

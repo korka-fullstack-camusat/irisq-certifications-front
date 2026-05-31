@@ -1131,11 +1131,12 @@ export async function candidateResubmitDocument(documentName: string, fileUrl: s
 export async function candidateNewApplication(
     certification: string,
     examMode: "online" | "onsite" = "online",
+    documents: Record<string, string> = {},
 ): Promise<CandidateDossier> {
     const res = await candidateFetch(url("candidate/new-application"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ certification, exam_mode: examMode }),
+        body: JSON.stringify({ certification, exam_mode: examMode, documents }),
     });
     if (!res.ok) {
         const err = await res.json().catch(() => ({}));
