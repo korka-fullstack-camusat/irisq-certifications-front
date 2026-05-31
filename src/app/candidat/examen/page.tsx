@@ -19,6 +19,18 @@ const EXAM_SESSION_KEY = "irisq_exam_active";
 const QUESTIONS_PER_PAGE = 3;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
+/**
+ * Vérifie qu'une chaîne HTML contient du texte visible réel
+ * (et non uniquement des balises / &nbsp; / espaces).
+ * Un HTML "whitespace-only" est produit par pdfplumber sur un PDF scanné :
+ * il est truthy mais son rendu est complètement vide.
+ */
+function hasVisibleContent(html: string | undefined | null): boolean {
+    if (!html) return false;
+    const text = html.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, '').trim();
+    return text.length > 0;
+}
+
 /** Convertit un chemin relatif (/api/files/…) en URL absolue vers le backend. */
 function resolveDocUrl(raw: string | undefined | null): string {
     if (!raw) return "";
@@ -137,7 +149,8 @@ export default function CandidatExamenPage() {
     // Déclenché dès que la phase "exam" démarre et que exam_content_html est vide.
     // Utilise l'endpoint candidat /candidate/exam/{id}/ensure-content (pas de 401).
     useEffect(() => {
-        if (phase !== "exam" || !exam || exam.exam_content_html || !exam._id) return;
+        // Déclencher le re-parse si exam_content_html est absent OU whitespace-only
+        if (phase !== "exam" || !exam || hasVisibleContent(exam.exam_content_html) || !exam._id) return;
         setIsReparsing(true);
         ensureExamContent(exam._id)
             .then(updated => { if (updated) setExam(updated); })
@@ -155,7 +168,7 @@ export default function CandidatExamenPage() {
         if (
             phase !== "exam" ||
             isReparsing ||
-            exam?.exam_content_html ||
+            hasVisibleContent(exam?.exam_content_html) ||   // ignore HTML whitespace-only (PDF scanné)
             !exam?.document_url ||
             docBlobUrl
         ) return;
@@ -1157,7 +1170,7 @@ export default function CandidatExamenPage() {
                                     <Loader2 className="h-5 w-5 animate-spin" style={{ color: "#1a237e" }} />
                                     <span>Chargement du sujet d&apos;examen…</span>
                                 </div>
-                            ) : exam.exam_content_html ? (
+                            ) : hasVisibleContent(exam.exam_content_html) ? (
                                 /* Contenu HTML converti depuis le document (DOCX / PDF texte / TXT) */
                                 <div
                                     className="overflow-y-auto px-5 py-4 exam-subject"
@@ -1167,7 +1180,7 @@ export default function CandidatExamenPage() {
                                         fontSize: "0.875rem",
                                         lineHeight: "1.7",
                                     }}
-                                    dangerouslySetInnerHTML={{ __html: exam.exam_content_html }}
+                                    dangerouslySetInnerHTML={{ __html: exam.exam_content_html! }}
                                 />
                             ) : docBlobUrl ? (
                                 /* PDF scanné (pas de texte extractible) — affiché via Blob URL inline */
