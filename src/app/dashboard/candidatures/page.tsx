@@ -22,6 +22,9 @@ import {
     FolderRoot,
     Globe,
     Download,
+    BookOpen,
+    GraduationCap,
+    ListFilter,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -38,7 +41,8 @@ import { Pagination } from "@/components/Pagination";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
-type ModeTab = "all" | "online" | "onsite";
+type ModeTab     = "all" | "online" | "onsite";
+type ExamTypeTab = "all" | "direct" | "after_formation";
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -48,6 +52,16 @@ function getDossierMode(d: MultiCandidatureDossier): "online" | "onsite" | "" {
     const fromAnswers = ((d.answers?.["Mode d'examen"] as string | undefined) || "").toLowerCase();
     if (fromAnswers.includes("ligne")) return "online";
     if (fromAnswers.includes("présent") || fromAnswers.includes("present")) return "onsite";
+    return "";
+}
+
+function getDossierExamType(d: MultiCandidatureDossier): "direct" | "after_formation" | "" {
+    const raw = (d.exam_type || "").toLowerCase().trim();
+    if (raw === "direct") return "direct";
+    if (raw === "after_formation") return "after_formation";
+    const fromAnswers = ((d.answers?.["Type d'examen"] as string | undefined) || "").toLowerCase();
+    if (fromAnswers.includes("direct")) return "direct";
+    if (fromAnswers.includes("formation")) return "after_formation";
     return "";
 }
 
@@ -71,6 +85,11 @@ function entryMatchesMode(entry: MultiCandidatureEntry, mode: ModeTab): boolean 
     return entry.dossiers.some(d => getDossierMode(d) === mode);
 }
 
+function entryMatchesExamType(entry: MultiCandidatureEntry, examType: ExamTypeTab): boolean {
+    if (examType === "all") return true;
+    return entry.dossiers.some(d => getDossierExamType(d) === examType);
+}
+
 // ── Status badge ───────────────────────────────────────────────────────────
 
 function StatusBadge({ status }: { status?: string }) {
@@ -92,6 +111,25 @@ function StatusBadge({ status }: { status?: string }) {
             <Hourglass className="h-3.5 w-3.5" /> En attente
         </span>
     );
+}
+
+// ── Exam type badge (réutilisable) ─────────────────────────────────────────
+
+function ExamTypeBadge({ dossier }: { dossier: MultiCandidatureDossier }) {
+    const t = getDossierExamType(dossier);
+    if (t === "direct") return (
+        <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full"
+            style={{ backgroundColor: "#f3e8ff", color: "#7b1fa2" }}>
+            <BookOpen className="h-3 w-3" /> Examen direct
+        </span>
+    );
+    if (t === "after_formation") return (
+        <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full"
+            style={{ backgroundColor: "#e0f2fe", color: "#0369a1" }}>
+            <GraduationCap className="h-3 w-3" /> Formation IRISQ
+        </span>
+    );
+    return null;
 }
 
 // ── Dossier sub-row (inside a multi-folder) ────────────────────────────────
@@ -133,6 +171,7 @@ function DossierSubRow({ dossier }: { dossier: MultiCandidatureDossier }) {
                                 <AlertTriangle className="h-3 w-3" /> Relance
                             </span>
                         )}
+                        <ExamTypeBadge dossier={dossier} />
                     </div>
                     <div className="mt-1 flex items-center gap-3 text-xs text-gray-500 flex-wrap">
                         {!dossier.session_id ? (
@@ -213,6 +252,7 @@ function SingleDossierCard({ entry }: { entry: MultiCandidatureEntry }) {
                                 <AlertTriangle className="h-3 w-3" /> Relance
                             </span>
                         )}
+                        <ExamTypeBadge dossier={dossier} />
                     </div>
 
                     {/* Ligne 2 : certification + origine + mode + date */}
@@ -360,6 +400,7 @@ function CandidaturesInner() {
     const [selectedSession, setSelectedSession] = useState<string>("");
     const [search, setSearch] = useState("");
     const [modeTab, setModeTab] = useState<ModeTab>("all");
+    const [examType, setExamType] = useState<ExamTypeTab>("all");
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [exporting, setExporting] = useState(false);
@@ -394,13 +435,12 @@ function CandidaturesInner() {
     }, [selectedSession]);
 
     // Réinitialiser la page quand les filtres changent
-    useEffect(() => { setPage(1); }, [modeTab, search]);
+    useEffect(() => { setPage(1); }, [modeTab, examType, search]);
 
     const filtered = useMemo(() => {
         let list = entries;
-        if (modeTab !== "all") {
-            list = list.filter(e => entryMatchesMode(e, modeTab));
-        }
+        if (modeTab !== "all")     list = list.filter(e => entryMatchesMode(e, modeTab));
+        if (examType !== "all")    list = list.filter(e => entryMatchesExamType(e, examType));
         if (search.trim()) {
             const q = search.toLowerCase();
             list = list.filter(e =>
@@ -410,7 +450,7 @@ function CandidaturesInner() {
             );
         }
         return list;
-    }, [entries, modeTab, search]);
+    }, [entries, modeTab, examType, search]);
 
     const paged = useMemo(() => {
         const start = (page - 1) * PAGE_SIZE;
@@ -434,9 +474,16 @@ function CandidaturesInner() {
 
     // Compteurs pour les onglets mode
     const countByMode = useMemo(() => ({
-        all: entries.length,
+        all:    entries.length,
         online: entries.filter(e => entryMatchesMode(e, "online")).length,
         onsite: entries.filter(e => entryMatchesMode(e, "onsite")).length,
+    }), [entries]);
+
+    // Compteurs pour les onglets type d'examen
+    const countByExamType = useMemo(() => ({
+        all:              entries.length,
+        direct:           entries.filter(e => entryMatchesExamType(e, "direct")).length,
+        after_formation:  entries.filter(e => entryMatchesExamType(e, "after_formation")).length,
     }), [entries]);
 
     return (
@@ -490,62 +537,109 @@ function CandidaturesInner() {
             </header>
 
             {/* ── Barre de filtres ── */}
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm px-4 py-3 flex items-center gap-3 flex-wrap">
-                {/* Recherche */}
-                <div className="flex items-center gap-2 flex-1 min-w-[180px]">
-                    <Search className="h-4 w-4 shrink-0 text-gray-400" />
-                    <input
-                        type="text"
-                        placeholder="Rechercher par nom, email ou certification…"
-                        value={search}
-                        onChange={e => setSearch(e.target.value)}
-                        className="flex-1 min-w-0 bg-[#f4f6f9] border border-[#e0e0e0] rounded-xl px-3 py-2 text-sm text-gray-700 placeholder:text-gray-400 focus:outline-none focus:border-[#1a237e]"
-                    />
-                </div>
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm px-4 py-3 flex flex-col gap-3">
 
-                {/* Mode tabs */}
-                <div className="flex items-center gap-1 shrink-0 bg-[#f4f6f9] rounded-xl p-1">
-                    {([
-                        { key: "all",    label: "Tous",        Icon: Users   },
-                        { key: "online", label: "En ligne",    Icon: Monitor },
-                        { key: "onsite", label: "Présentiel",  Icon: MapPin  },
-                    ] as { key: ModeTab; label: string; Icon: React.ElementType }[]).map(({ key, label, Icon }) => (
-                        <button
-                            key={key}
-                            onClick={() => setModeTab(key)}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all"
-                            style={{
-                                backgroundColor: modeTab === key ? "#1a237e" : "transparent",
-                                color: modeTab === key ? "#ffffff" : "#6b7280",
-                            }}
+                {/* Ligne 1 : recherche + mode + compteur */}
+                <div className="flex items-center gap-3 flex-wrap">
+                    {/* Recherche */}
+                    <div className="flex items-center gap-2 flex-1 min-w-[180px]">
+                        <Search className="h-4 w-4 shrink-0 text-gray-400" />
+                        <input
+                            type="text"
+                            placeholder="Rechercher par nom, email ou certification…"
+                            value={search}
+                            onChange={e => setSearch(e.target.value)}
+                            className="flex-1 min-w-0 bg-[#f4f6f9] border border-[#e0e0e0] rounded-xl px-3 py-2 text-sm text-gray-700 placeholder:text-gray-400 focus:outline-none focus:border-[#1a237e]"
+                        />
+                    </div>
+
+                    {/* Mode (En ligne / Présentiel) */}
+                    <div className="flex items-center gap-1 shrink-0 bg-[#f4f6f9] rounded-xl p-1">
+                        {([
+                            { key: "all",    label: "Tous",       Icon: Users   },
+                            { key: "online", label: "En ligne",   Icon: Monitor },
+                            { key: "onsite", label: "Présentiel", Icon: MapPin  },
+                        ] as { key: ModeTab; label: string; Icon: React.ElementType }[]).map(({ key, label, Icon }) => (
+                            <button
+                                key={key}
+                                onClick={() => setModeTab(key)}
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all"
+                                style={{
+                                    backgroundColor: modeTab === key ? "#1a237e" : "transparent",
+                                    color: modeTab === key ? "#ffffff" : "#6b7280",
+                                }}
+                            >
+                                <Icon className="h-3 w-3" />
+                                {label}
+                                {!loading && (
+                                    <span
+                                        className="ml-0.5 text-[10px] px-1.5 py-0.5 rounded-full font-black"
+                                        style={{
+                                            backgroundColor: modeTab === key ? "rgba(255,255,255,0.2)" : "#e5e7eb",
+                                            color: modeTab === key ? "#ffffff" : "#374151",
+                                        }}
+                                    >
+                                        {countByMode[key]}
+                                    </span>
+                                )}
+                            </button>
+                        ))}
+                    </div>
+
+                    {/* Compteur résultats filtrés */}
+                    {!loading && (
+                        <span
+                            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold shrink-0"
+                            style={{ backgroundColor: "#e8eaf6", color: "#1a237e" }}
                         >
-                            <Icon className="h-3 w-3" />
-                            {label}
-                            {!loading && (
-                                <span
-                                    className="ml-0.5 text-[10px] px-1.5 py-0.5 rounded-full font-black"
-                                    style={{
-                                        backgroundColor: modeTab === key ? "rgba(255,255,255,0.2)" : "#e5e7eb",
-                                        color: modeTab === key ? "#ffffff" : "#374151",
-                                    }}
-                                >
-                                    {countByMode[key]}
-                                </span>
-                            )}
-                        </button>
-                    ))}
+                            <Users className="h-3 w-3" />
+                            {filtered.length} candidat{filtered.length !== 1 ? "s" : ""}
+                        </span>
+                    )}
                 </div>
 
-                {/* Compteur résultats filtrés */}
-                {!loading && (
-                    <span
-                        className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold shrink-0"
-                        style={{ backgroundColor: "#e8eaf6", color: "#1a237e" }}
-                    >
-                        <Users className="h-3 w-3" />
-                        {filtered.length} candidat{filtered.length !== 1 ? "s" : ""}
+                {/* Séparateur */}
+                <div className="h-px bg-gray-100" />
+
+                {/* Ligne 2 : type d'examen */}
+                <div className="flex items-center gap-3 flex-wrap">
+                    <span className="inline-flex items-center gap-1.5 text-xs font-bold text-gray-400 shrink-0">
+                        <ListFilter className="h-3.5 w-3.5" />
+                        Type d&apos;examen
                     </span>
-                )}
+                    <div className="flex items-center gap-1 bg-[#f4f6f9] rounded-xl p-1">
+                        {([
+                            { key: "all",             label: "Tous",              Icon: Users          },
+                            { key: "direct",          label: "Examen direct",     Icon: BookOpen       },
+                            { key: "after_formation", label: "Formation IRISQ",   Icon: GraduationCap  },
+                        ] as { key: ExamTypeTab; label: string; Icon: React.ElementType }[]).map(({ key, label, Icon }) => (
+                            <button
+                                key={key}
+                                onClick={() => setExamType(key)}
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all"
+                                style={{
+                                    backgroundColor: examType === key ? "#7b1fa2" : "transparent",
+                                    color: examType === key ? "#ffffff" : "#6b7280",
+                                }}
+                            >
+                                <Icon className="h-3 w-3" />
+                                {label}
+                                {!loading && (
+                                    <span
+                                        className="ml-0.5 text-[10px] px-1.5 py-0.5 rounded-full font-black"
+                                        style={{
+                                            backgroundColor: examType === key ? "rgba(255,255,255,0.2)" : "#e5e7eb",
+                                            color: examType === key ? "#ffffff" : "#374151",
+                                        }}
+                                    >
+                                        {countByExamType[key]}
+                                    </span>
+                                )}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+
             </div>
 
             {/* ── Contenu ── */}
