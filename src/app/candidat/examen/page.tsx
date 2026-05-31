@@ -1115,218 +1115,181 @@ export default function CandidatExamenPage() {
                     </div>
                 </div>
 
-                {/* Main content */}
-                <div className="flex-1 overflow-auto p-4 lg:p-8 flex flex-col lg:flex-row gap-6 max-w-6xl mx-auto w-full">
+                {/* Main content — split view */}
+                <div className="flex-1 flex overflow-hidden flex-col md:flex-row">
 
-                    {/* Questions panel */}
-                    <div className="flex-[3] bg-white rounded-2xl shadow-sm border flex flex-col" style={{ borderColor: "#c5cae9" }}>
-                        {/* Panel header */}
-                        <div className="px-5 py-3 border-b flex items-center justify-between shrink-0" style={{ backgroundColor: "#e8eaf6", borderColor: "#c5cae9" }}>
-                            <div className="flex items-center gap-2">
-                                <FileText className="h-4 w-4 text-[#1a237e]" />
-                                <h2 className="font-black text-sm uppercase tracking-wider text-[#1a237e]">Sujet d&apos;Examen</h2>
-                            </div>
-                            <span className="text-xs font-bold bg-[#1a237e] text-white px-2 py-1 rounded-md">
-                                {questions.length > 0
-                                    ? `Page ${currentPage + 1} / ${totalPages} — ${questions.length} question${questions.length > 1 ? "s" : ""}`
-                                    : `${freeAnswerCount} question${freeAnswerCount > 1 ? "s" : ""}`
-                                }
-                            </span>
+                    {/* ══ GAUCHE : Sujet d'examen (scrollable) ══ */}
+                    <div className="md:flex-[5] flex flex-col border-b md:border-b-0 md:border-r overflow-hidden" style={{ borderColor: "#c5cae9", minHeight: "40vh" }}>
+                        {/* Header sujet */}
+                        <div className="px-4 py-2.5 border-b flex items-center gap-2 shrink-0" style={{ backgroundColor: "#e8eaf6", borderColor: "#c5cae9" }}>
+                            <FileText className="h-4 w-4 text-[#1a237e]" />
+                            <h2 className="font-black text-xs uppercase tracking-wider text-[#1a237e]">Sujet d&apos;Examen</h2>
                         </div>
 
-                        {/* Sujet d'examen : HTML (DOCX/PDF texte) ou iframe PDF (PDF scanne) */}
-                        <div className="shrink-0 border-b" style={{ borderColor: "#e8eaf6" }}>
+                        {/* Corps du sujet — scrollable */}
+                        <div className="flex-1 overflow-auto" style={{ backgroundColor: "#fafafa" }}>
                             {isReparsing ? (
-                                /* Conversion du document en cours */
-                                <div className="flex items-center justify-center gap-3 py-10 text-sm text-gray-400"
-                                    style={{ backgroundColor: "#fafafa" }}>
+                                <div className="flex items-center justify-center gap-3 h-full text-sm text-gray-400">
                                     <Loader2 className="h-5 w-5 animate-spin" style={{ color: "#1a237e" }} />
-                                    <span>Chargement du sujet d&apos;examen…</span>
+                                    <span>Chargement du sujet…</span>
                                 </div>
                             ) : hasVisibleContent(exam.exam_content_html) ? (
-                                /* Contenu HTML converti (DOCX / PDF texte / TXT) */
                                 <div
-                                    className="overflow-y-auto px-5 py-4 exam-subject"
-                                    style={{
-                                        maxHeight: questions.length > 0 ? "380px" : "560px",
-                                        backgroundColor: "#fafafa",
-                                        fontSize: "0.875rem",
-                                        lineHeight: "1.7",
-                                    }}
+                                    className="px-5 py-4 exam-subject"
+                                    style={{ fontSize: "0.875rem", lineHeight: "1.7" }}
                                     dangerouslySetInnerHTML={{ __html: exam.exam_content_html! }}
                                 />
                             ) : exam.document_url ? (
                                 <iframe
                                     src={resolveDocUrl(exam.document_url)}
                                     title="Sujet d'examen"
-                                    className="w-full border-0 block"
-                                    style={{
-                                        height: questions.length > 0 ? "380px" : "560px",
-                                        backgroundColor: "#fafafa",
-                                    }}
+                                    className="w-full h-full border-0 block"
+                                    style={{ minHeight: "300px" }}
                                 />
                             ) : (
-                                /* Aucun document attaché à cet examen */
-                                <div className="flex flex-col items-center justify-center gap-3 py-10 text-center px-6"
-                                    style={{ backgroundColor: "#fafafa" }}>
-                                    <FileText className="h-8 w-8 text-gray-300" />
-                                    <p className="text-sm font-semibold text-gray-500">
-                                        Aucun sujet n&apos;a été joint à cet examen.
-                                    </p>
-                                    <p className="text-xs text-gray-400 max-w-xs">
-                                        Contactez le responsable IRISQ — le document d&apos;examen n&apos;a pas encore été téléversé.
-                                    </p>
+                                <div className="flex flex-col items-center justify-center gap-3 h-full text-center px-6 py-10">
+                                    <FileText className="h-10 w-10 text-gray-200" />
+                                    <p className="text-sm font-semibold text-gray-500">Aucun sujet joint à cet examen.</p>
+                                    <p className="text-xs text-gray-400 max-w-xs">Contactez le responsable IRISQ.</p>
                                 </div>
                             )}
                         </div>
+                    </div>
 
-                        {/* Questions list (paginated) ou blocs de réponse numérotés */}
-                        <div className="flex-1 overflow-y-auto p-5 space-y-5">
+                    {/* ══ DROITE : Questions + réponses + soumettre ══ */}
+                    <div className="md:flex-[4] flex flex-col overflow-hidden" style={{ backgroundColor: "#f4f6f9" }}>
+
+                        {/* Header réponses */}
+                        <div className="px-4 py-2.5 border-b flex items-center justify-between shrink-0" style={{ backgroundColor: "#e8eaf6", borderColor: "#c5cae9" }}>
+                            <div className="flex items-center gap-2">
+                                <BookOpen className="h-4 w-4 text-[#1a237e]" />
+                                <h2 className="font-black text-xs uppercase tracking-wider text-[#1a237e]">Vos Réponses</h2>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                {questions.length === 0 && (
+                                    <>
+                                        <button
+                                            onClick={() => setFreeAnswerCount(n => Math.max(1, n - 1))}
+                                            className="inline-flex items-center gap-1 px-2 py-1 rounded-lg border text-[10px] font-bold text-gray-600 hover:bg-gray-100 transition-colors bg-white"
+                                            style={{ borderColor: "#e0e0e0" }}
+                                            title="Retirer un bloc"
+                                        >
+                                            <X className="h-3 w-3" />
+                                        </button>
+                                        <button
+                                            onClick={() => setFreeAnswerCount(n => n + 1)}
+                                            className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold text-white transition-colors"
+                                            style={{ backgroundColor: "#2e7d32" }}
+                                            title="Ajouter un bloc"
+                                        >
+                                            + Q
+                                        </button>
+                                    </>
+                                )}
+                                <span className="text-[10px] font-bold bg-[#1a237e] text-white px-2 py-1 rounded-md">
+                                    {answeredCount}/{totalQCount}
+                                </span>
+                            </div>
+                        </div>
+
+                        {/* Liste scrollable : question → réponse juste en dessous */}
+                        <div className="flex-1 overflow-y-auto p-3 space-y-3">
                             {questions.length === 0 ? (
-                                /* ── Blocs de réponse numérotés (aucune question parsée) ── */
-                                <div className="space-y-5">
-                                    {/* Contrôles add / remove */}
-                                    <div className="flex items-center justify-between">
-                                        <p className="text-sm font-bold text-gray-700">
-                                            Vos réponses
-                                            <span className="ml-1.5 text-xs font-normal text-gray-400">
-                                                — rédigez chaque réponse dans le bloc correspondant
-                                            </span>
-                                        </p>
-                                        <div className="flex items-center gap-1.5 shrink-0">
-                                            <button
-                                                onClick={() => setFreeAnswerCount(n => Math.max(1, n - 1))}
-                                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border text-xs font-bold text-gray-600 hover:bg-gray-100 transition-colors"
-                                                style={{ borderColor: "#e0e0e0" }}
-                                                title="Supprimer le dernier bloc"
-                                            >
-                                                <X className="h-3 w-3" />
-                                                Retirer
-                                            </button>
-                                            <span className="text-[10px] font-bold text-gray-400 px-1">
-                                                {freeAnswerCount} Q
-                                            </span>
-                                            <button
-                                                onClick={() => setFreeAnswerCount(n => n + 1)}
-                                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold text-white transition-colors"
-                                                style={{ backgroundColor: "#1a237e" }}
-                                                title="Ajouter un bloc de réponse"
-                                            >
-                                                <ChevronRight className="h-3 w-3" />
-                                                Ajouter
-                                            </button>
-                                        </div>
-                                    </div>
-
-                                    {/* Blocs numérotés */}
-                                    {Array.from({ length: freeAnswerCount }, (_, i) => {
-                                        const filled = !!(answers[`free_${i}`] && answers[`free_${i}`] !== "<p></p>");
-                                        return (
+                                /* ── PDF sans questions parsées : blocs numérotés ── */
+                                Array.from({ length: freeAnswerCount }, (_, i) => {
+                                    const filled = !!(answers[`free_${i}`] && answers[`free_${i}`] !== "<p></p>");
+                                    return (
+                                        <div
+                                            key={i}
+                                            className="rounded-xl overflow-hidden border transition-colors bg-white shadow-sm"
+                                            style={{ borderColor: filled ? "#a5d6a7" : "#e0e0e0" }}
+                                        >
+                                            {/* En-tête */}
                                             <div
-                                                key={i}
-                                                className="rounded-xl overflow-hidden shadow-sm border transition-colors"
-                                                style={{ borderColor: filled ? "#a5d6a7" : "#e0e0e0", backgroundColor: "#fff" }}
+                                                className="px-3 py-2 border-b flex items-center gap-2"
+                                                style={{ backgroundColor: filled ? "#e8f5e9" : "#f8f9fa", borderColor: filled ? "#a5d6a7" : "#eeeeee" }}
                                             >
-                                                {/* En-tête question */}
                                                 <div
-                                                    className="px-4 py-2.5 border-b flex items-center gap-3"
-                                                    style={{
-                                                        backgroundColor: filled ? "#e8f5e9" : "#f8f9fa",
-                                                        borderColor: filled ? "#a5d6a7" : "#eeeeee",
-                                                    }}
+                                                    className="h-5 w-5 rounded-full flex items-center justify-center text-[10px] font-black shrink-0 text-white"
+                                                    style={{ backgroundColor: filled ? "#2e7d32" : "#1a237e" }}
                                                 >
-                                                    <div
-                                                        className="h-6 w-6 rounded-full flex items-center justify-center text-[11px] font-black shrink-0"
-                                                        style={{
-                                                            backgroundColor: filled ? "#2e7d32" : "#1a237e",
-                                                            color: "#fff",
-                                                        }}
-                                                    >
-                                                        {i + 1}
-                                                    </div>
-                                                    <span className="text-xs font-black uppercase tracking-wide" style={{ color: filled ? "#2e7d32" : "#1a237e" }}>
-                                                        Question {i + 1}
+                                                    {i + 1}
+                                                </div>
+                                                <span className="text-xs font-black uppercase tracking-wide" style={{ color: filled ? "#2e7d32" : "#1a237e" }}>
+                                                    Question {i + 1}
+                                                </span>
+                                                {filled && (
+                                                    <span className="ml-auto flex items-center gap-1 text-[10px] font-bold text-emerald-700">
+                                                        <CheckCircle2 className="h-3 w-3" />Saisie
                                                     </span>
-                                                    {filled && (
-                                                        <span className="ml-auto flex items-center gap-1 text-[10px] font-bold" style={{ color: "#2e7d32" }}>
-                                                            <CheckCircle2 className="h-3.5 w-3.5" />
-                                                            Réponse saisie
-                                                        </span>
-                                                    )}
-                                                </div>
-                                                {/* Zone de réponse */}
-                                                <div className="p-4">
-                                                    <RichTextEditor
-                                                        value={answers[`free_${i}`] || ""}
-                                                        onChange={html => setAnswers(prev => ({ ...prev, [`free_${i}`]: html }))}
-                                                        placeholder={`Rédigez votre réponse à la question ${i + 1}…`}
-                                                        minHeight="130px"
-                                                    />
-                                                </div>
+                                                )}
                                             </div>
-                                        );
-                                    })}
-                                </div>
+                                            {/* Réponse juste en dessous */}
+                                            <div className="p-3">
+                                                <RichTextEditor
+                                                    value={answers[`free_${i}`] || ""}
+                                                    onChange={html => setAnswers(prev => ({ ...prev, [`free_${i}`]: html }))}
+                                                    placeholder={`Votre réponse à la question ${i + 1}…`}
+                                                    minHeight="120px"
+                                                />
+                                            </div>
+                                        </div>
+                                    );
+                                })
                             ) : (
-                                /* ── Questions parsées avec réponse en dessous ── */
-                                pageQuestions.map((q, idx) => {
-                                    const globalIdx = currentPage * QUESTIONS_PER_PAGE + idx + 1;
+                                /* ── Questions parsées : texte + réponse juste en dessous ── */
+                                questions.map((q, idx) => {
                                     const filled = !!(answers[q.id] && answers[q.id] !== "<p></p>");
                                     return (
                                         <div
                                             key={q.id}
-                                            className="rounded-xl overflow-hidden shadow-sm border transition-colors"
-                                            style={{ borderColor: filled ? "#a5d6a7" : "#e0e0e0", backgroundColor: "#fff" }}
+                                            className="rounded-xl overflow-hidden border transition-colors bg-white shadow-sm"
+                                            style={{ borderColor: filled ? "#a5d6a7" : "#e0e0e0" }}
                                         >
-                                            {/* En-tête question */}
+                                            {/* En-tête */}
                                             <div
-                                                className="px-4 py-2.5 border-b flex items-center gap-3"
-                                                style={{
-                                                    backgroundColor: filled ? "#e8f5e9" : "#f8f9fa",
-                                                    borderColor: filled ? "#a5d6a7" : "#eeeeee",
-                                                }}
+                                                className="px-3 py-2 border-b flex items-center gap-2"
+                                                style={{ backgroundColor: filled ? "#e8f5e9" : "#f8f9fa", borderColor: filled ? "#a5d6a7" : "#eeeeee" }}
                                             >
                                                 <div
-                                                    className="h-6 w-6 rounded-full flex items-center justify-center text-[11px] font-black shrink-0"
-                                                    style={{ backgroundColor: filled ? "#2e7d32" : "#1a237e", color: "#fff" }}
+                                                    className="h-5 w-5 rounded-full flex items-center justify-center text-[10px] font-black shrink-0 text-white"
+                                                    style={{ backgroundColor: filled ? "#2e7d32" : "#1a237e" }}
                                                 >
-                                                    {globalIdx}
+                                                    {idx + 1}
                                                 </div>
                                                 <span className="text-xs font-black uppercase tracking-wide" style={{ color: filled ? "#2e7d32" : "#1a237e" }}>
-                                                    Question {globalIdx}
+                                                    Question {idx + 1}
                                                 </span>
-                                                {q.part && <span className="text-[10px] text-gray-400 font-medium ml-1">{q.part}</span>}
+                                                {q.part && <span className="text-[10px] text-gray-400 ml-1">{q.part}</span>}
                                                 {q.type === "qcm" && (
-                                                    <span className="text-[9px] bg-purple-100 text-purple-700 font-bold px-2 py-0.5 rounded-full uppercase ml-1">QCM</span>
+                                                    <span className="text-[9px] bg-purple-100 text-purple-700 font-bold px-1.5 py-0.5 rounded-full uppercase ml-1">QCM</span>
                                                 )}
                                                 {filled && (
-                                                    <span className="ml-auto flex items-center gap-1 text-[10px] font-bold" style={{ color: "#2e7d32" }}>
-                                                        <CheckCircle2 className="h-3.5 w-3.5" />
-                                                        Réponse saisie
+                                                    <span className="ml-auto flex items-center gap-1 text-[10px] font-bold text-emerald-700">
+                                                        <CheckCircle2 className="h-3 w-3" />Saisie
                                                     </span>
                                                 )}
                                             </div>
                                             {/* Texte de la question */}
-                                            <div className="px-4 pt-3 pb-1">
+                                            <div className="px-3 pt-2.5 pb-2">
                                                 <p className="text-gray-900 font-medium text-sm leading-relaxed whitespace-pre-wrap">{q.text}</p>
                                             </div>
-                                            {/* Zone de réponse */}
-                                            <div className="p-4">
+                                            {/* Réponse juste en dessous */}
+                                            <div className="px-3 pb-3">
                                                 {q.type === "qcm" ? (
-                                                    <div className="space-y-2">
+                                                    <div className="space-y-1.5">
                                                         {q.options?.map((opt, i) => (
                                                             <label
                                                                 key={i}
-                                                                className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${answers[q.id] === opt ? "bg-[#e8eaf6] border-[#1a237e]" : "bg-gray-50 border-transparent hover:bg-gray-100"}`}
+                                                                className={`flex items-center gap-3 p-2.5 rounded-lg border cursor-pointer transition-colors ${answers[q.id] === opt ? "bg-[#e8eaf6] border-[#1a237e]" : "bg-gray-50 border-transparent hover:bg-gray-100"}`}
                                                             >
                                                                 <input
                                                                     type="radio"
                                                                     name={`q_${q.id}`}
-                                                                    className="mt-0.5"
                                                                     checked={answers[q.id] === opt}
                                                                     onChange={() => setAnswers(prev => ({ ...prev, [q.id]: opt }))}
                                                                 />
-                                                                <span className="text-sm font-medium text-gray-800">{opt}</span>
+                                                                <span className="text-sm text-gray-800">{opt}</span>
                                                             </label>
                                                         ))}
                                                     </div>
@@ -1334,8 +1297,8 @@ export default function CandidatExamenPage() {
                                                     <RichTextEditor
                                                         value={answers[q.id] || ""}
                                                         onChange={html => setAnswers(prev => ({ ...prev, [q.id]: html }))}
-                                                        placeholder="Rédigez votre réponse — texte, tableaux, listes…"
-                                                        minHeight="130px"
+                                                        placeholder="Votre réponse…"
+                                                        minHeight="120px"
                                                     />
                                                 )}
                                             </div>
@@ -1345,88 +1308,27 @@ export default function CandidatExamenPage() {
                             )}
                         </div>
 
-                        {/* Pagination bar */}
-                        {questions.length > QUESTIONS_PER_PAGE && (
-                            <div className="px-5 py-3 border-t flex items-center justify-between shrink-0" style={{ borderColor: "#e8eaf6", backgroundColor: "#f8f9fa" }}>
-                                <button
-                                    onClick={() => setCurrentPage(p => Math.max(0, p - 1))}
-                                    disabled={currentPage === 0}
-                                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-bold border border-gray-200 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-gray-100 transition-colors text-gray-700"
-                                >
-                                    <ChevronLeft className="h-4 w-4" />Précédent
-                                </button>
-
-                                <div className="flex items-center gap-1.5">
-                                    {Array.from({ length: totalPages }, (_, i) => (
-                                        <button
-                                            key={i}
-                                            onClick={() => setCurrentPage(i)}
-                                            className={`w-8 h-8 rounded-lg text-xs font-bold transition-colors ${currentPage === i ? "bg-[#1a237e] text-white" : "bg-white border border-gray-200 text-gray-600 hover:bg-[#e8eaf6]"}`}
-                                        >
-                                            {i + 1}
-                                        </button>
-                                    ))}
-                                </div>
-
-                                <button
-                                    onClick={() => setCurrentPage(p => Math.min(totalPages - 1, p + 1))}
-                                    disabled={isLastPage}
-                                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-bold border border-gray-200 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-gray-100 transition-colors text-gray-700"
-                                >
-                                    Suivant<ChevronRight className="h-4 w-4" />
-                                </button>
+                        {/* Barre progression + bouton soumettre (fixe en bas) */}
+                        <div className="shrink-0 border-t p-3 space-y-2.5" style={{ borderColor: "#c5cae9", backgroundColor: "#ffffff" }}>
+                            <div className="flex items-center justify-between text-xs">
+                                <span className="text-gray-500 font-medium">Progression</span>
+                                <span className="font-black text-[#1a237e]">{answeredCount} / {totalQCount} répondue{answeredCount !== 1 ? "s" : ""}</span>
                             </div>
-                        )}
-                    </div>
-
-                    {/* Right panel: progress + submit */}
-                    <div className="lg:w-64 flex flex-col gap-4 shrink-0">
-                        {/* Progress */}
-                        <div className="bg-white rounded-2xl shadow-sm border p-5" style={{ borderColor: "#c5cae9" }}>
-                            <h3 className="text-xs font-black uppercase tracking-wider text-[#1a237e] mb-3">Progression</h3>
-                            <>
-                                <div className="flex items-center justify-between mb-2">
-                                    <span className="text-xs text-gray-500">Réponses saisies</span>
-                                    <span className="font-black text-[#1a237e]">{answeredCount}/{totalQCount}</span>
-                                </div>
-                                <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
-                                    <div
-                                        className="h-full rounded-full transition-all"
-                                        style={{ width: `${totalQCount > 0 ? (answeredCount / totalQCount) * 100 : 0}%`, backgroundColor: "#2e7d32" }}
-                                    />
-                                </div>
-                                {questions.length > QUESTIONS_PER_PAGE && (
-                                    <div className="mt-3 grid gap-1" style={{ gridTemplateColumns: `repeat(${Math.min(totalPages, 5)}, 1fr)` }}>
-                                        {Array.from({ length: totalPages }, (_, i) => {
-                                            const start = i * QUESTIONS_PER_PAGE;
-                                            const pageAnswered = questions
-                                                .slice(start, start + QUESTIONS_PER_PAGE)
-                                                .every(q => answers[q.id] && answers[q.id] !== "<p></p>");
-                                            return (
-                                                <button key={i} onClick={() => setCurrentPage(i)} className={`h-6 rounded text-[10px] font-bold transition-colors ${currentPage === i ? "bg-[#1a237e] text-white" : pageAnswered ? "bg-emerald-100 text-emerald-700" : "bg-gray-100 text-gray-500"}`}>
-                                                    P{i + 1}
-                                                </button>
-                                            );
-                                        })}
-                                    </div>
-                                )}
-                            </>
-                        </div>
-
-                        {/* Submit */}
-                        <div className="bg-white rounded-2xl shadow-sm border p-5" style={{ borderColor: "#c5cae9" }}>
-                            <p className="text-xs text-gray-500 mb-4 leading-relaxed">
-                                Une fois soumise, votre copie ne pourra plus être modifiée. Vérifiez toutes vos réponses avant de valider.
-                            </p>
+                            <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
+                                <div
+                                    className="h-full rounded-full transition-all duration-300"
+                                    style={{ width: `${totalQCount > 0 ? (answeredCount / totalQCount) * 100 : 0}%`, backgroundColor: "#2e7d32" }}
+                                />
+                            </div>
                             <button
                                 onClick={() => setShowSubmitModal(true)}
                                 disabled={isSubmitting}
-                                className="w-full py-3 text-white rounded-xl font-black transition-all shadow-md flex items-center justify-center gap-2 disabled:opacity-50"
+                                className="w-full py-2.5 text-white rounded-xl font-black transition-all shadow-md flex items-center justify-center gap-2 disabled:opacity-50 text-sm"
                                 style={{ backgroundColor: "#1a237e" }}
                             >
                                 {isSubmitting
-                                    ? <><Loader2 className="h-4 w-4 animate-spin" />Envoi…</>
-                                    : <><Send className="h-4 w-4" />Soumettre</>
+                                    ? <><Loader2 className="h-4 w-4 animate-spin" />Envoi en cours…</>
+                                    : <><Send className="h-4 w-4" />Soumettre ma copie</>
                                 }
                             </button>
                         </div>
