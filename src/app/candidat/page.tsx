@@ -4,8 +4,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
-    CheckCircle2, Clock, Loader2, BookOpen,
-    Layers, PlusCircle, Award, ShieldCheck, X,
+    Loader2, BookOpen,
+    Layers, PlusCircle, Award, ShieldCheck, X, CheckCircle2,
     MonitorSmartphone, MapPin,
 } from "lucide-react";
 
@@ -165,7 +165,7 @@ function NouvelleFormationModal({
                         <div className="flex items-center gap-2">
                             <PlusCircle className="h-4 w-4 text-white/80" />
                             <span className="text-sm font-bold uppercase tracking-widest text-white">
-                                Nouvelle formation
+                                Nouvelle demande de certification
                             </span>
                         </div>
                         <button onClick={onClose} className="text-white/60 hover:text-white transition-colors">
@@ -353,10 +353,6 @@ export default function TableauDeBordPage() {
         );
     }
 
-    // ── Groupes de demandes ──────────────────────────────────────────────────
-    const validees  = dossiers.filter(d => d.status === "approved" || d.final_decision === "certified");
-    const enAttente = dossiers.filter(d => d.status !== "approved" && d.final_decision !== "certified");
-
     const displayName   = dossier.name  || "Candidat";
     const existingCerts = dossiers
         .map(d => d.answers?.["Certification souhaitée"])
@@ -370,12 +366,12 @@ export default function TableauDeBordPage() {
     return (
         <div className="space-y-8 py-4">
 
-            {/* ── En-tête avec bouton Nouvelle formation ── */}
+            {/* ── En-tête avec bouton Nouvelle demande de certification ── */}
             <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
                 <p className="text-xs font-bold uppercase tracking-[0.2em] text-gray-400 mb-1">
                     Tableau de bord
                 </p>
-                <div className="flex items-start justify-between gap-4">
+                <div className="flex items-start justify-between gap-4 flex-wrap">
                     <h1 className="text-3xl font-black leading-tight" style={{ color: "#1a237e" }}>
                         Bonjour,&nbsp;{displayName}&nbsp;👋
                     </h1>
@@ -385,8 +381,7 @@ export default function TableauDeBordPage() {
                         style={{ backgroundColor: "#1a237e", boxShadow: "0 6px 16px rgba(26,35,126,0.22)" }}
                     >
                         <PlusCircle className="h-4 w-4" />
-                        <span className="hidden sm:inline">Nouvelle formation</span>
-                        <span className="sm:hidden">Nouveau</span>
+                        Nouvelle demande de certification
                     </button>
                 </div>
             </motion.div>
@@ -396,12 +391,22 @@ export default function TableauDeBordPage() {
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.05 }}
-                className="space-y-4"
+                className="space-y-3"
             >
-                <h2 className="text-xs font-bold uppercase tracking-widest text-gray-500 flex items-center gap-2">
-                    <Layers className="h-4 w-4" style={{ color: "#1a237e" }} />
-                    Mes demandes
-                </h2>
+                <div className="flex items-center gap-2">
+                    <h2 className="text-xs font-bold uppercase tracking-widest text-gray-500 flex items-center gap-2">
+                        <Layers className="h-4 w-4" style={{ color: "#1a237e" }} />
+                        Mes demandes
+                    </h2>
+                    {dossiers.length > 0 && (
+                        <span
+                            className="text-[10px] font-black px-2 py-0.5 rounded-full text-white"
+                            style={{ backgroundColor: "#1a237e" }}
+                        >
+                            {dossiers.length}
+                        </span>
+                    )}
+                </div>
 
                 {dossiers.length === 0 ? (
                     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-10 text-center">
@@ -417,33 +422,11 @@ export default function TableauDeBordPage() {
                         </button>
                     </div>
                 ) : (
-                    <>
-                        {/* Validées */}
-                        {validees.length > 0 && (
-                            <div className="space-y-2">
-                                <h3 className="text-[11px] font-bold uppercase tracking-widest flex items-center gap-2" style={{ color: "#2e7d32" }}>
-                                    <CheckCircle2 className="h-3.5 w-3.5" />
-                                    Validées · {validees.length}
-                                </h3>
-                                {validees.map((d, i) => (
-                                    <DossierCard key={d._id} d={d} delay={i * 0.04} now={now} exams={exams} />
-                                ))}
-                            </div>
-                        )}
-
-                        {/* En attente */}
-                        {enAttente.length > 0 && (
-                            <div className="space-y-2">
-                                <h3 className="text-[11px] font-bold uppercase tracking-widest flex items-center gap-2" style={{ color: "#b45309" }}>
-                                    <Clock className="h-3.5 w-3.5" />
-                                    En attente · {enAttente.length}
-                                </h3>
-                                {enAttente.map((d, i) => (
-                                    <DossierCard key={d._id} d={d} delay={i * 0.04} now={now} exams={exams} />
-                                ))}
-                            </div>
-                        )}
-                    </>
+                    <div className="space-y-2">
+                        {dossiers.map((d, i) => (
+                            <DossierCard key={d._id} d={d} delay={i * 0.04} now={now} exams={exams} />
+                        ))}
+                    </div>
                 )}
             </motion.div>
 
