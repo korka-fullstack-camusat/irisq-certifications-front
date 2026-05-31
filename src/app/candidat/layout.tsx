@@ -3,7 +3,10 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LogOut, X, MonitorSmartphone, Home, Award, FileText, BookOpen } from "lucide-react";
+import {
+    LogOut, X, MonitorSmartphone,
+    Home, Award, FileText, BookOpen,
+} from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import Image from "next/image";
 import { CandidateProvider, useCandidate } from "@/lib/candidate-context";
@@ -29,36 +32,49 @@ export default function CandidateLayout({ children }: { children: React.ReactNod
     );
 }
 
-// ── Navigation items ──────────────────────────────────────────────────────
+// ── Navigation items ──────────────────────────────────────────────────────────
 const NAV_ITEMS = [
-    { href: "/candidat",               label: "Accueil",        icon: Home   },
-    { href: "/candidat/certifications",label: "Certifications", icon: Award  },
-    { href: "/candidat/documents",     label: "Documents",      icon: FileText },
-    { href: "/candidat/examen",        label: "Examen",         icon: BookOpen },
+    { href: "/candidat",                label: "Accueil",        icon: Home      },
+    { href: "/candidat/certifications", label: "Certifications", icon: Award     },
+    { href: "/candidat/documents",      label: "Documents",      icon: FileText  },
+    { href: "/candidat/examen",         label: "Examen",         icon: BookOpen  },
 ];
 
+// ── Shell ─────────────────────────────────────────────────────────────────────
 function Shell({ children }: { children: React.ReactNode }) {
     const { dossier, logout, examActive, sessionInvalidated, confirmSessionLogout } = useCandidate();
-    const pathname = usePathname();
+    const pathname  = usePathname();
     const [showLogoutModal, setShowLogoutModal] = useState(false);
 
-    // Examen déjà soumis ou certifié → on grise le lien "Examen" dans la nav
     const examDone =
         dossier?.exam_status === "submitted" ||
-        dossier?.exam_status === "graded" ||
+        dossier?.exam_status === "graded"    ||
         dossier?.final_decision === "certified";
 
     const initials    = (dossier?.name || dossier?.public_id || "??").substring(0, 2).toUpperCase();
     const displayName = dossier?.name || dossier?.public_id || "Candidat";
 
-    // Nav active : match exact pour "/" et prefix pour les autres
     const isActive = (href: string) =>
         href === "/candidat" ? pathname === "/candidat" : pathname.startsWith(href);
+
+    // ── Lock icon SVG ─────────────────────────────────────────────────────────
+    const LockBadge = () => (
+        <span
+            className="absolute -top-1 -right-1 h-3.5 w-3.5 rounded-full flex items-center justify-center"
+            style={{ backgroundColor: "#c62828" }}
+        >
+            <svg width="7" height="7" viewBox="0 0 10 10" fill="white">
+                <path d="M3 4V3a2 2 0 1 1 4 0v1h.5a.5.5 0 0 1 .5.5v4a.5.5 0 0 1-.5.5h-5a.5.5 0 0 1-.5-.5v-4A.5.5 0 0 1 2.5 4H3z" />
+            </svg>
+        </span>
+    );
 
     return (
         <div className={`flex min-h-screen font-sans${examActive ? " overflow-hidden" : ""}`} style={{ backgroundColor: "#f4f6f9" }}>
 
-            {/* ── Modal déconnexion ── */}
+            {/* ══════════════════════════════════════════
+                MODAL DÉCONNEXION
+            ══════════════════════════════════════════ */}
             <AnimatePresence>
                 {showLogoutModal && (
                     <>
@@ -90,14 +106,18 @@ function Shell({ children }: { children: React.ReactNode }) {
                                     </button>
                                 </div>
                                 <div className="px-6 py-6 text-center">
-                                    <div
-                                        className="h-14 w-14 rounded-full flex items-center justify-center text-sm font-black text-white mx-auto mb-4"
-                                        style={{ backgroundColor: "#2e7d32" }}
-                                    >
+                                    <div className="h-14 w-14 rounded-full flex items-center justify-center text-sm font-black text-white mx-auto mb-4" style={{ backgroundColor: "#2e7d32" }}>
                                         {initials}
                                     </div>
                                     <p className="font-bold text-gray-800 mb-1">{displayName}</p>
                                     <p className="text-gray-400 text-sm mb-6">Voulez-vous vraiment vous déconnecter ?</p>
+
+                                    <div className="flex items-center gap-3 mb-6">
+                                        <div className="flex-1 h-px bg-gray-100" />
+                                        <span className="w-2 h-2 rotate-45 inline-block" style={{ backgroundColor: "#c62828" }} />
+                                        <div className="flex-1 h-px bg-gray-100" />
+                                    </div>
+
                                     <div className="flex gap-3">
                                         <button
                                             onClick={() => setShowLogoutModal(false)}
@@ -121,7 +141,9 @@ function Shell({ children }: { children: React.ReactNode }) {
                 )}
             </AnimatePresence>
 
-            {/* ── Modal session invalidée ── */}
+            {/* ══════════════════════════════════════════
+                MODAL SESSION INVALIDÉE
+            ══════════════════════════════════════════ */}
             {sessionInvalidated && (
                 <>
                     <motion.div
@@ -164,90 +186,171 @@ function Shell({ children }: { children: React.ReactNode }) {
                 </>
             )}
 
-            {/* ── Barre du haut ── */}
-            <div
-                className={`fixed top-0 left-0 right-0 h-16 z-40 flex items-center justify-between px-6 shadow-sm transition-transform duration-300 ${examActive ? "-translate-y-full pointer-events-none" : "translate-y-0"}`}
-                style={{ backgroundColor: "#ffffff", borderBottom: "3px solid #2e7d32" }}
+            {/* ══════════════════════════════════════════
+                SIDEBAR — desktop
+            ══════════════════════════════════════════ */}
+            <aside
+                className={`fixed top-0 left-0 h-screen w-72 hidden md:flex flex-col z-20 shadow-lg transition-transform duration-300 ${examActive ? "-translate-x-full" : "translate-x-0"}`}
+                style={{ backgroundColor: "#ffffff", borderRight: "2px solid #e8eaf6" }}
             >
-                {/* Logo */}
-                <Link href="/candidat" className="flex items-center gap-3 group">
-                    <div className="w-9 h-9 flex items-center justify-center drop-shadow-sm group-hover:scale-105 transition-transform">
-                        <Image src="/logo.png" alt="IRISQ" width={36} height={36} className="object-contain w-full h-full" priority />
-                    </div>
-                    <span className="text-xs font-extrabold tracking-[0.18em] uppercase hidden sm:block" style={{ color: "#1a237e" }}>
-                        Espace candidat
-                    </span>
-                </Link>
-
-                {/* Avatar + déconnexion */}
-                <button
-                    onClick={() => setShowLogoutModal(true)}
-                    className="flex items-center gap-2.5 px-3 py-2 rounded-xl transition-colors group hover:bg-gray-50"
-                    title="Se déconnecter"
+                {/* Logo + titre */}
+                <div
+                    className="flex flex-col items-center justify-center gap-2 py-6 px-4 shrink-0"
+                    style={{ borderBottom: "3px solid #2e7d32" }}
                 >
-                    <div
-                        className="h-8 w-8 rounded-full flex items-center justify-center text-xs font-black text-white shrink-0"
-                        style={{ backgroundColor: "#1a237e" }}
+                    <Link href="/candidat" className="flex flex-col items-center gap-2 group">
+                        <div className="w-20 h-20 flex items-center justify-center drop-shadow-md group-hover:scale-105 transition-transform">
+                            <Image
+                                src="/logo.png"
+                                alt="IRISQ Logo"
+                                width={80}
+                                height={80}
+                                className="object-contain w-full h-full"
+                                priority
+                            />
+                        </div>
+                        <span className="text-[10px] font-extrabold tracking-[0.2em] uppercase" style={{ color: "#1a237e" }}>
+                            Espace candidat
+                        </span>
+                    </Link>
+                </div>
+
+                {/* Navigation */}
+                <div className="flex-1 overflow-y-auto p-4">
+                    <nav className="space-y-0.5">
+                        {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
+                            const active       = isActive(href);
+                            const isExamLocked = href === "/candidat/examen" && examDone;
+                            return (
+                                <Link
+                                    key={href}
+                                    href={href}
+                                    title={isExamLocked ? "Examen déjà soumis — accès bloqué" : undefined}
+                                    className="relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all"
+                                    style={{
+                                        color:           isExamLocked ? "#d1d5db" : active ? "#ffffff" : "#555",
+                                        backgroundColor: active ? "#1a237e" : "transparent",
+                                    }}
+                                    onMouseEnter={e => {
+                                        if (!active && !isExamLocked) (e.currentTarget as HTMLElement).style.backgroundColor = "#e8eaf6";
+                                    }}
+                                    onMouseLeave={e => {
+                                        if (!active) (e.currentTarget as HTMLElement).style.backgroundColor = "transparent";
+                                    }}
+                                >
+                                    {active && (
+                                        <motion.span
+                                            layoutId="candidate-sidebar-diamond"
+                                            className="absolute -left-1 w-2.5 h-2.5 rotate-45"
+                                            style={{ backgroundColor: "#c62828" }}
+                                            initial={{ opacity: 0 }}
+                                            animate={{ opacity: 1 }}
+                                            transition={{ duration: 0.2 }}
+                                        />
+                                    )}
+                                    <div className="relative shrink-0">
+                                        <Icon
+                                            className="h-5 w-5"
+                                            style={{ color: isExamLocked ? "#d1d5db" : active ? "#ffffff" : "#2e7d32" }}
+                                        />
+                                        {isExamLocked && <LockBadge />}
+                                    </div>
+                                    {label}
+                                </Link>
+                            );
+                        })}
+                    </nav>
+                </div>
+
+                {/* Profil candidat — cliquable pour se déconnecter */}
+                <div className="p-4 shrink-0" style={{ borderTop: "2px solid #e8eaf6" }}>
+                    <button
+                        onClick={() => setShowLogoutModal(true)}
+                        className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all text-left group"
+                        onMouseEnter={e => (e.currentTarget as HTMLElement).style.backgroundColor = "#f4f6f9"}
+                        onMouseLeave={e => (e.currentTarget as HTMLElement).style.backgroundColor = "transparent"}
+                        title="Cliquer pour se déconnecter"
+                    >
+                        <div
+                            className="h-9 w-9 rounded-full flex items-center justify-center text-xs font-black text-white shrink-0 group-hover:ring-2 transition-all"
+                            style={{ backgroundColor: "#2e7d32" }}
+                        >
+                            {initials}
+                        </div>
+                        <div className="flex flex-col min-w-0">
+                            <span className="text-sm font-bold text-gray-800 truncate">{displayName}</span>
+                            <span className="text-xs text-gray-400">Candidat IRISQ</span>
+                        </div>
+                        <LogOut className="h-4 w-4 ml-auto opacity-0 group-hover:opacity-100 transition-opacity shrink-0" style={{ color: "#c62828" }} />
+                    </button>
+                </div>
+            </aside>
+
+            {/* ══════════════════════════════════════════
+                MAIN CONTENT
+            ══════════════════════════════════════════ */}
+            <main className={`flex-1 flex flex-col min-w-0 transition-all duration-300 ${examActive ? "" : "md:pl-72"}`}>
+
+                {/* Header mobile */}
+                <header
+                    className={`fixed top-0 left-0 right-0 h-16 flex items-center justify-between px-4 md:hidden z-40 shadow-sm transition-transform duration-300 ${examActive ? "-translate-y-full pointer-events-none" : "translate-y-0"}`}
+                    style={{ backgroundColor: "#ffffff", borderBottom: "3px solid #2e7d32" }}
+                >
+                    <Link href="/candidat" className="flex items-center gap-2">
+                        <Image src="/logo.png" alt="IRISQ" width={36} height={36} className="object-contain" />
+                        <span className="text-xs font-extrabold tracking-widest uppercase" style={{ color: "#1a237e" }}>
+                            Espace candidat
+                        </span>
+                    </Link>
+                    <button
+                        onClick={() => setShowLogoutModal(true)}
+                        className="h-8 w-8 rounded-full flex items-center justify-center text-xs font-black text-white"
+                        style={{ backgroundColor: "#2e7d32" }}
                     >
                         {initials}
-                    </div>
-                    <span className="text-sm font-semibold text-gray-700 hidden sm:block">{displayName}</span>
-                    <LogOut className="h-4 w-4 text-gray-400 group-hover:text-red-500 transition-colors" />
-                </button>
-            </div>
+                    </button>
+                </header>
 
-            {/* ── Contenu ──
-                Pendant l'examen (examActive=true) la page examen se monte en
-                fixed inset-0 z-[200] par-dessus tout — le contenu normal reste
-                monté mais invisible pour ne pas interférer.
-            ── */}
-            <main className="flex-1 pt-16 pb-20">
-                <div className={`w-full max-w-2xl mx-auto px-4 py-10 transition-opacity duration-300 ${examActive ? "opacity-0 pointer-events-none" : "opacity-100"}`}>
-                    {children}
+                {/* Contenu — masqué pendant l'examen (la page exam monte en fixed z-[200]) */}
+                <div className={`flex-1 w-full pt-20 md:pt-8 p-4 md:p-8 transition-opacity duration-300 ${examActive ? "opacity-0 pointer-events-none" : "opacity-100"}`}>
+                    <div className="max-w-4xl mx-auto pb-20">
+                        {children}
+                    </div>
                 </div>
             </main>
 
-            {/* ── Barre de navigation bas ── */}
+            {/* ══════════════════════════════════════════
+                BOTTOM NAV — mobile
+            ══════════════════════════════════════════ */}
             <nav
-                className={`fixed bottom-0 left-0 right-0 z-40 flex items-center justify-around border-t transition-transform duration-300 ${examActive ? "translate-y-full pointer-events-none" : "translate-y-0"}`}
-                style={{ backgroundColor: "#ffffff", borderColor: "#e0e0e0", height: "64px" }}
+                className={`md:hidden fixed bottom-0 left-0 right-0 z-40 flex items-center justify-around px-2 transition-transform duration-300 ${examActive ? "translate-y-full pointer-events-none" : "translate-y-0"}`}
+                style={{ backgroundColor: "#ffffff", borderTop: "2px solid #e8eaf6", height: "64px" }}
             >
                 {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
-                    const active = isActive(href);
+                    const active       = isActive(href);
                     const isExamLocked = href === "/candidat/examen" && examDone;
                     return (
                         <Link
                             key={href}
                             href={href}
-                            className="flex flex-col items-center gap-0.5 px-4 py-2 rounded-xl transition-colors group"
+                            className="flex flex-col items-center gap-1 p-3 transition-colors relative shrink-0"
+                            style={{ color: isExamLocked ? "#d1d5db" : active ? "#1a237e" : "#9ca3af" }}
                             title={isExamLocked ? "Examen déjà soumis — accès bloqué" : undefined}
                         >
-                            <div
-                                className="h-8 w-8 flex items-center justify-center rounded-xl transition-colors relative"
-                                style={{ backgroundColor: active ? "#e8eaf6" : "transparent" }}
-                            >
-                                <Icon
-                                    className="h-4.5 w-4.5 transition-colors"
-                                    style={{ color: isExamLocked ? "#d1d5db" : active ? "#1a237e" : "#9e9e9e" }}
-                                    size={18}
+                            {active && !isExamLocked && (
+                                <motion.div
+                                    layoutId="candidate-mobile-nav-active"
+                                    className="absolute -top-[2px] left-1/2 -translate-x-1/2 w-6 h-1 rounded-b-full"
+                                    style={{ backgroundColor: "#2e7d32" }}
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: 1 }}
                                 />
-                                {isExamLocked && (
-                                    <span
-                                        className="absolute -top-1 -right-1 h-3.5 w-3.5 rounded-full flex items-center justify-center"
-                                        style={{ backgroundColor: "#c62828" }}
-                                    >
-                                        <svg width="7" height="7" viewBox="0 0 10 10" fill="white">
-                                            <path d="M3 4V3a2 2 0 1 1 4 0v1h.5a.5.5 0 0 1 .5.5v4a.5.5 0 0 1-.5.5h-5a.5.5 0 0 1-.5-.5v-4A.5.5 0 0 1 2.5 4H3z"/>
-                                        </svg>
-                                    </span>
-                                )}
+                            )}
+                            <div className="relative">
+                                <Icon className="h-5 w-5" />
+                                {isExamLocked && <LockBadge />}
                             </div>
-                            <span
-                                className="text-[10px] font-bold uppercase tracking-wide transition-colors"
-                                style={{ color: isExamLocked ? "#d1d5db" : active ? "#1a237e" : "#9e9e9e" }}
-                            >
-                                {label}
-                            </span>
+                            <span className="text-[10px] font-bold text-center leading-tight">{label}</span>
                         </Link>
                     );
                 })}
