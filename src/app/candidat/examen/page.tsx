@@ -10,17 +10,9 @@ import {
     ChevronRight, Send, X, Trophy,
 } from "lucide-react";
 import { useCandidate } from "@/lib/candidate-context";
-import { API_URL, fetchCandidateExam, fetchCandidateExams, uploadFiles, submitExamWithAntiCheat, type CandidateExam, type CandidateDossier } from "@/lib/api";
+import { fetchCandidateExam, fetchCandidateExams, reparseExam, uploadFiles, submitExamWithAntiCheat, type CandidateExam, type CandidateDossier } from "@/lib/api";
 import RichTextEditor from "@/components/RichTextEditor";
 
-/** Résout une URL de document stockée par le backend (chemin relatif ou absolu). */
-function resolveDocUrl(raw: string | undefined | null): string | undefined {
-    if (!raw) return undefined;
-    if (raw.startsWith("http://") || raw.startsWith("https://")) return raw;
-    // Chemin relatif /api/files/... → préfixer l'origine du backend
-    const backendBase = API_URL.replace(/\/api\/?$/, "");
-    return `${backendBase}${raw.startsWith("/") ? "" : "/"}${raw}`;
-}
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const EXAM_SESSION_KEY = "irisq_exam_active";
@@ -112,6 +104,8 @@ export default function CandidatExamenPage() {
     const [currentPage, setCurrentPage] = useState(0);
     const [showSubmitModal, setShowSubmitModal] = useState(false);
     const [showExpiredModal, setShowExpiredModal] = useState(false);
+    // Re-parsing automatique si exam_content_html est vide (document non converti)
+    const [isReparsing, setIsReparsing] = useState(false);
 
     // ── Blocage par rechargement désactivé ─────────────────────────────────
     // Le blocage anti-rechargement est temporairement désactivé pour permettre
@@ -127,6 +121,21 @@ export default function CandidatExamenPage() {
         setExamActive(phase === "exam");
         return () => setExamActive(false);
     }, [phase, setExamActive]);
+
+    // ── Re-parse automatique si le contenu HTML du sujet est vide ─────────
+    // Déclenché dès que la phase "exam" démarre et que exam_content_html est absent.
+    // Permet d'afficher le sujet sans iframe pour les examens créés avant le parseur.
+    useEffect(() => {
+        if (phase !== "exam" || !exam || exam.exam_content_html || !exam._id) return;
+        setIsReparsing(true);
+        reparseExam(exam._id)
+            .then(res => {
+                if (res.exam) setExam(res.exam);
+            })
+            .catch(() => { /* silencieux — le candidat verra juste un sujet vide */ })
+            .finally(() => setIsReparsing(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [phase, exam?._id]);
 
     // ── Auto-arrêt caméra + plein écran si la copie est déjà soumise ───────
     // Se déclenche si exam_status passe à "submitted"/"graded" pendant l'examen
@@ -958,8 +967,6 @@ export default function CandidatExamenPage() {
     }
 
     // ── EXAM phase (plein écran complet, couvre le sidebar) ──────────────────
-    // Résoudre l'URL du document (peut être un chemin relatif /api/files/...)
-    const documentFullUrl = resolveDocUrl(exam.document_url);
     const questions = exam.parsed_questions || [];
     const totalPages = questions.length > 0 ? Math.ceil(questions.length / QUESTIONS_PER_PAGE) : 1;
     const pageQuestions = questions.slice(currentPage * QUESTIONS_PER_PAGE, (currentPage + 1) * QUESTIONS_PER_PAGE);
@@ -1080,58 +1087,41 @@ export default function CandidatExamenPage() {
                             )}
                         </div>
 
-                        {/* ── Sujet du document — toujours affiché en référence ── */}
-                        {(exam.exam_content_html || documentFullUrl) && (
-                            <div className="shrink-0 border-b" style={{ borderColor: "#e8eaf6" }}>
-                                {exam.exam_content_html ? (
-                                    /* HTML converti depuis DOCX/TXT/PDF — fidèle au document original */
-                                    <div>
-                                        <div
-                                            className="overflow-y-auto px-5 py-4"
-                                            style={{ maxHeight: questions.length > 0 ? "360px" : "520px", backgroundColor: "#fafafa" }}
-                                            dangerouslySetInnerHTML={{ __html: exam.exam_content_html }}
-                                        />
-                                        {/* Bouton d'accès au fichier original en cas de doute */}
-                                        {documentFullUrl && (
-                                            <div className="px-5 pb-3 flex items-center gap-3">
-                                                <a
-                                                    href={documentFullUrl}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border transition-colors hover:bg-gray-50"
-                                                    style={{ borderColor: "#c5cae9", color: "#1a237e" }}
-                                                >
-                                                    <FileText className="h-3.5 w-3.5" />
-                                                    Télécharger le sujet original
-                                                </a>
-                                            </div>
-                                        )}
-                                    </div>
-                                ) : (
-                                    /* Fallback : iframe pour les PDF (rendu natif du navigateur) */
-                                    <div className="flex flex-col gap-2 p-4">
-                                        <div className="w-full rounded-xl border border-gray-200 overflow-hidden" style={{ height: "420px" }}>
-                                            <iframe
-                                                src={documentFullUrl ?? ""}
-                                                title="Sujet d'examen"
-                                                className="w-full h-full"
-                                                style={{ border: "none" }}
-                                            />
-                                        </div>
-                                        <a
-                                            href={documentFullUrl ?? "#"}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="self-start inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border transition-colors hover:bg-gray-50"
-                                            style={{ borderColor: "#c5cae9", color: "#1a237e" }}
-                                        >
-                                            <FileText className="h-3.5 w-3.5" />
-                                            Ouvrir le sujet dans un nouvel onglet ↗
-                                        </a>
-                                    </div>
-                                )}
-                            </div>
-                        )}
+                        {/* ── Sujet d'examen — affiché en HTML, jamais de téléchargement ── */}
+                        <div className="shrink-0 border-b" style={{ borderColor: "#e8eaf6" }}>
+                            {isReparsing ? (
+                                /* Conversion du document en cours */
+                                <div className="flex items-center justify-center gap-3 py-10 text-sm text-gray-400"
+                                    style={{ backgroundColor: "#fafafa" }}>
+                                    <Loader2 className="h-5 w-5 animate-spin" style={{ color: "#1a237e" }} />
+                                    <span>Chargement du sujet d&apos;examen…</span>
+                                </div>
+                            ) : exam.exam_content_html ? (
+                                /* Contenu HTML converti depuis le document (DOCX / PDF / TXT) */
+                                <div
+                                    className="overflow-y-auto px-5 py-4 exam-subject"
+                                    style={{
+                                        maxHeight: questions.length > 0 ? "380px" : "560px",
+                                        backgroundColor: "#fafafa",
+                                        fontSize: "0.875rem",
+                                        lineHeight: "1.7",
+                                    }}
+                                    dangerouslySetInnerHTML={{ __html: exam.exam_content_html }}
+                                />
+                            ) : (
+                                /* Document non converti — message explicatif */
+                                <div className="flex flex-col items-center justify-center gap-3 py-10 text-center px-6"
+                                    style={{ backgroundColor: "#fafafa" }}>
+                                    <FileText className="h-8 w-8 text-gray-300" />
+                                    <p className="text-sm font-semibold text-gray-500">
+                                        Le sujet n&apos;a pas pu être chargé.
+                                    </p>
+                                    <p className="text-xs text-gray-400 max-w-xs">
+                                        Contactez le responsable IRISQ pour qu&apos;il régénère le contenu du sujet depuis l&apos;interface administrateur.
+                                    </p>
+                                </div>
+                            )}
+                        </div>
 
                         {/* Questions list (paginated) ou zone de réponse libre */}
                         <div className="flex-1 overflow-y-auto p-5 space-y-6">

@@ -453,7 +453,7 @@ export async function publishExam(id: string) {
     return res.json();
 }
 
-export async function reparseExam(id: string): Promise<{ message: string; exam_content_html_length: number; parsed_questions_count: number }> {
+export async function reparseExam(id: string): Promise<{ message: string; exam_content_html_length: number; parsed_questions_count: number; exam: CandidateExam }> {
     const res = await apiFetch(url(`exams/${id}/reparse`), { method: "POST", redirect: "follow" });
     if (!res.ok) {
         const err = await res.json().catch(() => ({}));
