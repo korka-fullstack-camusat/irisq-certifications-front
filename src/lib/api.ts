@@ -1040,6 +1040,16 @@ export async function fetchCandidateExams(): Promise<CandidateExam[]> {
     return res.json();
 }
 
+/**
+ * Re-parse le document de l'examen si exam_content_html est vide.
+ * Accessible aux candidats (pas besoin du rôle ÉVALUATEUR).
+ */
+export async function ensureExamContent(examId: string): Promise<CandidateExam | null> {
+    const res = await candidateFetch(url(`candidate/exam/${examId}/ensure-content`), { method: "POST" });
+    if (!res.ok) return null;
+    return res.json();
+}
+
 // ──────────────────────────────────────────────────────────────
 // Admin documents (documents officiels partagés avec les candidats)
 // ──────────────────────────────────────────────────────────────

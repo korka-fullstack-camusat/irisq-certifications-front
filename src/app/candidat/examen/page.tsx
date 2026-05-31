@@ -10,7 +10,7 @@ import {
     ChevronRight, Send, X, Trophy,
 } from "lucide-react";
 import { useCandidate } from "@/lib/candidate-context";
-import { fetchCandidateExam, fetchCandidateExams, reparseExam, uploadFiles, submitExamWithAntiCheat, type CandidateExam, type CandidateDossier } from "@/lib/api";
+import { fetchCandidateExam, fetchCandidateExams, ensureExamContent, uploadFiles, submitExamWithAntiCheat, type CandidateExam, type CandidateDossier } from "@/lib/api";
 import RichTextEditor from "@/components/RichTextEditor";
 
 
@@ -122,17 +122,15 @@ export default function CandidatExamenPage() {
         return () => setExamActive(false);
     }, [phase, setExamActive]);
 
-    // ── Re-parse automatique si le contenu HTML du sujet est vide ─────────
-    // Déclenché dès que la phase "exam" démarre et que exam_content_html est absent.
-    // Permet d'afficher le sujet sans iframe pour les examens créés avant le parseur.
+    // ── Génération automatique du contenu HTML si absent ──────────────────
+    // Déclenché dès que la phase "exam" démarre et que exam_content_html est vide.
+    // Utilise l'endpoint candidat /candidate/exam/{id}/ensure-content (pas de 401).
     useEffect(() => {
         if (phase !== "exam" || !exam || exam.exam_content_html || !exam._id) return;
         setIsReparsing(true);
-        reparseExam(exam._id)
-            .then(res => {
-                if (res.exam) setExam(res.exam);
-            })
-            .catch(() => { /* silencieux — le candidat verra juste un sujet vide */ })
+        ensureExamContent(exam._id)
+            .then(updated => { if (updated) setExam(updated); })
+            .catch(() => { /* silencieux — message d'erreur affiché dans le sujet */ })
             .finally(() => setIsReparsing(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [phase, exam?._id]);

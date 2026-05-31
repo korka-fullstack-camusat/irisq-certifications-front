@@ -2,7 +2,7 @@
 
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
-import { Underline } from "@tiptap/extension-underline";
+import Underline from "@tiptap/extension-underline";
 import { TextAlign } from "@tiptap/extension-text-align";
 import { Table } from "@tiptap/extension-table";
 import { TableRow } from "@tiptap/extension-table-row";
@@ -60,7 +60,9 @@ export default function RichTextEditor({
     const editor = useEditor({
         immediatelyRender: false,
         extensions: [
-            StarterKit.configure({ codeBlock: false }),
+            // StarterKit v3 inclut Underline — on le désactive ici et on l'ajoute
+            // manuellement ci-dessous pour éviter le warning "Duplicate extension"
+            StarterKit.configure({ codeBlock: false, underline: false }),
             Underline,
             TextAlign.configure({ types: ["heading", "paragraph"] }),
             Table.configure({ resizable: false }),
