@@ -126,9 +126,6 @@ export default function CandidatExamenPage() {
     const [showExpiredModal, setShowExpiredModal] = useState(false);
     // Re-parsing automatique si exam_content_html est vide (document non converti)
     const [isReparsing, setIsReparsing] = useState(false);
-    // Fallback Blob URL pour afficher le PDF en inline (cas PDF scanné sans texte extractible)
-    const [docBlobUrl, setDocBlobUrl] = useState<string | null>(null);
-    const [docBlobLoading, setDocBlobLoading] = useState(false);
 
     // ── Blocage par rechargement désactivé ─────────────────────────────────
     // Le blocage anti-rechargement est temporairement désactivé pour permettre
@@ -146,70 +143,34 @@ export default function CandidatExamenPage() {
     }, [phase, setExamActive]);
 
     // ── Génération automatique du contenu HTML si absent ──────────────────
-    // Déclenché dès que la phase "exam" démarre et que exam_content_html est vide.
-    // Utilise l'endpoint candidat /candidate/exam/{id}/ensure-content (pas de 401).
+    // Déclenché dès que la phase "exam" démarre et que exam_content_html est vide/whitespace.
+    // - Pour un DOCX : le re-parse produit un HTML riche → on affiche un spinner pendant l'attente.
+    // - Pour un PDF  : l'iframe affiche le fichier immédiatement pendant que le re-parse tourne
+    //                  en arrière-plan ; si le PDF contient du texte sélectionnable, le résultat
+    //                  HTML remplacera l'iframe à la prochaine render.
     useEffect(() => {
-        // Déclencher le re-parse si exam_content_html est absent OU whitespace-only
         if (phase !== "exam" || !exam || hasVisibleContent(exam.exam_content_html) || !exam._id) return;
-        setIsReparsing(true);
-        ensureExamContent(exam._id)
-            .then(updated => { if (updated) setExam(updated); })
-            .catch(() => { /* silencieux — message d'erreur affiché dans le sujet */ })
-            .finally(() => setIsReparsing(false));
+
+        // Détecter le format via le paramètre ?n= de document_url
+        const nParam = (exam.document_url || "").split("?n=")[1] || "";
+        const name   = decodeURIComponent(nParam).toLowerCase();
+        const isDocx = name.endsWith(".docx") || name.endsWith(".doc");
+
+        if (isDocx) {
+            // DOCX → afficher le spinner le temps de la conversion HTML
+            setIsReparsing(true);
+            ensureExamContent(exam._id)
+                .then(updated => { if (updated) setExam(updated); })
+                .catch(() => {})
+                .finally(() => setIsReparsing(false));
+        } else {
+            // PDF / autre → l'iframe affiche le fichier directement ; re-parse en arrière-plan
+            ensureExamContent(exam._id)
+                .then(updated => { if (updated) setExam(updated); })
+                .catch(() => {});
+        }
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [phase, exam?._id]);
-
-    // ── Fallback Blob URL — charge le document PDF en mémoire pour affichage inline ──
-    // Déclenché quand : phase="exam" ET le reparse est terminé ET exam_content_html
-    // est toujours vide (PDF scanné sans texte extractible) ET document_url existe.
-    // Technique : on télécharge le fichier avec le JWT candidat, on crée un Blob URL
-    // same-origin → le navigateur l'affiche dans un <iframe> sans déclencher de DL.
-    useEffect(() => {
-        if (
-            phase !== "exam" ||
-            isReparsing ||
-            hasVisibleContent(exam?.exam_content_html) ||   // ignore HTML whitespace-only (PDF scanné)
-            !exam?.document_url ||
-            docBlobUrl
-        ) return;
-
-        const resolvedUrl = resolveDocUrl(exam.document_url);
-        if (!resolvedUrl) return;
-
-        let cancelled = false;
-        setDocBlobLoading(true);
-
-        const token =
-            typeof window !== "undefined"
-                ? localStorage.getItem("candidate_token")
-                : null;
-
-        fetch(resolvedUrl, {
-            headers: token ? { Authorization: `Bearer ${token}` } : {},
-        })
-            .then(res => {
-                if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                return res.blob();
-            })
-            .then(blob => {
-                if (cancelled) return;
-                const objectUrl = URL.createObjectURL(blob);
-                setDocBlobUrl(objectUrl);
-            })
-            .catch(() => { /* silencieux — le message d'erreur s'affiche en fallback */ })
-            .finally(() => { if (!cancelled) setDocBlobLoading(false); });
-
-        return () => { cancelled = true; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [phase, isReparsing, exam?.exam_content_html, exam?.document_url]);
-
-    // ── Nettoyage du Blob URL à la destruction du composant ───────────────
-    useEffect(() => {
-        return () => {
-            if (docBlobUrl) URL.revokeObjectURL(docBlobUrl);
-        };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [docBlobUrl]);
 
     // ── Auto-arrêt caméra + plein écran si la copie est déjà soumise ───────
     // Se déclenche si exam_status passe à "submitted"/"graded" pendant l'examen
@@ -1161,17 +1122,23 @@ export default function CandidatExamenPage() {
                             )}
                         </div>
 
-                        {/* ── Sujet d'examen — HTML prioritaire, sinon PDF inline via Blob URL ── */}
+                        {/* ── Sujet d'examen ────────────────────────────────────────────────────
+                             Priorité 1 : HTML extrait (DOCX / PDF texte) → rendu riche
+                             Priorité 2 : URL directe du fichier dans une iframe
+                                          (le backend envoie Content-Disposition: inline →
+                                           le navigateur affiche le PDF sans télécharger)
+                             Priorité 3 : Message d'erreur si aucune ressource disponible
+                        ─────────────────────────────────────────────────────────────────── */}
                         <div className="shrink-0 border-b" style={{ borderColor: "#e8eaf6" }}>
-                            {isReparsing || docBlobLoading ? (
-                                /* Chargement en cours (reparse OU téléchargement blob) */
+                            {isReparsing ? (
+                                /* Conversion du document en cours */
                                 <div className="flex items-center justify-center gap-3 py-10 text-sm text-gray-400"
                                     style={{ backgroundColor: "#fafafa" }}>
                                     <Loader2 className="h-5 w-5 animate-spin" style={{ color: "#1a237e" }} />
                                     <span>Chargement du sujet d&apos;examen…</span>
                                 </div>
                             ) : hasVisibleContent(exam.exam_content_html) ? (
-                                /* Contenu HTML converti depuis le document (DOCX / PDF texte / TXT) */
+                                /* Contenu HTML converti (DOCX / PDF texte / TXT) */
                                 <div
                                     className="overflow-y-auto px-5 py-4 exam-subject"
                                     style={{
@@ -1182,10 +1149,16 @@ export default function CandidatExamenPage() {
                                     }}
                                     dangerouslySetInnerHTML={{ __html: exam.exam_content_html! }}
                                 />
-                            ) : docBlobUrl ? (
-                                /* PDF scanné (pas de texte extractible) — affiché via Blob URL inline */
+                            ) : exam.document_url ? (
+                                /* PDF (scanné ou texte) — affiché nativement par le navigateur.
+                                   L'URL absolue est obligatoire (resolveDocUrl) sinon le navigateur
+                                   chercherait le fichier sur le frontend (irisq-certifications.online)
+                                   au lieu du backend (irisq-certifications-api.onrender.com).
+                                   L'iframe n'est PAS soumise au CORS — elle charge l'URL comme
+                                   une navigation normale. Le backend répond avec
+                                   Content-Disposition: inline → affichage inline garanti. */}
                                 <iframe
-                                    src={docBlobUrl}
+                                    src={resolveDocUrl(exam.document_url)}
                                     title="Sujet d'examen"
                                     className="w-full border-0 block"
                                     style={{
@@ -1194,15 +1167,15 @@ export default function CandidatExamenPage() {
                                     }}
                                 />
                             ) : (
-                                /* Aucun contenu disponible — message d'erreur */
+                                /* Aucun document attaché à cet examen */
                                 <div className="flex flex-col items-center justify-center gap-3 py-10 text-center px-6"
                                     style={{ backgroundColor: "#fafafa" }}>
                                     <FileText className="h-8 w-8 text-gray-300" />
                                     <p className="text-sm font-semibold text-gray-500">
-                                        Le sujet n&apos;a pas pu être chargé.
+                                        Aucun sujet n&apos;a été joint à cet examen.
                                     </p>
                                     <p className="text-xs text-gray-400 max-w-xs">
-                                        Contactez le responsable IRISQ pour qu&apos;il régénère le contenu du sujet depuis l&apos;interface administrateur.
+                                        Contactez le responsable IRISQ — le document d&apos;examen n&apos;a pas encore été téléversé.
                                     </p>
                                 </div>
                             )}
