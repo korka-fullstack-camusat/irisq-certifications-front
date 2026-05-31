@@ -448,14 +448,22 @@ export default function TableauDeBordPage() {
     const [now,       setNow]       = useState(Date.now());
     const [showModal, setShowModal] = useState(false);
 
+    // Charger les infos d'examen seulement si au moins un dossier est validé.
+    // Pour les candidats en attente, ces données ne sont ni affichées ni utiles.
+    const hasApprovedDossier = dossiers.some(
+        d => d.status === "approved" || !!d.exam_token
+    );
+
     useEffect(() => {
+        if (!hasApprovedDossier) return; // pas encore validé → inutile de fetcher
         fetchCandidateExams().then(setExams).catch(() => {});
         const id = setInterval(
             () => fetchCandidateExams().then(setExams).catch(() => {}),
             30_000,
         );
         return () => clearInterval(id);
-    }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [hasApprovedDossier]);
 
     useEffect(() => {
         const id = setInterval(() => setNow(Date.now()), 1000);

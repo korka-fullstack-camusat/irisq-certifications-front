@@ -10,8 +10,17 @@ import {
     ChevronRight, Send, X, PhoneCall, Trophy,
 } from "lucide-react";
 import { useCandidate } from "@/lib/candidate-context";
-import { fetchCandidateExam, fetchCandidateExams, uploadFiles, submitExamWithAntiCheat, reportExamBlocked, candidateMe, type CandidateExam, type CandidateDossier } from "@/lib/api";
+import { API_URL, fetchCandidateExam, fetchCandidateExams, uploadFiles, submitExamWithAntiCheat, reportExamBlocked, candidateMe, type CandidateExam, type CandidateDossier } from "@/lib/api";
 import RichTextEditor from "@/components/RichTextEditor";
+
+/** Résout une URL de document stockée par le backend (chemin relatif ou absolu). */
+function resolveDocUrl(raw: string | undefined | null): string | undefined {
+    if (!raw) return undefined;
+    if (raw.startsWith("http://") || raw.startsWith("https://")) return raw;
+    // Chemin relatif /api/files/... → préfixer l'origine du backend
+    const backendBase = API_URL.replace(/\/api\/?$/, "");
+    return `${backendBase}${raw.startsWith("/") ? "" : "/"}${raw}`;
+}
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const EXAM_SESSION_KEY = "irisq_exam_active";
@@ -73,6 +82,7 @@ export default function CandidatExamenPage() {
     const [exam, setExam] = useState<CandidateExam | null | undefined>(undefined);
     const [examLoading, setExamLoading] = useState(true);
     const [allExams, setAllExams] = useState<CandidateExam[]>([]);
+    const [allExamsLoading, setAllExamsLoading] = useState(true);
     const [now, setNow] = useState(Date.now());
     // Start at "select" (overview listing); refresh detection may override to "blocked"
     const [phase, setPhase] = useState<Phase>(() => {
@@ -186,7 +196,11 @@ export default function CandidatExamenPage() {
 
     // ── Load all exams (for overview listing) ────────────────────────────────
     useEffect(() => {
-        fetchCandidateExams().then(setAllExams).catch(() => setAllExams([]));
+        setAllExamsLoading(true);
+        fetchCandidateExams()
+            .then(setAllExams)
+            .catch(() => setAllExams([]))
+            .finally(() => setAllExamsLoading(false));
     }, []);
 
     // ── Load exam data (fallback via API) — re-runs when examKey bumps ─────
@@ -475,6 +489,11 @@ export default function CandidatExamenPage() {
         const eligibles = dossiers.filter(d =>
             d.status === "approved" || !!d.exam_token
         );
+        // Dossiers encore en attente de validation (ni approuvés, ni rejetés)
+        const pendingDossiers = dossiers.filter(
+            d => d.status !== "approved" && d.status !== "rejected" && !d.exam_token
+        );
+        const allPending = dossiers.length > 0 && eligibles.length === 0;
 
         return (
             <div className="space-y-6">
@@ -491,15 +510,60 @@ export default function CandidatExamenPage() {
                         initial={{ opacity: 0, y: 8 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: 0.06 }}
-                        className="bg-white rounded-2xl border border-gray-100 shadow-sm p-10 text-center"
+                        className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden"
                     >
-                        <div className="h-14 w-14 rounded-2xl flex items-center justify-center mx-auto mb-4" style={{ backgroundColor: "#e8eaf6" }}>
-                            <BookOpen className="h-7 w-7" style={{ color: "#1a237e" }} />
+                        {/* Bande colorée selon le contexte */}
+                        <div
+                            className="h-1.5 w-full"
+                            style={{ backgroundColor: allPending ? "#b45309" : "#1a237e" }}
+                        />
+                        <div className="p-10 text-center">
+                            <div
+                                className="h-14 w-14 rounded-2xl flex items-center justify-center mx-auto mb-4"
+                                style={{ backgroundColor: allPending ? "#fff8e1" : "#e8eaf6" }}
+                            >
+                                <BookOpen
+                                    className="h-7 w-7"
+                                    style={{ color: allPending ? "#b45309" : "#1a237e" }}
+                                />
+                            </div>
+                            {allPending ? (
+                                <>
+                                    <p className="font-bold text-gray-700 mb-1">
+                                        Candidature en cours d&apos;examen
+                                    </p>
+                                    <p className="text-sm text-gray-400 leading-relaxed mb-4">
+                                        Votre dossier est actuellement examiné par l&apos;administration IRISQ.<br />
+                                        L&apos;accès à l&apos;épreuve sera disponible ici dès que votre candidature aura été <strong>validée</strong>.
+                                    </p>
+                                    {/* Liste des dossiers en attente */}
+                                    {pendingDossiers.length > 0 && (
+                                        <div className="inline-flex flex-col gap-2 text-left mt-2">
+                                            {pendingDossiers.map(d => (
+                                                <div
+                                                    key={d._id}
+                                                    className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm"
+                                                    style={{ backgroundColor: "#fff8e1", color: "#b45309" }}
+                                                >
+                                                    <span className="w-2 h-2 rounded-full shrink-0 animate-pulse" style={{ backgroundColor: "#b45309" }} />
+                                                    <span className="font-semibold">
+                                                        {d.answers?.["Certification souhaitée"] || d.public_id || "Certification"}
+                                                    </span>
+                                                    <span className="text-xs opacity-70">— En attente</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </>
+                            ) : (
+                                <>
+                                    <p className="font-bold text-gray-700">Aucune candidature validée</p>
+                                    <p className="text-sm text-gray-400 mt-1 leading-relaxed">
+                                        Vos examens apparaîtront ici dès que votre candidature sera validée par l&apos;administration.
+                                    </p>
+                                </>
+                            )}
                         </div>
-                        <p className="font-bold text-gray-700">Aucune candidature validée</p>
-                        <p className="text-sm text-gray-400 mt-1 leading-relaxed">
-                            Vos examens apparaîtront ici dès que votre candidature sera validée par l&apos;administration.
-                        </p>
                     </motion.div>
                 ) : (
                     <div className="space-y-3">
@@ -595,11 +659,14 @@ export default function CandidatExamenPage() {
                                         {canStart && (
                                             <button
                                                 onClick={() => handleAccessExam(d)}
-                                                className="w-full mt-1 inline-flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold text-white transition-all hover:-translate-y-0.5"
+                                                disabled={allExamsLoading}
+                                                className="w-full mt-1 inline-flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold text-white transition-all hover:-translate-y-0.5 disabled:opacity-60 disabled:cursor-wait"
                                                 style={{ backgroundColor: "#2e7d32", boxShadow: "0 6px 16px rgba(46,125,50,0.3)" }}
                                             >
-                                                <PlayCircle className="h-4 w-4" />
-                                                Accéder à l&apos;examen
+                                                {allExamsLoading
+                                                    ? <><Loader2 className="h-4 w-4 animate-spin" />Chargement…</>
+                                                    : <><PlayCircle className="h-4 w-4" />Accéder à l&apos;examen</>
+                                                }
                                             </button>
                                         )}
                                         {alreadyDone && (
@@ -980,6 +1047,8 @@ export default function CandidatExamenPage() {
     }
 
     // ── EXAM phase (plein écran complet, couvre le sidebar) ──────────────────
+    // Résoudre l'URL du document (peut être un chemin relatif /api/files/...)
+    const documentFullUrl = resolveDocUrl(exam.document_url);
     const questions = exam.parsed_questions || [];
     const totalPages = questions.length > 0 ? Math.ceil(questions.length / QUESTIONS_PER_PAGE) : 1;
     const pageQuestions = questions.slice(currentPage * QUESTIONS_PER_PAGE, (currentPage + 1) * QUESTIONS_PER_PAGE);
@@ -1101,34 +1170,52 @@ export default function CandidatExamenPage() {
                         </div>
 
                         {/* ── Sujet du document — toujours affiché en référence ── */}
-                        {(exam.exam_content_html || exam.document_url) && (
+                        {(exam.exam_content_html || documentFullUrl) && (
                             <div className="shrink-0 border-b" style={{ borderColor: "#e8eaf6" }}>
                                 {exam.exam_content_html ? (
                                     /* HTML converti depuis DOCX/TXT/PDF — fidèle au document original */
-                                    <div
-                                        className="overflow-y-auto px-5 py-4"
-                                        style={{ maxHeight: questions.length > 0 ? "320px" : "460px", backgroundColor: "#fafafa" }}
-                                        dangerouslySetInnerHTML={{ __html: exam.exam_content_html }}
-                                    />
+                                    <div>
+                                        <div
+                                            className="overflow-y-auto px-5 py-4"
+                                            style={{ maxHeight: questions.length > 0 ? "360px" : "520px", backgroundColor: "#fafafa" }}
+                                            dangerouslySetInnerHTML={{ __html: exam.exam_content_html }}
+                                        />
+                                        {/* Bouton d'accès au fichier original en cas de doute */}
+                                        {documentFullUrl && (
+                                            <div className="px-5 pb-3 flex items-center gap-3">
+                                                <a
+                                                    href={documentFullUrl}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border transition-colors hover:bg-gray-50"
+                                                    style={{ borderColor: "#c5cae9", color: "#1a237e" }}
+                                                >
+                                                    <FileText className="h-3.5 w-3.5" />
+                                                    Télécharger le sujet original
+                                                </a>
+                                            </div>
+                                        )}
+                                    </div>
                                 ) : (
                                     /* Fallback : iframe pour les PDF (rendu natif du navigateur) */
                                     <div className="flex flex-col gap-2 p-4">
-                                        <div className="w-full rounded-xl border border-gray-200 overflow-hidden" style={{ height: "320px" }}>
+                                        <div className="w-full rounded-xl border border-gray-200 overflow-hidden" style={{ height: "420px" }}>
                                             <iframe
-                                                src={exam.document_url}
+                                                src={documentFullUrl ?? ""}
                                                 title="Sujet d'examen"
                                                 className="w-full h-full"
                                                 style={{ border: "none" }}
                                             />
                                         </div>
                                         <a
-                                            href={exam.document_url}
+                                            href={documentFullUrl ?? "#"}
                                             target="_blank"
                                             rel="noopener noreferrer"
-                                            className="self-start text-xs font-semibold underline"
-                                            style={{ color: "#1a237e" }}
+                                            className="self-start inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border transition-colors hover:bg-gray-50"
+                                            style={{ borderColor: "#c5cae9", color: "#1a237e" }}
                                         >
-                                            Ouvrir dans un nouvel onglet ↗
+                                            <FileText className="h-3.5 w-3.5" />
+                                            Ouvrir le sujet dans un nouvel onglet ↗
                                         </a>
                                     </div>
                                 )}

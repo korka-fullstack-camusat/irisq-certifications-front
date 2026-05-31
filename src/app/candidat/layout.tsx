@@ -33,23 +33,35 @@ export default function CandidateLayout({ children }: { children: React.ReactNod
 }
 
 // ── Navigation items ──────────────────────────────────────────────────────────
+// L'item "Examen" est marqué requiresApproval — il ne s'affiche que quand au
+// moins un dossier du candidat est validé (ou possède un exam_token).
 const NAV_ITEMS = [
-    { href: "/candidat",                         label: "Tableau de bord",     icon: LayoutDashboard },
-    { href: "/candidat/dossiers",                label: "Mon dossier",         icon: FolderOpen      },
-    { href: "/candidat/certifications",          label: "Certifications",      icon: Award           },
-    { href: "/candidat/documents",               label: "Documents officiels", icon: FileText        },
-    { href: "/candidat/examen",                  label: "Examen",              icon: BookOpen        },
-    { href: "/candidat/documents-signales",      label: "Docs signalés",       icon: AlertTriangle   },
+    { href: "/candidat",                         label: "Tableau de bord",     icon: LayoutDashboard, requiresApproval: false },
+    { href: "/candidat/dossiers",                label: "Mon dossier",         icon: FolderOpen,      requiresApproval: false },
+    { href: "/candidat/certifications",          label: "Certifications",      icon: Award,           requiresApproval: false },
+    { href: "/candidat/documents",               label: "Documents officiels", icon: FileText,        requiresApproval: false },
+    { href: "/candidat/examen",                  label: "Examen",              icon: BookOpen,        requiresApproval: true  },
+    { href: "/candidat/documents-signales",      label: "Docs signalés",       icon: AlertTriangle,   requiresApproval: false },
 ];
 
 // ── Shell ─────────────────────────────────────────────────────────────────────
 function Shell({ children }: { children: React.ReactNode }) {
-    const { dossier, logout, examActive, sessionInvalidated, confirmSessionLogout } = useCandidate();
+    const { dossier, dossiers, logout, examActive, sessionInvalidated, confirmSessionLogout } = useCandidate();
     const pathname  = usePathname();
     const [showLogoutModal, setShowLogoutModal] = useState(false);
 
     const initials    = (dossier?.name || dossier?.public_id || "??").substring(0, 2).toUpperCase();
     const displayName = dossier?.name || dossier?.public_id || "Candidat";
+
+    // Vrai si au moins un dossier a été validé ou possède un token d'examen
+    const hasApprovedDossier = dossiers.some(
+        d => d.status === "approved" || !!d.exam_token
+    );
+
+    // Filtrer les éléments de navigation selon l'état de validation
+    const visibleNavItems = NAV_ITEMS.filter(
+        item => !item.requiresApproval || hasApprovedDossier
+    );
 
     const isActive = (href: string) =>
         href === "/candidat" ? pathname === "/candidat" : pathname.startsWith(href);
@@ -203,7 +215,7 @@ function Shell({ children }: { children: React.ReactNode }) {
                 {/* Navigation */}
                 <div className="flex-1 overflow-y-auto p-4">
                     <nav className="space-y-0.5">
-                        {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
+                        {visibleNavItems.map(({ href, label, icon: Icon }) => {
                             const active = isActive(href);
                             return (
                                 <Link
@@ -308,7 +320,7 @@ function Shell({ children }: { children: React.ReactNode }) {
                 className={`md:hidden fixed bottom-0 left-0 right-0 z-40 flex items-center justify-around px-2 transition-transform duration-300 ${examActive ? "translate-y-full pointer-events-none" : "translate-y-0"}`}
                 style={{ backgroundColor: "#ffffff", borderTop: "2px solid #e8eaf6", height: "64px" }}
             >
-                {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
+                {visibleNavItems.map(({ href, label, icon: Icon }) => {
                     const active = isActive(href);
                     return (
                         <Link

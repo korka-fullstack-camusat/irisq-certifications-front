@@ -446,6 +446,15 @@ export async function publishExam(id: string) {
     return res.json();
 }
 
+export async function reparseExam(id: string): Promise<{ message: string; exam_content_html_length: number; parsed_questions_count: number }> {
+    const res = await apiFetch(url(`exams/${id}/reparse`), { method: "POST", redirect: "follow" });
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(typeof err.detail === "string" ? err.detail : "Erreur lors du re-parsing");
+    }
+    return res.json();
+}
+
 export async function submitExamWithAntiCheat(
     responseId: string,
     data: {

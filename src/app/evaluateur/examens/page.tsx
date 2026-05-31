@@ -6,12 +6,20 @@ import {
   FilePlus, Trash2, Download, Search, Loader2,
   FileText, Send, X, Plus, Upload, Eye,
   Clock, CalendarDays, Filter, CheckCircle2,
-  ChevronLeft, ChevronRight, AlertCircle,
+  ChevronLeft, ChevronRight, AlertCircle, RefreshCw,
 } from "lucide-react";
 import {
-  fetchExams, createExam, deleteExam, uploadFiles, publishExam,
-  fetchCertifications,
+  API_URL, fetchExams, createExam, deleteExam, uploadFiles, publishExam,
+  reparseExam, fetchCertifications,
 } from "@/lib/api";
+
+/** Résout un chemin relatif /api/files/... en URL absolue vers le backend. */
+function resolveDocUrl(raw: string | undefined | null): string {
+    if (!raw) return "";
+    if (raw.startsWith("http://") || raw.startsWith("https://")) return raw;
+    const base = API_URL.replace(/\/api\/?$/, "");
+    return `${base}${raw.startsWith("/") ? "" : "/"}${raw}`;
+}
 
 const SESSION_ID_KEY   = "irisq_evaluateur_session";
 const SESSION_NAME_KEY = "irisq_evaluateur_session_name";
@@ -35,6 +43,7 @@ export default function ExamensPage() {
   const [isLoading, setIsLoading]             = useState(false);
   const [isSubmitting, setIsSubmitting]       = useState(false);
   const [publishingId, setPublishingId]       = useState<string | null>(null);
+  const [reparsingId, setReparsingId]         = useState<string | null>(null);
   const [searchQuery, setSearchQuery]         = useState("");
   const [showModal, setShowModal]             = useState(false);
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
@@ -117,6 +126,23 @@ export default function ExamensPage() {
       setExams(prev => prev.filter(e => e._id !== id));
     } catch {
       alert("Erreur lors de la suppression.");
+    }
+  };
+
+  const handleReparse = async (id: string) => {
+    setReparsingId(id);
+    try {
+      const result = await reparseExam(id);
+      alert(
+        `Document re-parsé avec succès !\n` +
+        `HTML généré : ${result.exam_content_html_length} caractères\n` +
+        `Questions extraites : ${result.parsed_questions_count}`
+      );
+      await loadExams();
+    } catch (err: any) {
+      alert(err?.message || "Erreur lors du re-parsing du document.");
+    } finally {
+      setReparsingId(null);
     }
   };
 
@@ -385,20 +411,31 @@ export default function ExamensPage() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => setPreviewFile({ url: exam.document_url, title: exam.title })}
+                    onClick={() => setPreviewFile({ url: resolveDocUrl(exam.document_url), title: exam.title })}
                     className="h-8 w-8 rounded-lg border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-[#e8eaf6] hover:text-[#1a237e] hover:border-[#c5cae9] transition-all"
                     title="Visualiser"
                   >
                     <Eye className="h-3.5 w-3.5" />
                   </button>
                   <a
-                    href={exam.document_url}
+                    href={resolveDocUrl(exam.document_url)}
                     download
                     className="h-8 w-8 rounded-lg border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-emerald-50 hover:text-emerald-600 hover:border-emerald-200 transition-all"
                     title="Télécharger"
                   >
                     <Download className="h-3.5 w-3.5" />
                   </a>
+                  <button
+                    onClick={() => handleReparse(exam._id)}
+                    disabled={reparsingId === exam._id}
+                    className="h-8 w-8 rounded-lg border border-gray-200 flex items-center justify-center text-amber-500 hover:bg-amber-50 hover:border-amber-200 disabled:opacity-50 transition-all"
+                    title="Re-parser le document (régénérer le contenu HTML)"
+                  >
+                    {reparsingId === exam._id
+                      ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      : <RefreshCw className="h-3.5 w-3.5" />
+                    }
+                  </button>
                   <button
                     onClick={() => handleDelete(exam._id)}
                     className="h-8 w-8 rounded-lg border border-gray-200 flex items-center justify-center text-rose-400 hover:bg-rose-50 hover:border-rose-200 transition-all"
