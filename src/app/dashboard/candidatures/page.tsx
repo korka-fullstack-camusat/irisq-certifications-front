@@ -353,7 +353,7 @@ function CandidaturesInner() {
     const { user, isLoading } = useAuth();
     const router = useRouter();
 
-    const PAGE_SIZE = 15;
+    const PAGE_SIZE = 4;
 
     const [entries, setEntries] = useState<MultiCandidatureEntry[]>([]);
     const [sessions, setSessions] = useState<Session[]>([]);
@@ -442,39 +442,36 @@ function CandidaturesInner() {
     return (
         <div className="space-y-6">
             {/* ── Header ── */}
-            <header className="flex items-start justify-between gap-4 flex-wrap">
-                <div>
-                    <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-gray-400">
-                        Administration
-                    </p>
-                    <h1 className="text-2xl font-black" style={{ color: "#1a237e" }}>
-                        Revue des candidatures
-                    </h1>
-                    <p className="text-sm text-gray-500 mt-1">
-                        Toutes les demandes de certification — formulaire public et espace candidat.
-                        Cliquez sur une demande unique pour l&apos;ouvrir, ou déployez le dossier d&apos;un candidat multi-formations.
-                    </p>
-                </div>
-
-                {/* Session + Export */}
-                <div className="flex items-center gap-3 flex-wrap shrink-0 mt-1">
-                    <div className="flex items-center gap-2">
-                        <CalendarDays className="h-4 w-4 shrink-0" style={{ color: "#1a237e" }} />
-                        <select
-                            value={selectedSession}
-                            onChange={e => setSelectedSession(e.target.value)}
-                            className="bg-white border border-[#e0e0e0] rounded-xl px-3 py-2 text-sm text-gray-700 shadow-sm focus:outline-none focus:border-[#1a237e] min-w-[180px]"
-                        >
-                            <option value="">Toutes les sessions</option>
-                            {sessions.map(s => (
-                                <option key={s._id} value={s._id}>{s.name}</option>
-                            ))}
-                        </select>
+            <header className="space-y-1">
+                {/* Ligne 1 : titre ← → session + export */}
+                <div className="flex items-center justify-between gap-4 flex-wrap">
+                    <div>
+                        <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-gray-400">
+                            Administration
+                        </p>
+                        <h1 className="text-2xl font-black" style={{ color: "#1a237e" }}>
+                            Revue des candidatures
+                        </h1>
                     </div>
-                    {selectedSession && (
+
+                    {/* Session + Export — même niveau que le titre */}
+                    <div className="flex items-center gap-3 flex-wrap shrink-0">
+                        <div className="flex items-center gap-2">
+                            <CalendarDays className="h-4 w-4 shrink-0" style={{ color: "#1a237e" }} />
+                            <select
+                                value={selectedSession}
+                                onChange={e => setSelectedSession(e.target.value)}
+                                className="bg-white border border-[#e0e0e0] rounded-xl px-3 py-2 text-sm text-gray-700 shadow-sm focus:outline-none focus:border-[#1a237e] min-w-[180px]"
+                            >
+                                <option value="">Toutes les sessions</option>
+                                {sessions.map(s => (
+                                    <option key={s._id} value={s._id}>{s.name}</option>
+                                ))}
+                            </select>
+                        </div>
                         <button
                             onClick={handleExport}
-                            disabled={exporting || entries.length === 0}
+                            disabled={exporting || !selectedSession || entries.length === 0}
                             className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold text-white transition-all hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0"
                             style={{ backgroundColor: "#2e7d32", boxShadow: "0 4px 12px rgba(46,125,50,0.25)" }}
                         >
@@ -483,8 +480,13 @@ function CandidaturesInner() {
                                 : <Download className="h-4 w-4" />}
                             {exporting ? "Export…" : "Exporter ZIP"}
                         </button>
-                    )}
+                    </div>
                 </div>
+                {/* Ligne 2 : description */}
+                <p className="text-sm text-gray-500">
+                    Toutes les demandes de certification — formulaire public et espace candidat.
+                    Cliquez sur une demande unique pour l&apos;ouvrir, ou déployez le dossier d&apos;un candidat multi-formations.
+                </p>
             </header>
 
             {/* ── Barre de filtres ── */}
@@ -578,7 +580,7 @@ function CandidaturesInner() {
                             entry={entry}
                         />
                     ))}
-                    {filtered.length > PAGE_SIZE && (
+                    {filtered.length > 0 && (
                         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm px-4 py-2">
                             <Pagination
                                 total={filtered.length}
