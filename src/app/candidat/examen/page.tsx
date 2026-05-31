@@ -5,12 +5,12 @@ import { motion, AnimatePresence } from "framer-motion";
 import Image from "next/image";
 import {
     BookOpen, Clock, CalendarDays, ShieldCheck, Loader2,
-    PlayCircle, Lock, AlertTriangle, ShieldAlert, Maximize,
+    PlayCircle, Lock, AlertTriangle, Maximize,
     FileText, CheckCircle2, Monitor, Play, ChevronLeft,
-    ChevronRight, Send, X, PhoneCall, Trophy,
+    ChevronRight, Send, X, Trophy,
 } from "lucide-react";
 import { useCandidate } from "@/lib/candidate-context";
-import { API_URL, fetchCandidateExam, fetchCandidateExams, uploadFiles, submitExamWithAntiCheat, reportExamBlocked, candidateMe, type CandidateExam, type CandidateDossier } from "@/lib/api";
+import { API_URL, fetchCandidateExam, fetchCandidateExams, uploadFiles, submitExamWithAntiCheat, type CandidateExam, type CandidateDossier } from "@/lib/api";
 import RichTextEditor from "@/components/RichTextEditor";
 
 /** Résout une URL de document stockée par le backend (chemin relatif ou absolu). */
@@ -84,13 +84,8 @@ export default function CandidatExamenPage() {
     const [allExams, setAllExams] = useState<CandidateExam[]>([]);
     const [allExamsLoading, setAllExamsLoading] = useState(true);
     const [now, setNow] = useState(Date.now());
-    // Start at "select" (overview listing); refresh detection may override to "blocked"
-    const [phase, setPhase] = useState<Phase>(() => {
-        if (typeof sessionStorage !== "undefined" && sessionStorage.getItem(EXAM_SESSION_KEY) === "1") {
-            return "blocked";
-        }
-        return "select";
-    });
+    // Toujours démarrer sur "select" — le blocage par rechargement est désactivé pour l'instant
+    const [phase, setPhase] = useState<Phase>("select");
     // Bump to force a re-fetch of the active exam
     const [examKey, setExamKey] = useState(0);
 
@@ -104,8 +99,6 @@ export default function CandidatExamenPage() {
     const [mediaStream, setMediaStream] = useState<MediaStream | null>(null);
     const videoRef = useRef<HTMLVideoElement | null>(null);
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
-    // Indique qu'on a déjà envoyé le rapport de blocage au serveur pour cette session
-    const hasReportedBlock = useRef(false);
 
     const videoRefCallback = useCallback((node: HTMLVideoElement) => {
         videoRef.current = node;
@@ -120,48 +113,14 @@ export default function CandidatExamenPage() {
     const [showSubmitModal, setShowSubmitModal] = useState(false);
     const [showExpiredModal, setShowExpiredModal] = useState(false);
 
-    // ── Refresh detection est géré dans initialPhase() (useState(() => ...)) ──
-
-    // ── Reconciliation blocage local / état serveur ─────────────────────────
-    // Règle : ne signaler le blocage au serveur QUE SI l'évaluateur n'a pas
-    // déjà débloqué cet accès (exam_blocked !== false).
+    // ── Blocage par rechargement désactivé ─────────────────────────────────
+    // Le blocage anti-rechargement est temporairement désactivé pour permettre
+    // de tester l'affichage du document d'examen sans contrainte.
+    // La sessionStorage key est nettoyée au montage pour ne pas bloquer les
+    // candidats qui étaient déjà bloqués avant ce changement.
     useEffect(() => {
-        // Attendre que le dossier soit chargé et que la phase soit "blocked"
-        if (dossierLoading || phase !== "blocked") return;
-
-        if (dossier?.exam_blocked === false) {
-            // L'évaluateur a explicitement débloqué → on remet à zéro
-            sessionStorage.removeItem(EXAM_SESSION_KEY);
-            hasReportedBlock.current = false;
-            setPhase("info");
-        } else if (!hasReportedBlock.current) {
-            // Premier passage sans déblocage évaluateur → on signale
-            hasReportedBlock.current = true;
-            reportExamBlocked("Rechargement de page pendant l'examen");
-        }
-    }, [dossier, dossierLoading, phase]);
-
-    // ── Polling quand la phase est "blocked" ────────────────────────────────
-    // Interroge le serveur toutes les 8 s pour détecter en temps réel si
-    // l'évaluateur a débloqué l'accès, sans obliger le candidat à recharger.
-    useEffect(() => {
-        if (phase !== "blocked") return;
-
-        const intervalId = setInterval(async () => {
-            try {
-                const updated = await candidateMe();
-                if (updated.exam_blocked === false) {
-                    sessionStorage.removeItem(EXAM_SESSION_KEY);
-                    hasReportedBlock.current = false;
-                    setPhase("info");
-                }
-            } catch {
-                // Silencieux — on réessaiera au prochain tick
-            }
-        }, 8000);
-
-        return () => clearInterval(intervalId);
-    }, [phase]);
+        sessionStorage.removeItem(EXAM_SESSION_KEY);
+    }, []);
 
     // ── Masquer le sidebar pendant l'examen ────────────────────────────────
     useEffect(() => {
@@ -380,9 +339,7 @@ export default function CandidatExamenPage() {
         setAnswers(init);
         setCurrentPage(0);
 
-        // Mark exam as in progress (refresh detection)
-        sessionStorage.setItem(EXAM_SESSION_KEY, "1");
-
+        // (blocage par rechargement désactivé — pas d'écriture sessionStorage)
         setPhase("exam");
 
         // Photo captures
@@ -765,52 +722,6 @@ export default function CandidatExamenPage() {
         );
     }
 
-    // ── Bloqué après un refresh ─────────────────────────────────────────────
-    if (phase === "blocked") {
-        // Render guard : si le serveur dit que l'accès est débloqué
-        // (exam_blocked === false), on ne montre PAS l'écran bloqué.
-        // La reconciliation va mettre à jour phase → "info" dans le prochain cycle.
-        if (!dossierLoading && dossier?.exam_blocked === false) {
-            return (
-                <div className="flex items-center justify-center py-20">
-                    <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
-                </div>
-            );
-        }
-
-        return (
-            <div className="flex items-center justify-center min-h-[60vh]">
-                <motion.div
-                    initial={{ scale: 0.9, opacity: 0 }}
-                    animate={{ scale: 1, opacity: 1 }}
-                    className="bg-white rounded-2xl p-10 max-w-md w-full text-center border-t-4 border-rose-600 shadow-xl"
-                >
-                    <div className="h-16 w-16 bg-rose-50 text-rose-600 rounded-full flex items-center justify-center mx-auto mb-6">
-                        <Lock className="h-8 w-8" />
-                    </div>
-                    <h2 className="text-2xl font-black mb-3 text-rose-700">Accès bloqué</h2>
-                    <p className="text-gray-600 text-sm leading-relaxed mb-6">
-                        Votre session d&apos;examen a été interrompue suite à un rechargement de page.<br />
-                        Pour des raisons de sécurité, l&apos;accès à l&apos;épreuve est désormais verrouillé.
-                    </p>
-
-                    {/* Message contactez le responsable */}
-                    <div className="bg-rose-50 border border-rose-200 rounded-xl p-4 flex items-start gap-3 text-left mb-4">
-                        <PhoneCall className="h-5 w-5 text-rose-600 shrink-0 mt-0.5" />
-                        <p className="text-xs text-rose-800 font-medium">
-                            Veuillez contacter le responsable IRISQ pour débloquer votre accès et obtenir une nouvelle session.
-                        </p>
-                    </div>
-
-                    {/* Indicateur de surveillance automatique */}
-                    <div className="flex items-center justify-center gap-2 text-xs text-gray-400">
-                        <Loader2 className="h-3.5 w-3.5 animate-spin text-gray-400" />
-                        <span>Vérification automatique en cours… Cette page se mettra à jour dès que votre accès sera rétabli.</span>
-                    </div>
-                </motion.div>
-            </div>
-        );
-    }
 
     // ── Terminé ─────────────────────────────────────────────────────────────
     if (phase === "finished") {
