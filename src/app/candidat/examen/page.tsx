@@ -126,6 +126,8 @@ export default function CandidatExamenPage() {
     const [showExpiredModal, setShowExpiredModal] = useState(false);
     // Re-parsing automatique si exam_content_html est vide (document non converti)
     const [isReparsing, setIsReparsing] = useState(false);
+    // Nombre de blocs de réponse libres quand aucune question n'est parsée
+    const [freeAnswerCount, setFreeAnswerCount] = useState(5);
 
     // ── Blocage par rechargement désactivé ─────────────────────────────────
     // Le blocage anti-rechargement est temporairement désactivé pour permettre
@@ -426,7 +428,12 @@ export default function CandidatExamenPage() {
         } catch (e) { console.error("Final photo fail", e); }
 
         const photos = finalPhotoUrl ? [...candidatePhotos, finalPhotoUrl] : [...candidatePhotos];
-        const formattedAnswers = Object.entries(answers).map(([qId, ans]) => ({ question_id: qId, answer: ans }));
+        const formattedAnswers = questions.length > 0
+            ? Object.entries(answers).map(([qId, ans]) => ({ question_id: qId, answer: ans }))
+            : Array.from({ length: freeAnswerCount }, (_, i) => ({
+                question_id: `question_${i + 1}`,
+                answer: answers[`free_${i}`] || "",
+            }));
 
         try {
             await submitExamWithAntiCheat(dossier.exam_token, {
@@ -1006,7 +1013,11 @@ export default function CandidatExamenPage() {
     const totalPages = questions.length > 0 ? Math.ceil(questions.length / QUESTIONS_PER_PAGE) : 1;
     const pageQuestions = questions.slice(currentPage * QUESTIONS_PER_PAGE, (currentPage + 1) * QUESTIONS_PER_PAGE);
     const isLastPage = currentPage === totalPages - 1;
-    const answeredCount = Object.values(answers).filter(v => v !== "" && v !== "<p></p>").length;
+    const answeredCount = questions.length > 0
+        ? Object.values(answers).filter(v => v !== "" && v !== "<p></p>").length
+        : Array.from({ length: freeAnswerCount }, (_, i) => answers[`free_${i}`] || "")
+            .filter(v => v !== "" && v !== "<p></p>").length;
+    const totalQCount = questions.length > 0 ? questions.length : freeAnswerCount;
 
     // Copie soumise détectée pendant la phase exam (autre appareil ou double soumission)
     const alreadySubmittedMidExam =
@@ -1115,11 +1126,12 @@ export default function CandidatExamenPage() {
                                 <FileText className="h-4 w-4 text-[#1a237e]" />
                                 <h2 className="font-black text-sm uppercase tracking-wider text-[#1a237e]">Sujet d&apos;Examen</h2>
                             </div>
-                            {questions.length > 0 && (
-                                <span className="text-xs font-bold bg-[#1a237e] text-white px-2 py-1 rounded-md">
-                                    Page {currentPage + 1} / {totalPages} — {questions.length} question{questions.length > 1 ? "s" : ""}
-                                </span>
-                            )}
+                            <span className="text-xs font-bold bg-[#1a237e] text-white px-2 py-1 rounded-md">
+                                {questions.length > 0
+                                    ? `Page ${currentPage + 1} / ${totalPages} — ${questions.length} question${questions.length > 1 ? "s" : ""}`
+                                    : `${freeAnswerCount} question${freeAnswerCount > 1 ? "s" : ""}`
+                                }
+                            </span>
                         </div>
 
                         {/* Sujet d'examen : HTML (DOCX/PDF texte) ou iframe PDF (PDF scanne) */}
@@ -1168,39 +1180,152 @@ export default function CandidatExamenPage() {
                             )}
                         </div>
 
-                        {/* Questions list (paginated) ou zone de réponse libre */}
-                        <div className="flex-1 overflow-y-auto p-5 space-y-6">
+                        {/* Questions list (paginated) ou blocs de réponse numérotés */}
+                        <div className="flex-1 overflow-y-auto p-5 space-y-5">
                             {questions.length === 0 ? (
-                                /* Zone de réponse libre (aucune question parsée) */
-                                <div className="flex flex-col gap-2">
-                                    <h3 className="text-sm font-bold text-gray-700">
-                                        Votre Copie{" "}
-                                        <span className="text-xs font-normal text-gray-500">(rédigez vos réponses ci-dessous)</span>
-                                    </h3>
-                                    <RichTextEditor
-                                        value={answers["general_text"] || ""}
-                                        onChange={html => setAnswers(prev => ({ ...prev, general_text: html }))}
-                                        placeholder="Rédigez vos réponses ici — texte formaté, tableaux, listes…"
-                                        minHeight="240px"
-                                    />
+                                /* ── Blocs de réponse numérotés (aucune question parsée) ── */
+                                <div className="space-y-5">
+                                    {/* Contrôles add / remove */}
+                                    <div className="flex items-center justify-between">
+                                        <p className="text-sm font-bold text-gray-700">
+                                            Vos réponses
+                                            <span className="ml-1.5 text-xs font-normal text-gray-400">
+                                                — rédigez chaque réponse dans le bloc correspondant
+                                            </span>
+                                        </p>
+                                        <div className="flex items-center gap-1.5 shrink-0">
+                                            <button
+                                                onClick={() => setFreeAnswerCount(n => Math.max(1, n - 1))}
+                                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border text-xs font-bold text-gray-600 hover:bg-gray-100 transition-colors"
+                                                style={{ borderColor: "#e0e0e0" }}
+                                                title="Supprimer le dernier bloc"
+                                            >
+                                                <X className="h-3 w-3" />
+                                                Retirer
+                                            </button>
+                                            <span className="text-[10px] font-bold text-gray-400 px-1">
+                                                {freeAnswerCount} Q
+                                            </span>
+                                            <button
+                                                onClick={() => setFreeAnswerCount(n => n + 1)}
+                                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold text-white transition-colors"
+                                                style={{ backgroundColor: "#1a237e" }}
+                                                title="Ajouter un bloc de réponse"
+                                            >
+                                                <ChevronRight className="h-3 w-3" />
+                                                Ajouter
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {/* Blocs numérotés */}
+                                    {Array.from({ length: freeAnswerCount }, (_, i) => {
+                                        const filled = !!(answers[`free_${i}`] && answers[`free_${i}`] !== "<p></p>");
+                                        return (
+                                            <div
+                                                key={i}
+                                                className="rounded-xl overflow-hidden shadow-sm border transition-colors"
+                                                style={{ borderColor: filled ? "#a5d6a7" : "#e0e0e0", backgroundColor: "#fff" }}
+                                            >
+                                                {/* En-tête question */}
+                                                <div
+                                                    className="px-4 py-2.5 border-b flex items-center gap-3"
+                                                    style={{
+                                                        backgroundColor: filled ? "#e8f5e9" : "#f8f9fa",
+                                                        borderColor: filled ? "#a5d6a7" : "#eeeeee",
+                                                    }}
+                                                >
+                                                    <div
+                                                        className="h-6 w-6 rounded-full flex items-center justify-center text-[11px] font-black shrink-0"
+                                                        style={{
+                                                            backgroundColor: filled ? "#2e7d32" : "#1a237e",
+                                                            color: "#fff",
+                                                        }}
+                                                    >
+                                                        {i + 1}
+                                                    </div>
+                                                    <span className="text-xs font-black uppercase tracking-wide" style={{ color: filled ? "#2e7d32" : "#1a237e" }}>
+                                                        Question {i + 1}
+                                                    </span>
+                                                    {filled && (
+                                                        <span className="ml-auto flex items-center gap-1 text-[10px] font-bold" style={{ color: "#2e7d32" }}>
+                                                            <CheckCircle2 className="h-3.5 w-3.5" />
+                                                            Réponse saisie
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                {/* Zone de réponse */}
+                                                <div className="p-4">
+                                                    <RichTextEditor
+                                                        value={answers[`free_${i}`] || ""}
+                                                        onChange={html => setAnswers(prev => ({ ...prev, [`free_${i}`]: html }))}
+                                                        placeholder={`Rédigez votre réponse à la question ${i + 1}…`}
+                                                        minHeight="130px"
+                                                    />
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
                                 </div>
                             ) : (
+                                /* ── Questions parsées avec réponse en dessous ── */
                                 pageQuestions.map((q, idx) => {
                                     const globalIdx = currentPage * QUESTIONS_PER_PAGE + idx + 1;
+                                    const filled = !!(answers[q.id] && answers[q.id] !== "<p></p>");
                                     return (
-                                        <div key={q.id} className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
-                                            <div className="px-4 py-2 border-b border-gray-100 flex items-center justify-between" style={{ backgroundColor: "#f8f9fa" }}>
-                                                <span className="text-xs font-black text-[#1a237e] uppercase tracking-wide">Question {globalIdx}</span>
-                                                {q.part && <span className="text-[10px] text-gray-400 font-medium">{q.part}</span>}
-                                                {q.type === "qcm" && <span className="text-[9px] bg-purple-100 text-purple-700 font-bold px-2 py-0.5 rounded-full uppercase">QCM</span>}
+                                        <div
+                                            key={q.id}
+                                            className="rounded-xl overflow-hidden shadow-sm border transition-colors"
+                                            style={{ borderColor: filled ? "#a5d6a7" : "#e0e0e0", backgroundColor: "#fff" }}
+                                        >
+                                            {/* En-tête question */}
+                                            <div
+                                                className="px-4 py-2.5 border-b flex items-center gap-3"
+                                                style={{
+                                                    backgroundColor: filled ? "#e8f5e9" : "#f8f9fa",
+                                                    borderColor: filled ? "#a5d6a7" : "#eeeeee",
+                                                }}
+                                            >
+                                                <div
+                                                    className="h-6 w-6 rounded-full flex items-center justify-center text-[11px] font-black shrink-0"
+                                                    style={{ backgroundColor: filled ? "#2e7d32" : "#1a237e", color: "#fff" }}
+                                                >
+                                                    {globalIdx}
+                                                </div>
+                                                <span className="text-xs font-black uppercase tracking-wide" style={{ color: filled ? "#2e7d32" : "#1a237e" }}>
+                                                    Question {globalIdx}
+                                                </span>
+                                                {q.part && <span className="text-[10px] text-gray-400 font-medium ml-1">{q.part}</span>}
+                                                {q.type === "qcm" && (
+                                                    <span className="text-[9px] bg-purple-100 text-purple-700 font-bold px-2 py-0.5 rounded-full uppercase ml-1">QCM</span>
+                                                )}
+                                                {filled && (
+                                                    <span className="ml-auto flex items-center gap-1 text-[10px] font-bold" style={{ color: "#2e7d32" }}>
+                                                        <CheckCircle2 className="h-3.5 w-3.5" />
+                                                        Réponse saisie
+                                                    </span>
+                                                )}
                                             </div>
-                                            <div className="p-4 space-y-3">
-                                                <p className="text-gray-900 font-medium text-sm whitespace-pre-wrap">{q.text}</p>
+                                            {/* Texte de la question */}
+                                            <div className="px-4 pt-3 pb-1">
+                                                <p className="text-gray-900 font-medium text-sm leading-relaxed whitespace-pre-wrap">{q.text}</p>
+                                            </div>
+                                            {/* Zone de réponse */}
+                                            <div className="p-4">
                                                 {q.type === "qcm" ? (
                                                     <div className="space-y-2">
                                                         {q.options?.map((opt, i) => (
-                                                            <label key={i} className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${answers[q.id] === opt ? "bg-[#e8eaf6] border-[#1a237e]" : "bg-gray-50 border-transparent hover:bg-gray-100"}`}>
-                                                                <input type="radio" name={`q_${q.id}`} className="mt-0.5" checked={answers[q.id] === opt} onChange={() => setAnswers(prev => ({ ...prev, [q.id]: opt }))} />
+                                                            <label
+                                                                key={i}
+                                                                className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${answers[q.id] === opt ? "bg-[#e8eaf6] border-[#1a237e]" : "bg-gray-50 border-transparent hover:bg-gray-100"}`}
+                                                            >
+                                                                <input
+                                                                    type="radio"
+                                                                    name={`q_${q.id}`}
+                                                                    className="mt-0.5"
+                                                                    checked={answers[q.id] === opt}
+                                                                    onChange={() => setAnswers(prev => ({ ...prev, [q.id]: opt }))}
+                                                                />
                                                                 <span className="text-sm font-medium text-gray-800">{opt}</span>
                                                             </label>
                                                         ))}
@@ -1210,7 +1335,7 @@ export default function CandidatExamenPage() {
                                                         value={answers[q.id] || ""}
                                                         onChange={html => setAnswers(prev => ({ ...prev, [q.id]: html }))}
                                                         placeholder="Rédigez votre réponse — texte, tableaux, listes…"
-                                                        minHeight="120px"
+                                                        minHeight="130px"
                                                     />
                                                 )}
                                             </div>
@@ -1259,35 +1384,33 @@ export default function CandidatExamenPage() {
                         {/* Progress */}
                         <div className="bg-white rounded-2xl shadow-sm border p-5" style={{ borderColor: "#c5cae9" }}>
                             <h3 className="text-xs font-black uppercase tracking-wider text-[#1a237e] mb-3">Progression</h3>
-                            {questions.length > 0 && (
-                                <>
-                                    <div className="flex items-center justify-between mb-2">
-                                        <span className="text-xs text-gray-500">Réponses saisies</span>
-                                        <span className="font-black text-[#1a237e]">{answeredCount}/{questions.length}</span>
+                            <>
+                                <div className="flex items-center justify-between mb-2">
+                                    <span className="text-xs text-gray-500">Réponses saisies</span>
+                                    <span className="font-black text-[#1a237e]">{answeredCount}/{totalQCount}</span>
+                                </div>
+                                <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
+                                    <div
+                                        className="h-full rounded-full transition-all"
+                                        style={{ width: `${totalQCount > 0 ? (answeredCount / totalQCount) * 100 : 0}%`, backgroundColor: "#2e7d32" }}
+                                    />
+                                </div>
+                                {questions.length > QUESTIONS_PER_PAGE && (
+                                    <div className="mt-3 grid gap-1" style={{ gridTemplateColumns: `repeat(${Math.min(totalPages, 5)}, 1fr)` }}>
+                                        {Array.from({ length: totalPages }, (_, i) => {
+                                            const start = i * QUESTIONS_PER_PAGE;
+                                            const pageAnswered = questions
+                                                .slice(start, start + QUESTIONS_PER_PAGE)
+                                                .every(q => answers[q.id] && answers[q.id] !== "<p></p>");
+                                            return (
+                                                <button key={i} onClick={() => setCurrentPage(i)} className={`h-6 rounded text-[10px] font-bold transition-colors ${currentPage === i ? "bg-[#1a237e] text-white" : pageAnswered ? "bg-emerald-100 text-emerald-700" : "bg-gray-100 text-gray-500"}`}>
+                                                    P{i + 1}
+                                                </button>
+                                            );
+                                        })}
                                     </div>
-                                    <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
-                                        <div
-                                            className="h-full rounded-full transition-all"
-                                            style={{ width: `${(answeredCount / questions.length) * 100}%`, backgroundColor: "#2e7d32" }}
-                                        />
-                                    </div>
-                                    {questions.length > QUESTIONS_PER_PAGE && (
-                                        <div className="mt-3 grid gap-1" style={{ gridTemplateColumns: `repeat(${Math.min(totalPages, 5)}, 1fr)` }}>
-                                            {Array.from({ length: totalPages }, (_, i) => {
-                                                const start = i * QUESTIONS_PER_PAGE;
-                                                const pageAnswered = questions
-                                                    .slice(start, start + QUESTIONS_PER_PAGE)
-                                                    .every(q => answers[q.id] && answers[q.id] !== "<p></p>");
-                                                return (
-                                                    <button key={i} onClick={() => setCurrentPage(i)} className={`h-6 rounded text-[10px] font-bold transition-colors ${currentPage === i ? "bg-[#1a237e] text-white" : pageAnswered ? "bg-emerald-100 text-emerald-700" : "bg-gray-100 text-gray-500"}`}>
-                                                        P{i + 1}
-                                                    </button>
-                                                );
-                                            })}
-                                        </div>
-                                    )}
-                                </>
-                            )}
+                                )}
+                            </>
                         </div>
 
                         {/* Submit */}
@@ -1346,7 +1469,7 @@ export default function CandidatExamenPage() {
                                 </div>
                                 <h3 className="font-black text-gray-800 mb-2">Soumettre votre copie ?</h3>
                                 <p className="text-sm text-gray-500 mb-1">
-                                    Vous avez répondu à <span className="font-bold text-[#1a237e]">{answeredCount}</span> question{answeredCount !== 1 ? "s" : ""} sur <span className="font-bold">{questions.length || 1}</span>.
+                                    Vous avez répondu à <span className="font-bold text-[#1a237e]">{answeredCount}</span> question{answeredCount !== 1 ? "s" : ""} sur <span className="font-bold">{totalQCount}</span>.
                                 </p>
                                 <p className="text-xs text-gray-400 mb-6">Cette action est <strong>irréversible</strong>. Votre copie sera transmise immédiatement au correcteur.</p>
                                 <div className="flex gap-3">
