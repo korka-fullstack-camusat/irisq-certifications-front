@@ -533,9 +533,12 @@ export default function CandidatExamenPage() {
 
     // ── Vue d'ensemble des candidatures — phase "select" ──────────────────
     if (phase === "select") {
-        // Candidatures qui ont été approuvées OU qui ont un exam_token
+        // Candidatures accessibles : approuvées, soumises ou corrigées
+        // Les dossiers "pending" sont TOUJOURS exclus, peu importe s'il y a un examen disponible
         const eligibles = dossiers.filter(d =>
-            d.status === "approved" || !!d.exam_token
+            d.status === "approved" ||
+            d.exam_status === "submitted" ||
+            d.exam_status === "graded"
         );
         // Dossiers encore en attente de validation (ni approuvés, ni rejetés)
         const pendingDossiers = dossiers.filter(

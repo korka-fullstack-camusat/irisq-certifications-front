@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 import {
   API_URL, fetchExams, createExam, deleteExam, uploadFiles, publishExam,
-  reparseExam, fetchCertifications,
+  reparseExam, fetchCertifications, fetchExamCandidates, type ExamCandidate,
 } from "@/lib/api";
 
 /** Résout un chemin relatif /api/files/... en URL absolue vers le backend. */
@@ -43,6 +43,13 @@ export default function ExamensPage() {
   const [isLoading, setIsLoading]             = useState(false);
   const [isSubmitting, setIsSubmitting]       = useState(false);
   const [publishingId, setPublishingId]       = useState<string | null>(null);
+
+  // ── Modal publication ──
+  const [publishModal, setPublishModal] = useState<{ examId: string; certification: string } | null>(null);
+  const [publishCandidates, setPublishCandidates] = useState<ExamCandidate[]>([]);
+  const [publishSelected, setPublishSelected] = useState<Set<string>>(new Set());
+  const [publishLoadingCandidates, setPublishLoadingCandidates] = useState(false);
+  const [isPublishing, setIsPublishing] = useState(false);
   const [reparsingId, setReparsingId]         = useState<string | null>(null);
   const [searchQuery, setSearchQuery]         = useState("");
   const [showModal, setShowModal]             = useState(false);
@@ -146,18 +153,42 @@ export default function ExamensPage() {
     }
   };
 
-  const handlePublish = async (id: string, certification: string) => {
-    if (!confirm(
-      `Confirmer la publication de l'examen pour le parcours "${certification}" ?\n` +
-      `Tous les candidats validés recevront un email avec leur lien d'examen sécurisé.`
-    )) return;
-    setPublishingId(id);
+  const openPublishModal = async (id: string, certification: string) => {
+    setPublishModal({ examId: id, certification });
+    setPublishLoadingCandidates(true);
+    setPublishCandidates([]);
+    setPublishSelected(new Set());
     try {
-      const result = await publishExam(id);
-      alert(`Succès ! ${result.notified_candidates_count} candidat(s) ont reçu le lien.`);
+      const list = await fetchExamCandidates(id);
+      setPublishCandidates(list);
+      setPublishSelected(new Set(list.map(c => c.response_id)));
+    } catch {
+      setPublishCandidates([]);
+    } finally {
+      setPublishLoadingCandidates(false);
+    }
+  };
+
+  const togglePublishCandidate = (id: string) => {
+    setPublishSelected(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const handleConfirmPublish = async () => {
+    if (!publishModal) return;
+    setIsPublishing(true);
+    setPublishingId(publishModal.examId);
+    try {
+      const result = await publishExam(publishModal.examId, Array.from(publishSelected));
+      setPublishModal(null);
+      alert(`Succès ! ${result.notified_candidates_count} candidat(s) ont reçu le lien d'examen.`);
     } catch {
       alert("Erreur lors de la publication de l'examen.");
     } finally {
+      setIsPublishing(false);
       setPublishingId(null);
     }
   };
@@ -399,7 +430,7 @@ export default function ExamensPage() {
 
                 <div className="flex items-center gap-2">
                   <button
-                    onClick={() => handlePublish(exam._id, exam.certification)}
+                    onClick={() => openPublishModal(exam._id, exam.certification)}
                     disabled={publishingId === exam._id}
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold transition-all disabled:opacity-50"
                     style={{ borderColor: "#c5cae9", color: "#1a237e" }}
@@ -694,6 +725,141 @@ export default function ExamensPage() {
           onClose={() => setPreviewFile(null)}
         />
       )}
+
+      {/* ── MODAL Publication — sélection des candidats ── */}
+      <AnimatePresence>
+        {publishModal && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+            onClick={() => { if (!isPublishing) setPublishModal(null); }}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 16 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 16 }}
+              transition={{ duration: 0.22 }}
+              onClick={e => e.stopPropagation()}
+              className="bg-white rounded-2xl w-full max-w-md overflow-hidden shadow-xl"
+              style={{ border: "1px solid #c5cae9" }}
+            >
+              {/* Header */}
+              <div className="px-6 py-4 flex items-center justify-between" style={{ backgroundColor: "#1a237e" }}>
+                <div className="flex items-center gap-3">
+                  <div className="h-7 w-7 rounded-lg flex items-center justify-center" style={{ backgroundColor: "rgba(255,255,255,0.15)" }}>
+                    <Send className="h-4 w-4 text-white" />
+                  </div>
+                  <div>
+                    <h2 className="text-sm font-bold text-white">Publier l&apos;examen</h2>
+                    <p className="text-[11px] text-white/60 mt-0.5 truncate max-w-[220px]">{publishModal.certification}</p>
+                  </div>
+                </div>
+                {!isPublishing && (
+                  <button onClick={() => setPublishModal(null)} className="text-white/70 hover:text-white transition-colors">
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+
+              {/* Body */}
+              <div className="p-5">
+                <p className="text-xs text-gray-500 mb-3 leading-relaxed">
+                  Sélectionnez les candidats validés qui recevront le lien d&apos;accès à l&apos;examen par email.
+                </p>
+
+                {publishLoadingCandidates ? (
+                  <div className="flex items-center justify-center py-10 gap-3 text-gray-400">
+                    <Loader2 className="h-5 w-5 animate-spin" style={{ color: "#1a237e" }} />
+                    <span className="text-sm">Chargement des candidats…</span>
+                  </div>
+                ) : publishCandidates.length === 0 ? (
+                  <div className="text-center py-8 text-gray-400">
+                    <CheckCircle2 className="h-10 w-10 mx-auto mb-3 opacity-20" />
+                    <p className="text-sm font-medium">Aucun candidat validé</p>
+                    <p className="text-xs mt-1">Il n&apos;y a pas de candidat approuvé pour cette certification.</p>
+                  </div>
+                ) : (
+                  <>
+                    {/* Tout sélectionner / désélectionner */}
+                    <div className="flex items-center justify-between mb-2 px-1">
+                      <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">
+                        {publishCandidates.length} candidat(s) validé(s)
+                      </span>
+                      <button
+                        onClick={() => {
+                          if (publishSelected.size === publishCandidates.length)
+                            setPublishSelected(new Set());
+                          else
+                            setPublishSelected(new Set(publishCandidates.map(c => c.response_id)));
+                        }}
+                        className="text-xs font-semibold underline"
+                        style={{ color: "#1a237e" }}
+                      >
+                        {publishSelected.size === publishCandidates.length ? "Tout désélectionner" : "Tout sélectionner"}
+                      </button>
+                    </div>
+
+                    {/* Liste candidats */}
+                    <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+                      {publishCandidates.map(c => {
+                        const checked = publishSelected.has(c.response_id);
+                        return (
+                          <label
+                            key={c.response_id}
+                            className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all ${
+                              checked
+                                ? "border-[#c5cae9] bg-[#f0f2ff]"
+                                : "border-gray-100 bg-gray-50 opacity-60"
+                            }`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={() => togglePublishCandidate(c.response_id)}
+                              className="accent-[#1a237e] h-4 w-4 shrink-0"
+                            />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-bold text-gray-800 truncate">{c.name}</p>
+                              <p className="text-xs text-gray-400 truncate">{c.email}</p>
+                            </div>
+                            <span className="text-[10px] font-mono text-gray-400 shrink-0">{c.public_id}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </>
+                )}
+              </div>
+
+              {/* Footer */}
+              <div className="px-5 py-4 border-t border-gray-100 flex items-center justify-between gap-3" style={{ backgroundColor: "#f4f6f9" }}>
+                <span className="text-xs text-gray-400">
+                  {publishSelected.size} / {publishCandidates.length} sélectionné(s)
+                </span>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setPublishModal(null)}
+                    disabled={isPublishing}
+                    className="px-4 py-2 bg-white border border-gray-200 text-gray-600 rounded-xl text-sm font-semibold hover:bg-gray-50 transition-colors disabled:opacity-50"
+                  >
+                    Annuler
+                  </button>
+                  <button
+                    onClick={handleConfirmPublish}
+                    disabled={isPublishing || publishSelected.size === 0}
+                    className="inline-flex items-center gap-2 px-5 py-2 text-white rounded-xl text-sm font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    style={{ backgroundColor: "#1a237e" }}
+                  >
+                    {isPublishing
+                      ? <><Loader2 className="h-4 w-4 animate-spin" /> Envoi…</>
+                      : <><Send className="h-4 w-4" /> Envoyer</>
+                    }
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

@@ -447,8 +447,26 @@ export async function deleteExam(id: string) {
     return res.json();
 }
 
-export async function publishExam(id: string) {
-    const res = await apiFetch(url(`exams/${id}/publish`), { method: "POST", redirect: "follow" });
+export interface ExamCandidate {
+    response_id: string;
+    public_id:   string;
+    name:        string;
+    email:       string;
+}
+
+export async function fetchExamCandidates(id: string): Promise<ExamCandidate[]> {
+    const res = await apiFetch(url(`exams/${id}/candidates`), { redirect: "follow" });
+    if (!res.ok) throw new Error("Failed to fetch exam candidates");
+    return res.json();
+}
+
+export async function publishExam(id: string, selectedIds?: string[]) {
+    const res = await apiFetch(url(`exams/${id}/publish`), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ selected_response_ids: selectedIds ?? null }),
+        redirect: "follow",
+    });
     if (!res.ok) throw new Error("Failed to publish exam");
     return res.json();
 }
