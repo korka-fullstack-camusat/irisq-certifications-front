@@ -87,7 +87,7 @@ function DossierCard({
                         )}
                     </div>
                 </div>
-                {canAccess && (
+                {canAccess ? (
                     <Link
                         href="/candidat/examen"
                         className="shrink-0 inline-flex items-center gap-1 text-xs font-bold px-3 py-1.5 rounded-xl text-white animate-pulse"
@@ -96,6 +96,19 @@ function DossierCard({
                         <BookOpen className="h-3 w-3" />
                         Examen
                     </Link>
+                ) : (
+                    d.status === "approved" &&
+                    d.exam_status !== "submitted" &&
+                    d.exam_status !== "graded" &&
+                    d.final_decision !== "certified" && (
+                        <span
+                            className="shrink-0 inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1.5 rounded-xl"
+                            style={{ backgroundColor: "#f1f5f9", color: "#94a3b8", border: "1px solid #e2e8f0" }}
+                        >
+                            <BookOpen className="h-3 w-3" />
+                            En attente
+                        </span>
+                    )
                 )}
             </div>
         </motion.div>
