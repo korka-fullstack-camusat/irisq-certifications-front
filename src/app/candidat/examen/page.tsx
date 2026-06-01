@@ -533,18 +533,27 @@ export default function CandidatExamenPage() {
 
     // ── Vue d'ensemble des candidatures — phase "select" ──────────────────
     if (phase === "select") {
-        // Candidatures accessibles : approuvées, soumises ou corrigées
-        // Les dossiers "pending" sont TOUJOURS exclus, peu importe s'il y a un examen disponible
-        const eligibles = dossiers.filter(d =>
-            d.status === "approved" ||
+        // Groupe 1 : convoqués — ont un exam_token OU ont déjà soumis/été notés
+        const convoked = dossiers.filter(d =>
+            !!d.exam_token ||
             d.exam_status === "submitted" ||
-            d.exam_status === "graded"
+            d.exam_status === "graded" ||
+            d.final_decision === "certified"
         );
-        // Dossiers encore en attente de validation (ni approuvés, ni rejetés)
+        // Groupe 2 : validés mais PAS encore convoqués (evaluateur ne les a pas sélectionnés)
+        const awaitingConvocation = dossiers.filter(d =>
+            d.status === "approved" &&
+            !d.exam_token &&
+            d.exam_status !== "submitted" &&
+            d.exam_status !== "graded" &&
+            d.final_decision !== "certified"
+        );
+        // Groupe 3 : dossiers en attente de validation RH (pending)
         const pendingDossiers = dossiers.filter(
-            d => d.status !== "approved" && d.status !== "rejected" && !d.exam_token
+            d => d.status !== "approved" && d.status !== "rejected"
         );
-        const allPending = dossiers.length > 0 && eligibles.length === 0;
+        const allPending = dossiers.length > 0 && convoked.length === 0 && awaitingConvocation.length === 0;
+        const eligibles = convoked; // alias pour la suite
 
         return (
             <div className="space-y-6">
@@ -618,6 +627,7 @@ export default function CandidatExamenPage() {
                     </motion.div>
                 ) : (
                     <div className="space-y-3">
+                        {/* ── Cartes examen : candidats convoqués ── */}
                         {eligibles.map((d, i) => {
                             const cert = d.answers?.["Certification souhaitée"] || d.public_id || "Certification";
                             const matchedExam = allExams.find(e => e.certification === cert);
@@ -734,6 +744,69 @@ export default function CandidatExamenPage() {
                                 </motion.div>
                             );
                         })}
+
+                        {/* ── Cartes "En attente" : validés mais pas encore convoqués ── */}
+                        {awaitingConvocation.map((d, i) => {
+                            const cert = d.answers?.["Certification souhaitée"] || d.public_id || "Certification";
+                            return (
+                                <motion.div
+                                    key={d._id}
+                                    initial={{ opacity: 0, y: 8 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    transition={{ delay: (eligibles.length + i) * 0.06 }}
+                                    className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden"
+                                >
+                                    <div className="h-1 w-full" style={{ backgroundColor: "#e2e8f0" }} />
+                                    <div className="px-5 py-4 flex items-center gap-4">
+                                        <div className="h-11 w-11 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: "#f1f5f9" }}>
+                                            <Lock className="h-5 w-5" style={{ color: "#94a3b8" }} />
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <p className="font-black text-gray-700 text-sm leading-snug">{cert}</p>
+                                            {d.public_id && (
+                                                <p className="text-[10px] text-gray-400 font-mono mt-0.5">{d.public_id}</p>
+                                            )}
+                                            <div className="flex items-center gap-2 mt-2 p-2.5 rounded-xl" style={{ backgroundColor: "#f8fafc", border: "1px solid #e2e8f0" }}>
+                                                <Clock className="h-3.5 w-3.5 shrink-0" style={{ color: "#94a3b8" }} />
+                                                <p className="text-xs text-gray-400 leading-snug">
+                                                    Votre dossier est <strong className="text-gray-600">validé</strong>. L&apos;accès à l&apos;examen sera disponible dès que l&apos;évaluateur vous aura convoqué.
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <span
+                                            className="shrink-0 text-[10px] font-bold px-2.5 py-1 rounded-full"
+                                            style={{ backgroundColor: "#f1f5f9", color: "#94a3b8", border: "1px solid #e2e8f0" }}
+                                        >
+                                            En attente
+                                        </span>
+                                    </div>
+                                </motion.div>
+                            );
+                        })}
+
+                        {/* ── Dossiers en attente de validation RH ── */}
+                        {pendingDossiers.length > 0 && (
+                            <motion.div
+                                initial={{ opacity: 0, y: 8 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ delay: (eligibles.length + awaitingConvocation.length) * 0.06 }}
+                                className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden"
+                            >
+                                <div className="h-1 w-full" style={{ backgroundColor: "#fbbf24" }} />
+                                <div className="px-5 py-4">
+                                    <p className="text-xs font-bold text-gray-500 mb-2">En attente de validation</p>
+                                    <div className="space-y-2">
+                                        {pendingDossiers.map(d => (
+                                            <div key={d._id} className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm" style={{ backgroundColor: "#fffbeb", color: "#b45309" }}>
+                                                <span className="w-2 h-2 rounded-full shrink-0 animate-pulse" style={{ backgroundColor: "#f59e0b" }} />
+                                                <span className="font-semibold text-xs">{d.answers?.["Certification souhaitée"] || d.public_id}</span>
+                                                <span className="text-xs opacity-60 ml-auto">— Dossier en cours d&apos;examen</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            </motion.div>
+                        )}
                     </div>
                 )}
             </div>
