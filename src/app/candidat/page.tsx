@@ -58,7 +58,7 @@ function DossierCard({
         : false;
     const canAccess =
         d.status === "approved" &&
-        !!d.exam_token && !!exam && !expired &&
+        !!d.exam_convoked && !!exam && !expired &&
         d.exam_status !== "submitted" && d.exam_status !== "graded" &&
         d.final_decision !== "certified";
     const date = d.submitted_at
@@ -99,6 +99,7 @@ function DossierCard({
                     </Link>
                 ) : (
                     d.status === "approved" &&
+                    !d.exam_convoked &&
                     d.exam_status !== "submitted" &&
                     d.exam_status !== "graded" &&
                     d.final_decision !== "certified" && (

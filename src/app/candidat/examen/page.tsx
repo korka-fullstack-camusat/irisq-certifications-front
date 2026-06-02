@@ -533,17 +533,17 @@ export default function CandidatExamenPage() {
 
     // ── Vue d'ensemble des candidatures — phase "select" ──────────────────
     if (phase === "select") {
-        // Groupe 1 : convoqués — approuvés AVEC token, ou déjà soumis/notés/certifiés
+        // Groupe 1 : convoqués — approuvés ET exam_convoked=true, ou déjà soumis/notés/certifiés
         const convoked = dossiers.filter(d =>
-            (d.status === "approved" && !!d.exam_token) ||
+            (d.status === "approved" && !!d.exam_convoked) ||
             d.exam_status === "submitted" ||
             d.exam_status === "graded" ||
             d.final_decision === "certified"
         );
-        // Groupe 2 : approuvés SANS token — validés mais pas encore sélectionnés par l'évaluateur
+        // Groupe 2 : approuvés mais PAS convoqués — l'évaluateur ne les a pas encore sélectionnés
         const awaitingConvocation = dossiers.filter(d =>
             d.status === "approved" &&
-            !d.exam_token &&
+            !d.exam_convoked &&
             d.exam_status !== "submitted" &&
             d.exam_status !== "graded" &&
             d.final_decision !== "certified"
@@ -631,7 +631,7 @@ export default function CandidatExamenPage() {
                         {eligibles.map((d, i) => {
                             const cert = d.answers?.["Certification souhaitée"] || d.public_id || "Certification";
                             const matchedExam = allExams.find(e => e.certification === cert);
-                            const hasToken    = d.status === "approved" && !!d.exam_token;
+                            const hasToken    = d.status === "approved" && !!d.exam_convoked;
                             const expired     = matchedExam?.deadline
                                 ? new Date(matchedExam.deadline + "T23:59:59").getTime() < now
                                 : false;

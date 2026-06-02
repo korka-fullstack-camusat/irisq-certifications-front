@@ -967,6 +967,9 @@ export interface CandidateDossier {
     final_decision?: "certified" | "rejected" | null;
     must_change_password?: boolean;
     exam_token?: string;
+    /** True uniquement si l'évaluateur a publié l'examen ET sélectionné ce candidat.
+     *  C'est CE champ (et non exam_token) qui contrôle la visibilité du bouton Examen. */
+    exam_convoked?: boolean;
     /** Positionné à true par le système si le candidat a rechargé la page pendant l'examen.
      *  Repassé à false par l'évaluateur via le bouton "Débloquer l'accès". */
     exam_blocked?: boolean;

@@ -53,9 +53,9 @@ function Shell({ children }: { children: React.ReactNode }) {
     const initials    = (dossier?.name || dossier?.public_id || "??").substring(0, 2).toUpperCase();
     const displayName = dossier?.name || dossier?.public_id || "Candidat";
 
-    // Vrai si au moins un dossier a été validé ou possède un token d'examen
+    // Vrai si au moins un dossier est validé (le lien Examen devient visible même en attente de convocation)
     const hasApprovedDossier = dossiers.some(
-        d => d.status === "approved" || !!d.exam_token
+        d => d.status === "approved" || d.exam_status === "submitted" || d.exam_status === "graded"
     );
 
     // Filtrer les éléments de navigation selon l'état de validation
