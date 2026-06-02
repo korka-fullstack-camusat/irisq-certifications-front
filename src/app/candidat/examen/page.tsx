@@ -533,14 +533,14 @@ export default function CandidatExamenPage() {
 
     // ── Vue d'ensemble des candidatures — phase "select" ──────────────────
     if (phase === "select") {
-        // Groupe 1 : convoqués — ont un exam_token OU ont déjà soumis/été notés
+        // Groupe 1 : convoqués — approuvés AVEC token, ou déjà soumis/notés/certifiés
         const convoked = dossiers.filter(d =>
-            !!d.exam_token ||
+            (d.status === "approved" && !!d.exam_token) ||
             d.exam_status === "submitted" ||
             d.exam_status === "graded" ||
             d.final_decision === "certified"
         );
-        // Groupe 2 : validés mais PAS encore convoqués (evaluateur ne les a pas sélectionnés)
+        // Groupe 2 : approuvés SANS token — validés mais pas encore sélectionnés par l'évaluateur
         const awaitingConvocation = dossiers.filter(d =>
             d.status === "approved" &&
             !d.exam_token &&
@@ -548,7 +548,7 @@ export default function CandidatExamenPage() {
             d.exam_status !== "graded" &&
             d.final_decision !== "certified"
         );
-        // Groupe 3 : dossiers en attente de validation RH (pending)
+        // Groupe 3 : statut pending (dossier non encore validé par le RH)
         const pendingDossiers = dossiers.filter(
             d => d.status !== "approved" && d.status !== "rejected"
         );
@@ -631,7 +631,7 @@ export default function CandidatExamenPage() {
                         {eligibles.map((d, i) => {
                             const cert = d.answers?.["Certification souhaitée"] || d.public_id || "Certification";
                             const matchedExam = allExams.find(e => e.certification === cert);
-                            const hasToken    = !!d.exam_token;
+                            const hasToken    = d.status === "approved" && !!d.exam_token;
                             const expired     = matchedExam?.deadline
                                 ? new Date(matchedExam.deadline + "T23:59:59").getTime() < now
                                 : false;

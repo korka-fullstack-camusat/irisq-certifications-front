@@ -57,6 +57,7 @@ function DossierCard({
         ? new Date(exam.deadline + "T23:59:59").getTime() < now
         : false;
     const canAccess =
+        d.status === "approved" &&
         !!d.exam_token && !!exam && !expired &&
         d.exam_status !== "submitted" && d.exam_status !== "graded" &&
         d.final_decision !== "certified";
