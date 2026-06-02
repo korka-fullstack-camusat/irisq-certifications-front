@@ -7,6 +7,7 @@ import {
   FileText, Send, X, Plus, Upload, Eye,
   Clock, CalendarDays, Filter, CheckCircle2,
   ChevronLeft, ChevronRight, AlertCircle, RefreshCw,
+  BookOpen,
 } from "lucide-react";
 import {
   API_URL, fetchExams, createExam, deleteExam, uploadFiles, publishExam,
@@ -43,6 +44,9 @@ export default function ExamensPage() {
   const [isLoading, setIsLoading]             = useState(false);
   const [isSubmitting, setIsSubmitting]       = useState(false);
   const [publishingId, setPublishingId]       = useState<string | null>(null);
+
+  // ── Modal aperçu rendu examen ──
+  const [examPreview, setExamPreview] = useState<{ url: string; title: string; certification: string; duration?: number } | null>(null);
 
   // ── Modal publication ──
   const [publishModal, setPublishModal] = useState<{ examId: string; certification: string } | null>(null);
@@ -442,11 +446,20 @@ export default function ExamensPage() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => setPreviewFile({ url: resolveDocUrl(exam.document_url), title: exam.title })}
-                    className="h-8 w-8 rounded-lg border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-[#e8eaf6] hover:text-[#1a237e] hover:border-[#c5cae9] transition-all"
-                    title="Visualiser"
+                    onClick={() => setExamPreview({
+                      url: resolveDocUrl(exam.document_url),
+                      title: exam.title,
+                      certification: exam.certification,
+                      duration: exam.duration_minutes,
+                    })}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold transition-all"
+                    style={{ borderColor: "#c8e6c9", color: "#2e7d32", backgroundColor: "#f1f8e9" }}
+                    onMouseEnter={e => (e.currentTarget.style.backgroundColor = "#e8f5e9")}
+                    onMouseLeave={e => (e.currentTarget.style.backgroundColor = "#f1f8e9")}
+                    title="Voir le rendu côté candidat"
                   >
                     <Eye className="h-3.5 w-3.5" />
+                    <span className="hidden sm:inline">Aperçu</span>
                   </button>
                   <a
                     href={resolveDocUrl(exam.document_url)}
@@ -725,6 +738,102 @@ export default function ExamensPage() {
           onClose={() => setPreviewFile(null)}
         />
       )}
+
+      {/* ── MODAL Aperçu rendu examen (vue candidat) ── */}
+      <AnimatePresence>
+        {examPreview && (
+          <div className="fixed inset-0 z-50 flex flex-col bg-[#f4f6f9]">
+            {/* Top bar */}
+            <div className="bg-white border-b shadow-sm px-5 py-3 flex items-center justify-between shrink-0" style={{ borderColor: "#e0e0e0" }}>
+              <div className="flex items-center gap-3">
+                <div className="h-8 w-8 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: "#e8eaf6" }}>
+                  <Eye className="h-4 w-4" style={{ color: "#1a237e" }} />
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Aperçu — Vue Candidat</p>
+                  <p className="text-sm font-black text-gray-800 leading-tight">{examPreview.title}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                {examPreview.duration && (
+                  <span className="hidden sm:inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full"
+                    style={{ backgroundColor: "#e8eaf6", color: "#1a237e" }}>
+                    <Clock className="h-3.5 w-3.5" />
+                    {examPreview.duration} min
+                  </span>
+                )}
+                <span className="inline-flex items-center gap-1.5 text-[10px] font-bold px-2.5 py-1 rounded-full"
+                  style={{ backgroundColor: "#fff3e0", color: "#e65100", border: "1px solid #ffe0b2" }}>
+                  Mode aperçu — non interactif
+                </span>
+                <button
+                  onClick={() => setExamPreview(null)}
+                  className="h-8 w-8 rounded-lg border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-100 transition-colors"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* Split view */}
+            <div className="flex-1 flex overflow-hidden flex-col md:flex-row">
+
+              {/* ── GAUCHE : Document ── */}
+              <div className="md:flex-[5] flex flex-col border-b md:border-b-0 md:border-r overflow-hidden" style={{ borderColor: "#c5cae9" }}>
+                <div className="px-4 py-2.5 border-b flex items-center gap-2 shrink-0" style={{ backgroundColor: "#e8eaf6", borderColor: "#c5cae9" }}>
+                  <FileText className="h-4 w-4" style={{ color: "#1a237e" }} />
+                  <h2 className="font-black text-xs uppercase tracking-wider" style={{ color: "#1a237e" }}>Sujet d&apos;Examen</h2>
+                  <span className="ml-auto text-[10px] text-gray-400 font-medium">{examPreview.certification}</span>
+                </div>
+                <div className="flex-1 overflow-hidden bg-gray-50">
+                  <iframe
+                    src={examPreview.url}
+                    title="Aperçu sujet"
+                    className="w-full border-0 block"
+                    style={{ height: "100%", minHeight: "400px" }}
+                  />
+                </div>
+              </div>
+
+              {/* ── DROITE : Zone réponses (simulée) ── */}
+              <div className="md:flex-[4] flex flex-col overflow-hidden" style={{ backgroundColor: "#f4f6f9" }}>
+                <div className="px-4 py-2.5 border-b flex items-center gap-2 shrink-0" style={{ backgroundColor: "#e8eaf6", borderColor: "#c5cae9" }}>
+                  <BookOpen className="h-4 w-4" style={{ color: "#1a237e" }} />
+                  <h2 className="font-black text-xs uppercase tracking-wider" style={{ color: "#1a237e" }}>Zone de réponses</h2>
+                </div>
+                <div className="flex-1 overflow-y-auto p-4 flex flex-col items-center justify-center gap-6 text-center">
+                  <div className="h-14 w-14 rounded-2xl flex items-center justify-center" style={{ backgroundColor: "#e8eaf6" }}>
+                    <BookOpen className="h-7 w-7" style={{ color: "#1a237e" }} />
+                  </div>
+                  <div>
+                    <p className="font-black text-gray-700 text-sm mb-1">Zone de réponses candidat</p>
+                    <p className="text-xs text-gray-400 leading-relaxed max-w-xs">
+                      Lors de l&apos;examen, chaque question sera accompagnée d&apos;un champ de réponse directement en dessous.<br />
+                      Les candidats répondent question par question sur cette partie droite.
+                    </p>
+                  </div>
+                  <div className="w-full space-y-2 max-w-xs">
+                    {[1, 2, 3].map(n => (
+                      <div key={n} className="bg-white rounded-xl border p-3 text-left opacity-50" style={{ borderColor: "#e0e0e0" }}>
+                        <div className="flex items-center gap-2 mb-2">
+                          <div className="h-5 w-5 rounded-full flex items-center justify-center text-[10px] font-black text-white shrink-0" style={{ backgroundColor: "#1a237e" }}>
+                            {n}
+                          </div>
+                          <div className="h-2 bg-gray-200 rounded flex-1" />
+                        </div>
+                        <div className="h-12 bg-gray-100 rounded-lg border border-dashed border-gray-300 flex items-center justify-center">
+                          <span className="text-[10px] text-gray-400">Réponse du candidat</span>
+                        </div>
+                      </div>
+                    ))}
+                    <p className="text-[10px] text-gray-300 text-center">Aperçu simulé — {examPreview.duration ?? "—"} min</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* ── MODAL Publication — sélection des candidats ── */}
       <AnimatePresence>
