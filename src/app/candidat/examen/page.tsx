@@ -1317,119 +1317,112 @@ export default function CandidatExamenPage() {
                         </div>
 
                         {/* Liste scrollable : question → réponse juste en dessous */}
-                        <div className="flex-1 overflow-y-auto p-3 space-y-3">
+                        <div className="flex-1 overflow-y-auto p-3 space-y-2">
                             {questions.length === 0 ? (
                                 /* ── PDF sans questions parsées : blocs numérotés ── */
                                 Array.from({ length: freeAnswerCount }, (_, i) => {
                                     const filled = !!(answers[`free_${i}`] && answers[`free_${i}`] !== "<p></p>");
                                     return (
-                                        <div
-                                            key={i}
-                                            className="rounded-xl overflow-hidden border transition-colors bg-white shadow-sm"
-                                            style={{ borderColor: filled ? "#a5d6a7" : "#e0e0e0" }}
-                                        >
-                                            {/* En-tête */}
-                                            <div
-                                                className="px-3 py-2 border-b flex items-center gap-2"
-                                                style={{ backgroundColor: filled ? "#e8f5e9" : "#f8f9fa", borderColor: filled ? "#a5d6a7" : "#eeeeee" }}
-                                            >
-                                                <div
-                                                    className="h-5 w-5 rounded-full flex items-center justify-center text-[10px] font-black shrink-0 text-white"
-                                                    style={{ backgroundColor: filled ? "#2e7d32" : "#1a237e" }}
-                                                >
-                                                    {i + 1}
-                                                </div>
-                                                <span className="text-xs font-black uppercase tracking-wide" style={{ color: filled ? "#2e7d32" : "#1a237e" }}>
-                                                    Question {i + 1}
-                                                </span>
-                                                {filled && (
-                                                    <span className="ml-auto flex items-center gap-1 text-[10px] font-bold text-emerald-700">
-                                                        <CheckCircle2 className="h-3 w-3" />Saisie
-                                                    </span>
-                                                )}
+                                        <div key={i} className="rounded-xl overflow-hidden border transition-colors bg-white shadow-sm" style={{ borderColor: filled ? "#a5d6a7" : "#e0e0e0" }}>
+                                            <div className="px-3 py-2 border-b flex items-center gap-2" style={{ backgroundColor: filled ? "#e8f5e9" : "#f8f9fa", borderColor: filled ? "#a5d6a7" : "#eeeeee" }}>
+                                                <div className="h-5 w-5 rounded-full flex items-center justify-center text-[10px] font-black shrink-0 text-white" style={{ backgroundColor: filled ? "#2e7d32" : "#1a237e" }}>{i + 1}</div>
+                                                <span className="text-xs font-black uppercase tracking-wide" style={{ color: filled ? "#2e7d32" : "#1a237e" }}>Question {i + 1}</span>
+                                                {filled && <span className="ml-auto flex items-center gap-1 text-[10px] font-bold text-emerald-700"><CheckCircle2 className="h-3 w-3" />Saisie</span>}
                                             </div>
-                                            {/* Réponse juste en dessous */}
                                             <div className="p-3">
-                                                <RichTextEditor
-                                                    value={answers[`free_${i}`] || ""}
-                                                    onChange={html => setAnswers(prev => ({ ...prev, [`free_${i}`]: html }))}
-                                                    placeholder={`Votre réponse à la question ${i + 1}…`}
-                                                    minHeight="120px"
-                                                />
+                                                <RichTextEditor value={answers[`free_${i}`] || ""} onChange={html => setAnswers(prev => ({ ...prev, [`free_${i}`]: html }))} placeholder={`Votre réponse à la question ${i + 1}…`} minHeight="100px" />
                                             </div>
                                         </div>
                                     );
                                 })
-                            ) : (
-                                /* ── Questions parsées : texte + réponse juste en dessous ── */
-                                questions.map((q, idx) => {
-                                    const filled = !!(answers[q.id] && answers[q.id] !== "<p></p>");
-                                    return (
-                                        <div
-                                            key={q.id}
-                                            className="rounded-xl overflow-hidden border transition-colors bg-white shadow-sm"
-                                            style={{ borderColor: filled ? "#a5d6a7" : "#e0e0e0" }}
-                                        >
-                                            {/* En-tête */}
-                                            <div
-                                                className="px-3 py-2 border-b flex items-center gap-2"
-                                                style={{ backgroundColor: filled ? "#e8f5e9" : "#f8f9fa", borderColor: filled ? "#a5d6a7" : "#eeeeee" }}
-                                            >
-                                                <div
-                                                    className="h-5 w-5 rounded-full flex items-center justify-center text-[10px] font-black shrink-0 text-white"
-                                                    style={{ backgroundColor: filled ? "#2e7d32" : "#1a237e" }}
-                                                >
-                                                    {idx + 1}
-                                                </div>
-                                                <span className="text-xs font-black uppercase tracking-wide" style={{ color: filled ? "#2e7d32" : "#1a237e" }}>
-                                                    Question {idx + 1}
+                            ) : (() => {
+                                /* ── Questions parsées avec section/subsection dividers ── */
+                                const items: React.ReactNode[] = [];
+                                let lastSection    = "";
+                                let lastSubsection = "";
+
+                                questions.forEach((q, idx) => {
+                                    const section    = q.section    || q.part || "";
+                                    const subsection = q.subsection || "";
+                                    const filled     = !!(answers[q.id] && answers[q.id] !== "<p></p>");
+                                    const justifKey  = `${q.id}_justif`;
+                                    const justifFilled = !!(answers[justifKey] && answers[justifKey] !== "<p></p>");
+
+                                    // ── Divider de section ──
+                                    if (section && section !== lastSection) {
+                                        lastSection = section;
+                                        lastSubsection = "";
+                                        items.push(
+                                            <div key={`sec_${idx}`} className="flex items-center gap-2 pt-1">
+                                                <div className="flex-1 h-px bg-gray-200" />
+                                                <span className="text-[10px] font-black uppercase tracking-widest px-2 py-1 rounded-full" style={{ backgroundColor: "#1a237e", color: "white" }}>
+                                                    {section.replace(/^(Section\s+\d+|PARTIE\s+\w+)\s*[:\-]?\s*/i, "").trim() || section}
                                                 </span>
-                                                {q.part && <span className="text-[10px] text-gray-400 ml-1">{q.part}</span>}
-                                                {q.type === "qcm" && (
-                                                    <span className="text-[9px] bg-purple-100 text-purple-700 font-bold px-1.5 py-0.5 rounded-full uppercase ml-1">QCM</span>
-                                                )}
-                                                {filled && (
-                                                    <span className="ml-auto flex items-center gap-1 text-[10px] font-bold text-emerald-700">
-                                                        <CheckCircle2 className="h-3 w-3" />Saisie
-                                                    </span>
-                                                )}
+                                                <div className="flex-1 h-px bg-gray-200" />
                                             </div>
+                                        );
+                                    }
+
+                                    // ── Label de sous-section (QCM / Questions Ouvertes) ──
+                                    if (subsection && subsection !== lastSubsection) {
+                                        lastSubsection = subsection;
+                                        const isQcmSub = /QCM/i.test(subsection);
+                                        items.push(
+                                            <div key={`sub_${idx}`} className="px-1">
+                                                <span className="text-[10px] font-bold px-2 py-0.5 rounded" style={{ backgroundColor: isQcmSub ? "#ede7f6" : "#e3f2fd", color: isQcmSub ? "#6a1b9a" : "#1565c0" }}>
+                                                    {subsection.split("(")[0].trim()}
+                                                </span>
+                                            </div>
+                                        );
+                                    }
+
+                                    // ── Carte question ──
+                                    items.push(
+                                        <div key={q.id} className="rounded-xl overflow-hidden border transition-colors bg-white shadow-sm" style={{ borderColor: filled ? "#a5d6a7" : "#e0e0e0" }}>
+                                            {/* En-tête */}
+                                            <div className="px-3 py-2 border-b flex items-center gap-2" style={{ backgroundColor: filled ? "#e8f5e9" : "#f8f9fa", borderColor: filled ? "#a5d6a7" : "#eeeeee" }}>
+                                                <div className="h-5 w-5 rounded-full flex items-center justify-center text-[10px] font-black shrink-0 text-white" style={{ backgroundColor: filled ? "#2e7d32" : "#1a237e" }}>{idx + 1}</div>
+                                                <span className="text-xs font-black uppercase tracking-wide" style={{ color: filled ? "#2e7d32" : "#1a237e" }}>Question {idx + 1}</span>
+                                                {q.type === "qcm" && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full uppercase" style={{ backgroundColor: "#ede7f6", color: "#6a1b9a" }}>QCM</span>}
+                                                {filled && <span className="ml-auto flex items-center gap-1 text-[10px] font-bold text-emerald-700"><CheckCircle2 className="h-3 w-3" />Saisie</span>}
+                                            </div>
+
                                             {/* Texte de la question */}
-                                            <div className="px-3 pt-2.5 pb-2">
-                                                <p className="text-gray-900 font-medium text-sm leading-relaxed whitespace-pre-wrap">{q.text}</p>
+                                            <div className="px-3 pt-2.5 pb-1">
+                                                <p className="text-gray-800 font-semibold text-sm leading-relaxed whitespace-pre-wrap">{q.text}</p>
                                             </div>
-                                            {/* Réponse juste en dessous */}
-                                            <div className="px-3 pb-3">
-                                                {q.type === "qcm" ? (
-                                                    <div className="space-y-1.5">
-                                                        {q.options?.map((opt, i) => (
-                                                            <label
-                                                                key={i}
-                                                                className={`flex items-center gap-3 p-2.5 rounded-lg border cursor-pointer transition-colors ${answers[q.id] === opt ? "bg-[#e8eaf6] border-[#1a237e]" : "bg-gray-50 border-transparent hover:bg-gray-100"}`}
-                                                            >
-                                                                <input
-                                                                    type="radio"
-                                                                    name={`q_${q.id}`}
-                                                                    checked={answers[q.id] === opt}
-                                                                    onChange={() => setAnswers(prev => ({ ...prev, [q.id]: opt }))}
-                                                                />
-                                                                <span className="text-sm text-gray-800">{opt}</span>
-                                                            </label>
-                                                        ))}
-                                                    </div>
-                                                ) : (
-                                                    <RichTextEditor
-                                                        value={answers[q.id] || ""}
-                                                        onChange={html => setAnswers(prev => ({ ...prev, [q.id]: html }))}
-                                                        placeholder="Votre réponse…"
-                                                        minHeight="120px"
-                                                    />
-                                                )}
-                                            </div>
+
+                                            {/* Options QCM (radio) */}
+                                            {q.type === "qcm" && q.options && q.options.length > 0 && (
+                                                <div className="px-3 pb-2 space-y-1.5 mt-1">
+                                                    {q.options.map((opt, oi) => (
+                                                        <label key={oi} className={`flex items-start gap-2.5 p-2.5 rounded-lg border cursor-pointer transition-all ${answers[q.id] === opt ? "border-[#1a237e] bg-[#e8eaf6]" : "border-gray-100 bg-gray-50 hover:bg-gray-100"}`}>
+                                                            <input type="radio" name={`q_${q.id}`} checked={answers[q.id] === opt} onChange={() => setAnswers(prev => ({ ...prev, [q.id]: opt }))} className="mt-0.5 shrink-0 accent-[#1a237e]" />
+                                                            <span className="text-sm text-gray-800 leading-snug">{opt}</span>
+                                                        </label>
+                                                    ))}
+                                                </div>
+                                            )}
+
+                                            {/* Champ "Justifiez votre choix" pour QCM qui le demandent */}
+                                            {q.type === "qcm" && q.has_justification && (
+                                                <div className="px-3 pb-3 mt-1">
+                                                    <p className="text-[11px] font-bold text-gray-500 mb-1.5 italic">Justifiez votre choix :</p>
+                                                    <RichTextEditor value={answers[justifKey] || ""} onChange={html => setAnswers(prev => ({ ...prev, [justifKey]: html }))} placeholder="Justifiez votre réponse…" minHeight="80px" />
+                                                </div>
+                                            )}
+
+                                            {/* Champ réponse ouverte */}
+                                            {q.type === "open" && (
+                                                <div className="px-3 pb-3 mt-1">
+                                                    <RichTextEditor value={answers[q.id] || ""} onChange={html => setAnswers(prev => ({ ...prev, [q.id]: html }))} placeholder="Votre réponse…" minHeight="100px" />
+                                                </div>
+                                            )}
                                         </div>
                                     );
-                                })
-                            )}
+                                });
+                                return items;
+                            })()}
                         </div>
 
                         {/* Barre progression + bouton soumettre (fixe en bas) */}

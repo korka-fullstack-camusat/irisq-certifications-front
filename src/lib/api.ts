@@ -990,9 +990,12 @@ export interface CandidateExam {
     parsed_questions?: Array<{
         id: string;
         part?: string;
+        section?: string;
+        subsection?: string;
         text: string;
         type: string;
         options?: string[];
+        has_justification?: boolean;
     }>;
 }
 
