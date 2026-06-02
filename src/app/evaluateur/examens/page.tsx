@@ -792,49 +792,31 @@ export default function ExamensPage() {
                 </div>
                 <div className="flex-1 overflow-hidden bg-gray-50">
                   {(() => {
-                    // Détecter le type de fichier depuis le paramètre ?n= de l'URL
                     const rawName = decodeURIComponent(
-                      (examPreview.url || "").split("?n=")[1] || ""
+                      (examPreview.url || "").split("?n=")[1] || examPreview.url || ""
                     ).toLowerCase();
-                    const isPdf  = rawName.endsWith(".pdf");
                     const isDocx = rawName.endsWith(".docx") || rawName.endsWith(".doc");
-                    const officeUrl = `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(examPreview.url)}`;
 
-                    if (isPdf) {
-                      return (
-                        <object
-                          data={`${examPreview.url}#view=FitH&toolbar=1&navpanes=0`}
-                          type="application/pdf"
-                          className="w-full border-0"
-                          style={{ height: "100%", minHeight: "400px" }}
-                          aria-label="Aperçu sujet"
-                        >
-                          <iframe
-                            src={examPreview.url}
-                            title="Aperçu sujet"
-                            className="w-full border-0 block"
-                            style={{ height: "100%", minHeight: "400px" }}
-                          />
-                        </object>
-                      );
-                    }
+                    // DOCX → Office Online viewer (rendu Word fidèle)
                     if (isDocx) {
                       return (
                         <iframe
-                          src={officeUrl}
+                          src={`https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(examPreview.url)}`}
                           title="Aperçu sujet"
                           className="w-full border-0 block bg-white"
-                          style={{ height: "100%", minHeight: "400px" }}
+                          style={{ height: "100%", minHeight: "500px" }}
                         />
                       );
                     }
-                    // Fallback générique
+
+                    // PDF et tout autre format → iframe directe
+                    // Même logique que la page candidat /examen qui affiche correctement
                     return (
                       <iframe
                         src={examPreview.url}
                         title="Aperçu sujet"
                         className="w-full border-0 block"
-                        style={{ height: "100%", minHeight: "400px" }}
+                        style={{ height: "100%", minHeight: "500px" }}
                       />
                     );
                   })()}
