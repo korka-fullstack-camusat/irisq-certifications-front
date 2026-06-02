@@ -1249,20 +1249,28 @@ export default function CandidatExamenPage() {
                                     <Loader2 className="h-5 w-5 animate-spin" style={{ color: "#1a237e" }} />
                                     <span>Chargement du sujet…</span>
                                 </div>
-                            ) : hasVisibleContent(exam.exam_content_html) ? (
-                                <div
-                                    className="px-5 py-4 exam-subject"
-                                    style={{ fontSize: "0.875rem", lineHeight: "1.7" }}
-                                    dangerouslySetInnerHTML={{ __html: exam.exam_content_html! }}
-                                />
-                            ) : exam.document_url ? (
-                                <iframe
-                                    src={resolveDocUrl(exam.document_url)}
-                                    title="Sujet d'examen"
-                                    className="w-full h-full border-0 block"
-                                    style={{ minHeight: "300px" }}
-                                />
-                            ) : (
+                            ) : exam.document_url ? (() => {
+                                // Détecter le type de fichier pour choisir le mode d'affichage
+                                const rawName = decodeURIComponent((exam.document_url || "").split("?n=")[1] || exam.document_url || "").toLowerCase();
+                                const isDocx  = rawName.endsWith(".docx") || rawName.endsWith(".doc");
+                                // PDF → toujours iframe (préserve le format IRISQ exact, logo, tableaux, couleurs)
+                                // DOCX → HTML si disponible (mammoth), sinon iframe
+                                const useHtml = isDocx && hasVisibleContent(exam.exam_content_html);
+                                return useHtml ? (
+                                    <div
+                                        className="px-6 py-5 exam-subject"
+                                        style={{ fontSize: "0.875rem", lineHeight: "1.8" }}
+                                        dangerouslySetInnerHTML={{ __html: exam.exam_content_html! }}
+                                    />
+                                ) : (
+                                    <iframe
+                                        src={resolveDocUrl(exam.document_url)}
+                                        title="Sujet d'examen"
+                                        className="w-full border-0 block"
+                                        style={{ height: "100%", minHeight: "500px" }}
+                                    />
+                                );
+                            })() : (
                                 <div className="flex flex-col items-center justify-center gap-3 h-full text-center px-6 py-10">
                                     <FileText className="h-10 w-10 text-gray-200" />
                                     <p className="text-sm font-semibold text-gray-500">Aucun sujet joint à cet examen.</p>
