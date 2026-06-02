@@ -786,12 +786,53 @@ export default function ExamensPage() {
                   <span className="ml-auto text-[10px] text-gray-400 font-medium">{examPreview.certification}</span>
                 </div>
                 <div className="flex-1 overflow-hidden bg-gray-50">
-                  <iframe
-                    src={examPreview.url}
-                    title="Aperçu sujet"
-                    className="w-full border-0 block"
-                    style={{ height: "100%", minHeight: "400px" }}
-                  />
+                  {(() => {
+                    // Détecter le type de fichier depuis le paramètre ?n= de l'URL
+                    const rawName = decodeURIComponent(
+                      (examPreview.url || "").split("?n=")[1] || ""
+                    ).toLowerCase();
+                    const isPdf  = rawName.endsWith(".pdf");
+                    const isDocx = rawName.endsWith(".docx") || rawName.endsWith(".doc");
+                    const officeUrl = `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(examPreview.url)}`;
+
+                    if (isPdf) {
+                      return (
+                        <object
+                          data={`${examPreview.url}#view=FitH&toolbar=1&navpanes=0`}
+                          type="application/pdf"
+                          className="w-full border-0"
+                          style={{ height: "100%", minHeight: "400px" }}
+                          aria-label="Aperçu sujet"
+                        >
+                          <iframe
+                            src={examPreview.url}
+                            title="Aperçu sujet"
+                            className="w-full border-0 block"
+                            style={{ height: "100%", minHeight: "400px" }}
+                          />
+                        </object>
+                      );
+                    }
+                    if (isDocx) {
+                      return (
+                        <iframe
+                          src={officeUrl}
+                          title="Aperçu sujet"
+                          className="w-full border-0 block bg-white"
+                          style={{ height: "100%", minHeight: "400px" }}
+                        />
+                      );
+                    }
+                    // Fallback générique
+                    return (
+                      <iframe
+                        src={examPreview.url}
+                        title="Aperçu sujet"
+                        className="w-full border-0 block"
+                        style={{ height: "100%", minHeight: "400px" }}
+                      />
+                    );
+                  })()}
                 </div>
               </div>
 
