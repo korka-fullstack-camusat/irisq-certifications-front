@@ -9,6 +9,7 @@ import {
   ChevronLeft, ChevronRight, AlertCircle, RefreshCw,
   BookOpen,
 } from "lucide-react";
+import RichTextEditor from "@/components/RichTextEditor";
 import {
   API_URL, fetchExams, createExam, deleteExam, uploadFiles, publishExam,
   reparseExam, fetchCertifications, fetchExamCandidates, type ExamCandidate,
@@ -46,11 +47,16 @@ export default function ExamensPage() {
   const [publishingId, setPublishingId]       = useState<string | null>(null);
 
   // ── Modal aperçu rendu examen ──
-  type ExamQuestion = { id: string; text: string; type: string; options?: string[] };
+  type ExamQuestion = {
+    id: string; text: string; type: string;
+    options?: string[]; section?: string;
+    subsection?: string; has_justification?: boolean;
+  };
   const [examPreview, setExamPreview] = useState<{
     url: string; title: string; certification: string;
     duration?: number; questions: ExamQuestion[];
   } | null>(null);
+  const [previewAnswers, setPreviewAnswers] = useState<Record<string, string>>({});
 
   // ── Modal publication ──
   const [publishModal, setPublishModal] = useState<{ examId: string; certification: string } | null>(null);
@@ -450,13 +456,16 @@ export default function ExamensPage() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => setExamPreview({
-                      url: resolveDocUrl(exam.document_url),
-                      title: exam.title,
-                      certification: exam.certification,
-                      duration: exam.duration_minutes,
-                      questions: exam.parsed_questions || [],
-                    })}
+                    onClick={() => {
+                      setPreviewAnswers({});
+                      setExamPreview({
+                        url: resolveDocUrl(exam.document_url),
+                        title: exam.title,
+                        certification: exam.certification,
+                        duration: exam.duration_minutes,
+                        questions: exam.parsed_questions || [],
+                      });
+                    }}
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold transition-all"
                     style={{ borderColor: "#c8e6c9", color: "#2e7d32", backgroundColor: "#f1f8e9" }}
                     onMouseEnter={e => (e.currentTarget.style.backgroundColor = "#e8f5e9")}
@@ -836,78 +845,145 @@ export default function ExamensPage() {
                 </div>
 
                 <div className="flex-1 overflow-y-auto p-3 space-y-3">
-                  {examPreview.questions.length > 0 ? (
-                    /* ── Questions parsées depuis le document ── */
-                    examPreview.questions.map((q, i) => (
-                      <div key={q.id} className="rounded-xl overflow-hidden border bg-white shadow-sm" style={{ borderColor: "#e0e0e0" }}>
-                        {/* En-tête question */}
-                        <div className="px-3 py-2 border-b flex items-center gap-2" style={{ backgroundColor: "#f8f9fa", borderColor: "#eeeeee" }}>
-                          <div className="h-5 w-5 rounded-full flex items-center justify-center text-[10px] font-black shrink-0 text-white" style={{ backgroundColor: "#1a237e" }}>
-                            {i + 1}
+                  {examPreview.questions.length > 0 ? (() => {
+                    /* ── Questions parsées : rendu fidèle avec éditeur riche ── */
+                    const nodes: React.ReactNode[] = [];
+                    let lastSection    = "";
+                    let lastSubsection = "";
+
+                    examPreview.questions.forEach((q, i) => {
+                      const section    = q.section    || "";
+                      const subsection = q.subsection || "";
+
+                      // Divider de section
+                      if (section && section !== lastSection) {
+                        lastSection = section;
+                        lastSubsection = "";
+                        nodes.push(
+                          <div key={`sec_${i}`} className="flex items-center gap-2 pt-1">
+                            <div className="flex-1 h-px bg-gray-200" />
+                            <span className="text-[10px] font-black uppercase tracking-widest px-2 py-1 rounded-full text-white" style={{ backgroundColor: "#1a237e" }}>
+                              {section.replace(/^(Section\s+\d+|PARTIE\s+\w+)\s*[:\-]?\s*/i, "").trim() || section}
+                            </span>
+                            <div className="flex-1 h-px bg-gray-200" />
                           </div>
-                          <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
-                            {q.type === "mcq" ? "QCM" : "Question ouverte"}
-                          </span>
-                        </div>
-                        {/* Texte question */}
-                        <div className="px-3 pt-2 pb-1">
-                          <p className="text-xs text-gray-700 leading-relaxed">{q.text}</p>
-                        </div>
-                        {/* Options MCQ */}
-                        {q.options && q.options.length > 0 && (
-                          <div className="px-3 pb-2 space-y-1 mt-1">
-                            {q.options.map((opt, oi) => (
-                              <div key={oi} className="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-gray-50 border border-gray-100">
-                                <div className="h-3.5 w-3.5 rounded border-2 shrink-0" style={{ borderColor: "#c5cae9" }} />
-                                <span className="text-[11px] text-gray-600">{opt}</span>
-                              </div>
-                            ))}
+                        );
+                      }
+                      // Label sous-section (QCM / Questions Ouvertes)
+                      if (subsection && subsection !== lastSubsection) {
+                        lastSubsection = subsection;
+                        const isQcm = /QCM/i.test(subsection);
+                        nodes.push(
+                          <div key={`sub_${i}`} className="px-1">
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded" style={{ backgroundColor: isQcm ? "#ede7f6" : "#e3f2fd", color: isQcm ? "#6a1b9a" : "#1565c0" }}>
+                              {subsection.split("(")[0].trim()}
+                            </span>
                           </div>
-                        )}
-                        {/* Champ réponse */}
-                        <div className="px-3 pb-3 mt-2">
-                          <div
-                            className="w-full rounded-lg border border-dashed flex items-center justify-center text-[10px] text-gray-300 font-medium"
-                            style={{ backgroundColor: "#f8f9fa", borderColor: "#d1d5db", minHeight: q.type === "mcq" ? "32px" : "64px" }}
-                          >
-                            {q.type === "mcq" ? "Sélection du candidat" : "Réponse ouverte du candidat…"}
+                        );
+                      }
+
+                      const answKey   = q.id;
+                      const justKey   = `${q.id}_justif`;
+
+                      nodes.push(
+                        <div key={q.id} className="rounded-xl overflow-hidden border bg-white shadow-sm" style={{ borderColor: "#e0e0e0" }}>
+                          {/* En-tête */}
+                          <div className="px-3 py-2 border-b flex items-center gap-2" style={{ backgroundColor: "#f8f9fa", borderColor: "#eeeeee" }}>
+                            <div className="h-5 w-5 rounded-full flex items-center justify-center text-[10px] font-black shrink-0 text-white" style={{ backgroundColor: "#1a237e" }}>
+                              {i + 1}
+                            </div>
+                            <span className="text-xs font-black uppercase tracking-wide" style={{ color: "#1a237e" }}>Question {i + 1}</span>
+                            {q.type === "qcm" && (
+                              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full uppercase" style={{ backgroundColor: "#ede7f6", color: "#6a1b9a" }}>QCM</span>
+                            )}
                           </div>
+
+                          {/* Texte question */}
+                          <div className="px-3 pt-2.5 pb-1">
+                            <p className="text-sm text-gray-800 font-semibold leading-relaxed whitespace-pre-wrap">{q.text}</p>
+                          </div>
+
+                          {/* Options QCM — radio interactifs */}
+                          {q.type === "qcm" && q.options && q.options.length > 0 && (
+                            <div className="px-3 pb-2 space-y-1.5 mt-1">
+                              {q.options.map((opt, oi) => (
+                                <label key={oi} className={`flex items-start gap-2.5 p-2.5 rounded-lg border cursor-pointer transition-all ${previewAnswers[answKey] === opt ? "border-[#1a237e] bg-[#e8eaf6]" : "border-gray-100 bg-gray-50 hover:bg-gray-100"}`}>
+                                  <input
+                                    type="radio"
+                                    name={`preview_${q.id}`}
+                                    checked={previewAnswers[answKey] === opt}
+                                    onChange={() => setPreviewAnswers(prev => ({ ...prev, [answKey]: opt }))}
+                                    className="mt-0.5 shrink-0 accent-[#1a237e]"
+                                  />
+                                  <span className="text-sm text-gray-800 leading-snug">{opt}</span>
+                                </label>
+                              ))}
+                            </div>
+                          )}
+
+                          {/* Champ justification (QCM avec demande de justification) */}
+                          {q.type === "qcm" && q.has_justification && (
+                            <div className="px-3 pb-2 mt-1">
+                              <p className="text-[11px] font-bold text-gray-500 mb-1 italic">Justifiez votre choix :</p>
+                              <RichTextEditor
+                                value={previewAnswers[justKey] || ""}
+                                onChange={html => setPreviewAnswers(prev => ({ ...prev, [justKey]: html }))}
+                                placeholder="Rédigez votre justification…"
+                                minHeight="80px"
+                              />
+                            </div>
+                          )}
+
+                          {/* Champ réponse ouverte — éditeur Word complet */}
+                          {q.type !== "qcm" && (
+                            <div className="px-3 pb-3 mt-1">
+                              <RichTextEditor
+                                value={previewAnswers[answKey] || ""}
+                                onChange={html => setPreviewAnswers(prev => ({ ...prev, [answKey]: html }))}
+                                placeholder="Rédigez votre réponse (texte, tableaux, listes…)"
+                                minHeight="120px"
+                              />
+                            </div>
+                          )}
                         </div>
-                      </div>
-                    ))
-                  ) : (
-                    /* ── Aucune question parsée : blocs numérotés libres ── */
+                      );
+                    });
+                    return <div className="space-y-2">{nodes}</div>;
+                  })() : (
+                    /* ── Aucune question parsée : blocs libres avec éditeur ── */
                     <div className="space-y-3">
                       {[1, 2, 3, 4, 5].map(n => (
                         <div key={n} className="rounded-xl overflow-hidden border bg-white shadow-sm" style={{ borderColor: "#e0e0e0" }}>
                           <div className="px-3 py-2 border-b flex items-center gap-2" style={{ backgroundColor: "#f8f9fa", borderColor: "#eeeeee" }}>
-                            <div className="h-5 w-5 rounded-full flex items-center justify-center text-[10px] font-black shrink-0 text-white" style={{ backgroundColor: "#1a237e" }}>
-                              {n}
-                            </div>
-                            <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Question {n}</span>
+                            <div className="h-5 w-5 rounded-full flex items-center justify-center text-[10px] font-black text-white shrink-0" style={{ backgroundColor: "#1a237e" }}>{n}</div>
+                            <span className="text-xs font-black uppercase tracking-wide" style={{ color: "#1a237e" }}>Question {n}</span>
                           </div>
                           <div className="p-3">
-                            <div
-                              className="w-full rounded-lg border border-dashed flex items-center justify-center text-[10px] text-gray-300 font-medium"
-                              style={{ backgroundColor: "#f8f9fa", borderColor: "#d1d5db", minHeight: "72px" }}
-                            >
-                              Réponse ouverte du candidat…
-                            </div>
+                            <RichTextEditor
+                              value={previewAnswers[`free_${n}`] || ""}
+                              onChange={html => setPreviewAnswers(prev => ({ ...prev, [`free_${n}`]: html }))}
+                              placeholder="Rédigez votre réponse (texte, tableaux, listes…)"
+                              minHeight="100px"
+                            />
                           </div>
                         </div>
                       ))}
-                      <p className="text-[10px] text-gray-400 text-center px-2">
-                        Le document n&apos;a pas encore de questions extraites automatiquement.<br/>
-                        Utilisez le bouton <strong>Re-parser</strong> pour les extraire.
-                      </p>
+                      <div className="rounded-xl p-3 text-center" style={{ backgroundColor: "#fff8e1", border: "1px solid #ffe082" }}>
+                        <p className="text-[11px] text-amber-700 font-semibold">
+                          Questions non extraites automatiquement.
+                        </p>
+                        <p className="text-[10px] text-amber-600 mt-0.5">
+                          Fermez ce panneau et utilisez le bouton <strong>⟳ Re-parser</strong> sur l&apos;examen.
+                        </p>
+                      </div>
                     </div>
                   )}
                 </div>
 
-                {/* Barre de bas — bouton soumettre simulé */}
+                {/* Barre de bas */}
                 <div className="px-4 py-3 border-t shrink-0 flex items-center justify-between" style={{ backgroundColor: "#fff", borderColor: "#e0e0e0" }}>
                   <span className="text-[10px] text-gray-400">
-                    {examPreview.duration ? `⏱ ${examPreview.duration} min` : ""} · Aperçu non interactif
+                    {examPreview.duration ? `⏱ ${examPreview.duration} min` : ""} · Aperçu évaluateur
                   </span>
                   <div className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold text-white opacity-40 cursor-not-allowed" style={{ backgroundColor: "#2e7d32" }}>
                     <Send className="h-3 w-3" />
