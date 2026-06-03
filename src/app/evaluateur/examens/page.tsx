@@ -794,7 +794,7 @@ export default function ExamensPage() {
                   previewAnswers[q.id] && previewAnswers[q.id] !== "<p></p>"
                 ).length;
                 return (
-                  <div className="w-56 shrink-0 border-r flex flex-col overflow-y-auto" style={{ backgroundColor: "#fff", borderColor: "#e0e0e0" }}>
+                  <div className="w-72 shrink-0 border-r flex flex-col overflow-y-auto" style={{ backgroundColor: "#fff", borderColor: "#e0e0e0" }}>
                     {/* Titre + stats */}
                     <div className="px-4 pt-5 pb-3 border-b" style={{ borderColor: "#e8eaf6" }}>
                       <p className="text-[10px] font-black uppercase tracking-widest mb-2" style={{ color: "#1a237e" }}>Avancement</p>
@@ -859,7 +859,7 @@ export default function ExamensPage() {
               <div className="flex-1 overflow-y-auto" style={{ backgroundColor: "#f4f6f9" }}>
 
               {/* ── Formulaire dynamique ── */}
-              <div className="max-w-2xl mx-auto px-4 pt-6 pb-10 space-y-0">
+              <div className="px-6 pt-6 pb-10 space-y-0">
                 {examPreview.questions.length > 0 ? (() => {
                   const totalPreviewPages = Math.ceil(examPreview.questions.length / PREVIEW_PER_PAGE);
                   const pageStart = previewPage * PREVIEW_PER_PAGE;
