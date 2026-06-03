@@ -1241,114 +1241,62 @@ export default function CandidatExamenPage() {
                     </div>
                 </div>
 
-                {/* Main content — split view */}
-                <div className="flex-1 flex overflow-hidden flex-col md:flex-row">
+                {/* Main content — sidebar gauche + formulaire droite (même layout que l'Aperçu) */}
+                <div className="flex-1 flex overflow-hidden">
 
-                    {/* ══ GAUCHE : Sujet + navigateur de questions ══ */}
-                    <div className="md:flex-[5] flex flex-col border-b md:border-b-0 md:border-r overflow-hidden" style={{ borderColor: "#c5cae9", minHeight: "40vh" }}>
-                        {/* Header sujet */}
-                        <div className="px-4 py-2.5 border-b flex items-center gap-2 shrink-0" style={{ backgroundColor: "#e8eaf6", borderColor: "#c5cae9" }}>
-                            <FileText className="h-4 w-4 text-[#1a237e]" />
-                            <h2 className="font-black text-xs uppercase tracking-wider text-[#1a237e]">Sujet d&apos;Examen</h2>
-                        </div>
-
-                        {/* Corps du sujet — scrollable */}
-                        <div className="flex-1 overflow-auto" style={{ backgroundColor: "#fafafa" }}>
-                            {isReparsing ? (
-                                <div className="flex items-center justify-center gap-3 h-full text-sm text-gray-400">
-                                    <Loader2 className="h-5 w-5 animate-spin" style={{ color: "#1a237e" }} />
-                                    <span>Chargement du sujet…</span>
-                                </div>
-                            ) : exam.document_url ? (() => {
-                                const rawName = decodeURIComponent((exam.document_url || "").split("?n=")[1] || exam.document_url || "").toLowerCase();
-                                const isDocx  = rawName.endsWith(".docx") || rawName.endsWith(".doc");
-                                const useHtml = isDocx && hasVisibleContent(exam.exam_content_html);
-                                return useHtml ? (
-                                    <div className="px-6 py-5 exam-subject" style={{ fontSize: "0.875rem", lineHeight: "1.8" }} dangerouslySetInnerHTML={{ __html: exam.exam_content_html! }} />
-                                ) : (
-                                    <iframe src={resolveDocUrl(exam.document_url)} title="Sujet d'examen" className="w-full border-0 block" style={{ height: "100%", minHeight: "500px" }} />
-                                );
-                            })() : (
-                                <div className="flex flex-col items-center justify-center gap-3 h-full text-center px-6 py-10">
-                                    <FileText className="h-10 w-10 text-gray-200" />
-                                    <p className="text-sm font-semibold text-gray-500">Aucun sujet joint à cet examen.</p>
-                                </div>
-                            )}
-                        </div>
-
-                        {/* ── Navigateur de questions (état d'avancement) ── */}
-                        {totalQCount > 0 && (
-                            <div className="shrink-0 border-t px-3 py-3" style={{ borderColor: "#c5cae9", backgroundColor: "#f4f6f9" }}>
-                                <div className="flex items-center justify-between mb-2">
-                                    <span className="text-[10px] font-black uppercase tracking-widest text-gray-500">Avancement</span>
-                                    <span className="text-[10px] font-bold" style={{ color: "#1a237e" }}>
-                                        {answeredCount}/{totalQCount} répondues
-                                    </span>
-                                </div>
-                                {/* Grille de chips par question */}
-                                <div className="flex flex-wrap gap-1.5">
-                                    {(questions.length > 0 ? questions : Array.from({ length: freeAnswerCount }, (_, i) => ({ id: `free_${i}` }))).map((q, idx) => {
-                                        const isAnswered = questions.length > 0
-                                            ? !!(answers[q.id] && answers[q.id] !== "<p></p>")
-                                            : !!(answers[`free_${idx}`] && answers[`free_${idx}`] !== "<p></p>");
-                                        const qPage = Math.floor(idx / QUESTIONS_PER_PAGE);
-                                        const isCurrentPage = qPage === currentPage && phase === "exam";
-                                        return (
-                                            <button
-                                                key={q.id}
-                                                onClick={() => { setCurrentPage(qPage); if (phase === "review") setPhase("exam"); }}
-                                                title={isAnswered ? `Question ${idx + 1} — Répondue` : `Question ${idx + 1} — Non répondue, cliquez pour y aller`}
-                                                className={`h-6 w-6 rounded-md text-[10px] font-black transition-all flex items-center justify-center ${
-                                                    isCurrentPage
-                                                        ? "ring-2 ring-offset-1 ring-[#1a237e]"
-                                                        : ""
-                                                }`}
-                                                style={{
-                                                    backgroundColor: isAnswered ? "#2e7d32" : "#ffebee",
-                                                    color: isAnswered ? "white" : "#c62828",
-                                                    border: isAnswered ? "none" : "1px solid #ef9a9a",
-                                                }}
-                                            >
-                                                {idx + 1}
-                                            </button>
-                                        );
-                                    })}
-                                </div>
-                                {/* Légende */}
-                                <div className="flex items-center gap-3 mt-2">
-                                    <span className="flex items-center gap-1 text-[9px] text-gray-500">
-                                        <span className="h-3 w-3 rounded-sm inline-block" style={{ backgroundColor: "#2e7d32" }} />Répondue
-                                    </span>
-                                    <span className="flex items-center gap-1 text-[9px] text-gray-500">
-                                        <span className="h-3 w-3 rounded-sm inline-block border border-red-300" style={{ backgroundColor: "#ffebee" }} />Non répondue
-                                    </span>
-                                </div>
+                    {/* ══ GAUCHE : Sidebar navigateur (identique à l'Aperçu) ══ */}
+                    <div className="shrink-0 border-r flex flex-col overflow-y-auto" style={{ width: "320px", minWidth: "320px", backgroundColor: "#fff", borderColor: "#e0e0e0" }}>
+                        {/* Stats */}
+                        <div className="px-5 pt-5 pb-4 border-b" style={{ borderColor: "#e8eaf6" }}>
+                            <p className="text-xs font-black uppercase tracking-widest mb-3" style={{ color: "#1a237e" }}>Avancement</p>
+                            <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden mb-2">
+                                <div className="h-full rounded-full transition-all" style={{ width: `${totalQCount > 0 ? (answeredCount / totalQCount) * 100 : 0}%`, backgroundColor: "#2e7d32" }} />
                             </div>
-                        )}
+                            <div className="flex items-center justify-between">
+                                <span className="text-[11px] font-bold" style={{ color: "#2e7d32" }}>{answeredCount} répondues</span>
+                                <span className="text-[11px] text-gray-400">{totalQCount - answeredCount} restantes</span>
+                            </div>
+                        </div>
+                        {/* Chips questions */}
+                        <div className="px-5 py-4 flex-1">
+                            <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-3">Questions</p>
+                            <div className="flex flex-wrap gap-2">
+                                {(questions.length > 0 ? questions : Array.from({ length: freeAnswerCount }, (_, i) => ({ id: `free_${i}` }))).map((q, idx) => {
+                                    const isAnswered = questions.length > 0
+                                        ? !!(answers[q.id] && answers[q.id] !== "<p></p>")
+                                        : !!(answers[`free_${idx}`] && answers[`free_${idx}`] !== "<p></p>");
+                                    const qPage = Math.floor(idx / QUESTIONS_PER_PAGE);
+                                    const isCurrent = qPage === currentPage && phase === "exam";
+                                    return (
+                                        <button key={q.id} onClick={() => { setCurrentPage(qPage); if (phase === "review") setPhase("exam"); }}
+                                            title={`Q${idx + 1} — ${isAnswered ? "Répondue" : "Non répondue"}`}
+                                            className="h-9 w-9 rounded-lg text-xs font-black transition-all flex items-center justify-center"
+                                            style={{ backgroundColor: isAnswered ? "#2e7d32" : "#ffebee", color: isAnswered ? "white" : "#c62828", border: isCurrent ? "2px solid #1a237e" : isAnswered ? "none" : "1px solid #ef9a9a", boxShadow: isCurrent ? "0 0 0 3px #c5cae9" : "none" }}>
+                                            {idx + 1}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                        {/* Légende */}
+                        <div className="px-5 py-4 border-t space-y-2.5" style={{ borderColor: "#e8eaf6" }}>
+                            <div className="flex items-center gap-3"><span className="h-5 w-5 rounded-md shrink-0" style={{ backgroundColor: "#2e7d32" }} /><span className="text-xs text-gray-600 font-semibold">Répondue</span></div>
+                            <div className="flex items-center gap-3"><span className="h-5 w-5 rounded-md shrink-0 border border-red-300" style={{ backgroundColor: "#ffebee" }} /><span className="text-xs text-gray-600 font-semibold">Non répondue</span></div>
+                            <div className="flex items-center gap-3"><span className="h-5 w-5 rounded-md shrink-0" style={{ border: "2px solid #1a237e", boxShadow: "0 0 0 2px #c5cae9", backgroundColor: "white" }} /><span className="text-xs text-gray-600 font-semibold">Page actuelle</span></div>
+                        </div>
                     </div>
 
-                    {/* ══ DROITE : Questions + réponses ══ */}
-                    <div className="md:flex-[4] flex flex-col overflow-hidden" style={{ backgroundColor: "#f4f6f9" }}>
-
-                        {/* Header */}
-                        <div className="px-4 py-2.5 border-b flex items-center justify-between shrink-0" style={{ backgroundColor: "#e8eaf6", borderColor: "#c5cae9" }}>
+                    {/* ══ DROITE : Formulaire Google Forms pleine largeur ══ */}
+                    <div className="flex-1 flex flex-col overflow-hidden" style={{ backgroundColor: "#f4f6f9" }}>
+                        {/* Header slim */}
+                        <div className="px-4 py-2 border-b flex items-center justify-between shrink-0" style={{ backgroundColor: "#e8eaf6", borderColor: "#c5cae9" }}>
                             <div className="flex items-center gap-2">
                                 <BookOpen className="h-4 w-4 text-[#1a237e]" />
                                 <h2 className="font-black text-xs uppercase tracking-wider text-[#1a237e]">
                                     {phase === "review" ? "Révision de vos réponses" : "Vos Réponses"}
                                 </h2>
                             </div>
-                            <div className="flex items-center gap-2">
-                                {phase !== "review" && questions.length === 0 && (
-                                    <>
-                                        <button onClick={() => setFreeAnswerCount(n => Math.max(1, n - 1))} className="inline-flex items-center gap-1 px-2 py-1 rounded-lg border text-[10px] font-bold text-gray-600 hover:bg-gray-100 transition-colors bg-white" style={{ borderColor: "#e0e0e0" }} title="Retirer un bloc"><X className="h-3 w-3" /></button>
-                                        <button onClick={() => setFreeAnswerCount(n => n + 1)} className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold text-white transition-colors" style={{ backgroundColor: "#2e7d32" }} title="Ajouter un bloc">+ Q</button>
-                                    </>
-                                )}
-                                <span className="text-[10px] font-bold bg-[#1a237e] text-white px-2 py-1 rounded-md">
-                                    {answeredCount}/{totalQCount}
-                                </span>
-                            </div>
+                            <span className="text-[10px] font-bold bg-[#1a237e] text-white px-2 py-1 rounded-md">{answeredCount}/{totalQCount}</span>
                         </div>
 
                         {/* ══ RÉVISION — toutes les questions + réponses ══ */}
@@ -1476,71 +1424,63 @@ export default function CandidatExamenPage() {
                                         );
                                     }
 
-                                    // ── Carte question ──
+                                    // ── Carte question style Google Forms (identique à l'Aperçu) ──
                                     items.push(
-                                        <div key={q.id} className="rounded-xl overflow-hidden border transition-colors bg-white shadow-sm" style={{ borderColor: filled ? "#a5d6a7" : "#e0e0e0" }}>
-                                            {/* En-tête */}
-                                            <div className="px-3 py-2 border-b flex items-center gap-2" style={{ backgroundColor: filled ? "#e8f5e9" : "#f8f9fa", borderColor: filled ? "#a5d6a7" : "#eeeeee" }}>
-                                                <div className="h-5 w-5 rounded-full flex items-center justify-center text-[10px] font-black shrink-0 text-white" style={{ backgroundColor: filled ? "#2e7d32" : "#1a237e" }}>{idx + 1}</div>
-                                                <span className="text-xs font-black uppercase tracking-wide" style={{ color: filled ? "#2e7d32" : "#1a237e" }}>Question {idx + 1}</span>
-                                                {q.type === "qcm" && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full uppercase" style={{ backgroundColor: "#ede7f6", color: "#6a1b9a" }}>QCM</span>}
-                                                {filled && <span className="ml-auto flex items-center gap-1 text-[10px] font-bold text-emerald-700"><CheckCircle2 className="h-3 w-3" />Saisie</span>}
-                                            </div>
-
+                                        <div key={q.id} className="bg-white border overflow-hidden" style={{ borderColor: "#c5cae9", borderTopWidth: idx === pageStart ? "1px" : "0" }}>
                                             {/* Texte de la question */}
-                                            <div className="px-3 pt-2.5 pb-1">
-                                                <p className="text-gray-800 font-semibold text-sm leading-relaxed whitespace-pre-wrap">{q.text}</p>
+                                            <div className="px-6 pt-5 pb-3">
+                                                <div className="flex items-start gap-3">
+                                                    <span className="h-6 w-6 rounded-full flex items-center justify-center text-[11px] font-black text-white shrink-0 mt-0.5" style={{ backgroundColor: filled ? "#2e7d32" : "#1a237e" }}>{idx + 1}</span>
+                                                    <p className="text-sm font-semibold text-gray-900 leading-relaxed whitespace-pre-wrap flex-1">{q.text}</p>
+                                                </div>
                                             </div>
 
-                                            {/* Options QCM (radio) */}
+                                            {/* Options QCM */}
                                             {q.type === "qcm" && q.options && q.options.length > 0 && (
-                                                <div className="px-3 pb-2 space-y-1.5 mt-1">
-                                                    {q.options.map((opt, oi) => (
-                                                        <label key={oi} className={`flex items-start gap-2.5 p-2.5 rounded-lg border cursor-pointer transition-all ${answers[q.id] === opt ? "border-[#1a237e] bg-[#e8eaf6]" : "border-gray-100 bg-gray-50 hover:bg-gray-100"}`}>
-                                                            <input type="radio" name={`q_${q.id}`} checked={answers[q.id] === opt} onChange={() => setAnswers(prev => ({ ...prev, [q.id]: opt }))} className="mt-0.5 shrink-0 accent-[#1a237e]" />
-                                                            <span className="text-sm text-gray-800 leading-snug">{opt}</span>
-                                                        </label>
-                                                    ))}
+                                                <div className="px-8 pb-3 space-y-2">
+                                                    {q.options.map((opt, oi) => {
+                                                        const sel = answers[q.id] === opt;
+                                                        return (
+                                                            <label key={oi} className={`flex items-center gap-3 py-2 px-3 rounded-lg cursor-pointer transition-all group ${sel ? "bg-[#e8f5e9]" : "hover:bg-gray-50"}`}>
+                                                                <div className={`h-5 w-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-all ${sel ? "border-[#2e7d32] bg-[#2e7d32]" : "border-gray-400 group-hover:border-[#1a237e]"}`}>
+                                                                    {sel && <div className="h-2 w-2 rounded-full bg-white" />}
+                                                                </div>
+                                                                <input type="radio" name={`q_${q.id}`} checked={sel} onChange={() => setAnswers(prev => ({ ...prev, [q.id]: opt }))} className="sr-only" />
+                                                                <span className={`text-sm leading-snug ${sel ? "font-semibold text-gray-900" : "text-gray-700"}`}>{opt}</span>
+                                                            </label>
+                                                        );
+                                                    })}
                                                 </div>
                                             )}
                                             {q.type === "qcm" && q.has_justification && (
-                                                <div className="px-3 pb-3 mt-1">
-                                                    <p className="text-[11px] font-bold text-gray-500 mb-1.5 italic">Justifiez votre choix :</p>
-                                                    <RichTextEditor value={answers[justifKey] || ""} onChange={html => setAnswers(prev => ({ ...prev, [justifKey]: html }))} placeholder="Justifiez votre réponse…" minHeight="80px" />
+                                                <div className="px-6 pb-5 mt-1">
+                                                    <p className="text-xs font-bold text-gray-500 mb-2 italic underline">Justifiez votre/vos choix :</p>
+                                                    <RichTextEditor value={answers[justifKey] || ""} onChange={html => setAnswers(prev => ({ ...prev, [justifKey]: html }))} placeholder="Rédigez votre justification…" minHeight="90px" />
                                                 </div>
                                             )}
 
-                                            {/* ── Questions composées Vrai/Faux (Lead Implementor) ── */}
+                                            {/* Questions composées Vrai/Faux */}
                                             {q.type === "compound" && q.parts && q.parts.length > 0 && (
-                                                <div className="px-3 pb-3 space-y-3 mt-1">
+                                                <div className="px-6 pb-5 space-y-3">
                                                     {q.parts.map((part) => (
                                                         <div key={part.id} className="border rounded-xl overflow-hidden" style={{ borderColor: "#e8eaf6" }}>
-                                                            <div className="px-3 py-2 text-xs font-bold text-gray-700" style={{ backgroundColor: "#f4f6f9" }}>
-                                                                {part.label}
-                                                            </div>
+                                                            <div className="px-4 py-2 text-xs font-bold text-gray-700" style={{ backgroundColor: "#f4f6f9" }}>{part.label}</div>
                                                             {part.type === "vraifaux" ? (
-                                                                <div className="px-3 py-3 flex gap-3">
+                                                                <div className="px-4 py-3 flex gap-3">
                                                                     {["Vrai", "Faux"].map(val => {
-                                                                        const key = `${q.id}_${part.id}`;
-                                                                        const selected = answers[key] === val;
+                                                                        const k = `${q.id}_${part.id}`;
+                                                                        const sel = answers[k] === val;
                                                                         return (
-                                                                            <button
-                                                                                key={val}
-                                                                                onClick={() => setAnswers(prev => ({ ...prev, [key]: val }))}
+                                                                            <button key={val} onClick={() => setAnswers(prev => ({ ...prev, [k]: val }))}
                                                                                 className="flex-1 py-2.5 rounded-xl text-sm font-black transition-all border"
-                                                                                style={{
-                                                                                    backgroundColor: selected ? (val === "Vrai" ? "#2e7d32" : "#c62828") : "white",
-                                                                                    color: selected ? "white" : (val === "Vrai" ? "#2e7d32" : "#c62828"),
-                                                                                    borderColor: val === "Vrai" ? "#a5d6a7" : "#ef9a9a",
-                                                                                }}
-                                                                            >
+                                                                                style={{ backgroundColor: sel ? (val === "Vrai" ? "#2e7d32" : "#c62828") : "white", color: sel ? "white" : (val === "Vrai" ? "#2e7d32" : "#c62828"), borderColor: val === "Vrai" ? "#a5d6a7" : "#ef9a9a" }}>
                                                                                 {val === "Vrai" ? "✓ Vrai" : "✗ Faux"}
                                                                             </button>
                                                                         );
                                                                     })}
                                                                 </div>
                                                             ) : (
-                                                                <div className="px-3 pb-3 pt-2">
+                                                                <div className="px-4 pb-3 pt-2">
                                                                     <RichTextEditor value={answers[`${q.id}_${part.id}`] || ""} onChange={html => setAnswers(prev => ({ ...prev, [`${q.id}_${part.id}`]: html }))} placeholder="Votre réponse…" minHeight="80px" />
                                                                 </div>
                                                             )}
@@ -1549,12 +1489,14 @@ export default function CandidatExamenPage() {
                                                 </div>
                                             )}
 
-                                            {/* Champ réponse ouverte */}
+                                            {/* Réponse ouverte */}
                                             {q.type === "open" && (
-                                                <div className="px-3 pb-3 mt-1">
-                                                    <RichTextEditor value={answers[q.id] || ""} onChange={html => setAnswers(prev => ({ ...prev, [q.id]: html }))} placeholder="Votre réponse…" minHeight="100px" />
+                                                <div className="px-6 pb-5 mt-1">
+                                                    <RichTextEditor value={answers[q.id] || ""} onChange={html => setAnswers(prev => ({ ...prev, [q.id]: html }))} placeholder="Rédigez votre réponse (texte, tableaux, listes…)" minHeight="140px" />
                                                 </div>
                                             )}
+
+                                            <div className="h-px mx-6" style={{ backgroundColor: "#e8eaf6" }} />
                                         </div>
                                     );
                                 });
@@ -1562,20 +1504,9 @@ export default function CandidatExamenPage() {
                             })()}
                         </div>
 
-                        {/* ── Barre navigation paginée ── */}
-                        <div className="shrink-0 border-t p-3 space-y-2" style={{ borderColor: "#c5cae9", backgroundColor: "#ffffff" }}>
-                            {/* Progression */}
-                            <div className="flex items-center justify-between text-xs mb-1">
-                                <span className="text-gray-500 font-medium">
-                                    Page <strong className="text-[#1a237e]">{currentPage + 1}</strong> / {totalPages}
-                                    {" · "}{answeredCount}/{totalQCount} répondues
-                                </span>
-                                <span className="text-[10px] text-gray-400">{Math.round(totalQCount > 0 ? (answeredCount / totalQCount) * 100 : 0)}%</span>
-                            </div>
-                            <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden mb-2">
-                                <div className="h-full rounded-full transition-all duration-300" style={{ width: `${totalQCount > 0 ? (answeredCount / totalQCount) * 100 : 0}%`, backgroundColor: "#2e7d32" }} />
-                            </div>
-                            {/* Navigation */}
+                        {/* ── Navigation paginée (même style que l'Aperçu) ── */}
+                        <div className="shrink-0 border-t px-6 py-4 flex items-center justify-between" style={{ borderColor: "#c5cae9", backgroundColor: "#fff" }}>
+                            <span className="text-xs text-gray-400">Page <strong>{currentPage + 1}</strong> / {totalPages} · {answeredCount}/{totalQCount} répondues</span>
                             <div className="flex gap-2">
                                 {currentPage > 0 && (
                                     <button
