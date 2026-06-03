@@ -1542,7 +1542,7 @@ export default function CandidatExamenPage() {
                 </div>
 
                 {/* Webcam overlay */}
-                <div className={`fixed top-16 right-4 z-[210] rounded-xl overflow-hidden shadow-2xl border border-gray-600 w-40 h-28 bg-black transition-all ${isCameraActive ? "opacity-100" : "opacity-0 pointer-events-none"}`}>
+                <div className={`fixed top-16 left-1/2 -translate-x-1/2 z-[210] rounded-xl overflow-hidden shadow-2xl border border-gray-600 w-40 h-28 bg-black transition-all ${isCameraActive ? "opacity-100" : "opacity-0 pointer-events-none"}`}>
                     <video ref={videoRefCallback} autoPlay playsInline muted className="w-full h-full object-cover transform -scale-x-100" />
                     <div className="absolute top-1.5 left-1.5 flex items-center gap-1 bg-black/60 px-1.5 py-0.5 rounded text-[9px] font-bold text-white uppercase tracking-wider">
                         <div className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />REC
