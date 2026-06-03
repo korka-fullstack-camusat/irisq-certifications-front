@@ -115,6 +115,15 @@ export default function EvaluateurDashboardPage() {
     );
   }
 
+  function loadData(sid?: string) {
+    const id = sid ?? selectedSessionId ?? "all";
+    setIsLoading(true);
+    fetchSessionResponses(id || "all")
+      .then(data => applyRows(data as any[]))
+      .catch(() => {})
+      .finally(() => setIsLoading(false));
+  }
+
   // ── Notifications de signature correcteurs ──
   const signedCorrecteurs = correcteurs.filter(
     c => c.correction_signed_at && !dismissedSigns.has(c.id)
@@ -308,19 +317,37 @@ export default function EvaluateurDashboardPage() {
             <Bell className="h-4 w-4" />
             Activité en cours
           </h2>
-          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border"
-            style={{ borderColor: "#c5cae9", color: "#1a237e" }}>
-            3 dernières
-          </span>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => loadData()}
+              disabled={isLoading}
+              className="flex items-center gap-1.5 text-[10px] font-bold px-2.5 py-1 rounded-lg border transition-colors disabled:opacity-50"
+              style={{ borderColor: "#c5cae9", color: "#1a237e" }}
+              title="Rafraîchir"
+            >
+              {isLoading
+                ? <Loader2 className="h-3 w-3 animate-spin" />
+                : <Bell className="h-3 w-3" />
+              }
+              Rafraîchir
+            </button>
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border"
+              style={{ borderColor: "#c5cae9", color: "#1a237e" }}>
+              {activityFeed.length} dernière{activityFeed.length !== 1 ? "s" : ""}
+            </span>
+          </div>
         </div>
 
         {isLoading ? (
           <div className="p-10 flex justify-center">
             <Loader2 className="h-5 w-5 animate-spin text-gray-400" />
           </div>
-        ) : !selectedSessionId || activityFeed.length === 0 ? (
-          <div className="p-10 text-center text-sm text-gray-400">
-            Aucune candidature validée pour cette session.
+        ) : activityFeed.length === 0 ? (
+          <div className="p-10 text-center">
+            <p className="text-sm text-gray-400 mb-3">Aucune candidature validée.</p>
+            <button onClick={() => loadData()} className="text-xs font-bold underline" style={{ color: "#1a237e" }}>
+              Cliquer pour rafraîchir
+            </button>
           </div>
         ) : (
           <ul className="divide-y divide-gray-50">
