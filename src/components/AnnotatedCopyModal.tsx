@@ -39,6 +39,7 @@ export function AnnotatedCopyModal({
     const [isRendering, setIsRendering]       = useState(false);
     const [renderProgress, setRenderProgress] = useState(0);
     const [totalPages, setTotalPages]         = useState(0);
+    const [renderError, setRenderError]       = useState<string | null>(null);
     const cancelRef = useRef(false);
 
     // Load PDF.js once
@@ -62,13 +63,15 @@ export function AnnotatedCopyModal({
         setRenderedPages([]);
         setRenderProgress(0);
         setTotalPages(0);
+        setRenderError(null);
         setIsRendering(true);
 
         (async () => {
             try {
                 const docUrl = resolveUrl(examDocument);
-                const res = await fetch(docUrl, { credentials: "include" });
-                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                // credentials: "omit" pour éviter les erreurs CORS (les fichiers sont publics)
+                const res = await fetch(docUrl, { credentials: "omit", mode: "cors" });
+                if (!res.ok) throw new Error(`HTTP ${res.status} — document introuvable`);
                 const blob = await res.blob();
                 const ab   = await blob.arrayBuffer();
                 const lib  = (window as any).pdfjsLib;
@@ -93,7 +96,10 @@ export function AnnotatedCopyModal({
                     }]);
                     setRenderProgress(i);
                 }
-            } catch (e) { console.error("PDF render error:", e); }
+            } catch (e: any) {
+                console.error("PDF render error:", e);
+                if (!cancelRef.current) setRenderError(e?.message || "Impossible de charger le document.");
+            }
             finally { if (!cancelRef.current) setIsRendering(false); }
         })();
 
@@ -161,6 +167,30 @@ export function AnnotatedCopyModal({
 
                         {/* PDF viewer */}
                         <div className="flex-1 overflow-y-auto bg-gray-700">
+
+                            {/* Pas de document */}
+                            {!examDocument && (
+                                <div className="flex flex-col items-center justify-center h-full gap-4 text-white/60 p-8 text-center">
+                                    <div className="text-4xl">📄</div>
+                                    <p className="font-semibold">Aucune copie d&apos;examen disponible pour ce candidat.</p>
+                                    <p className="text-sm opacity-70">Le candidat n&apos;a pas encore soumis son examen.</p>
+                                </div>
+                            )}
+
+                            {/* Erreur de chargement → fallback iframe */}
+                            {renderError && examDocument && (
+                                <div className="flex flex-col h-full">
+                                    <div className="px-5 py-2 bg-amber-600/80 text-white text-xs font-semibold flex items-center gap-2 shrink-0">
+                                        ⚠️ {renderError} — Affichage alternatif :
+                                    </div>
+                                    <iframe
+                                        src={docUrl}
+                                        title="Copie d'examen"
+                                        className="flex-1 w-full border-0"
+                                    />
+                                </div>
+                            )}
+
                             {/* Progress bar */}
                             {isRendering && (
                                 <div className="sticky top-0 z-10 bg-gray-800/90 backdrop-blur-sm px-5 py-2 flex items-center gap-3">
