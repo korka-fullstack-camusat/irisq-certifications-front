@@ -784,65 +784,82 @@ export default function ExamensPage() {
               </div>
             </div>
 
-            {/* ── Barre d'avancement ── */}
-            {examPreview.questions.length > 0 && (() => {
-              const totalQ = examPreview.questions.length;
-              const answeredQ = examPreview.questions.filter(q =>
-                previewAnswers[q.id] && previewAnswers[q.id] !== "<p></p>"
-              ).length;
-              return (
-                <div className="shrink-0 border-b px-5 py-2.5" style={{ backgroundColor: "#fff", borderColor: "#e0e0e0" }}>
-                  <div className="max-w-3xl mx-auto">
-                    <div className="flex items-center justify-between mb-1.5">
-                      <span className="text-[10px] font-black uppercase tracking-widest text-gray-500">Avancement</span>
-                      <span className="text-[10px] font-bold" style={{ color: "#1a237e" }}>
-                        {answeredQ}/{totalQ} répondues
-                      </span>
+            {/* ── Corps principal : panneau gauche + formulaire ── */}
+            <div className="flex-1 flex overflow-hidden">
+
+              {/* ── GAUCHE : Avancement des questions ── */}
+              {examPreview.questions.length > 0 && (() => {
+                const totalQ = examPreview.questions.length;
+                const answeredQ = examPreview.questions.filter(q =>
+                  previewAnswers[q.id] && previewAnswers[q.id] !== "<p></p>"
+                ).length;
+                return (
+                  <div className="w-56 shrink-0 border-r flex flex-col overflow-y-auto" style={{ backgroundColor: "#fff", borderColor: "#e0e0e0" }}>
+                    {/* Titre + stats */}
+                    <div className="px-4 pt-5 pb-3 border-b" style={{ borderColor: "#e8eaf6" }}>
+                      <p className="text-[10px] font-black uppercase tracking-widest mb-2" style={{ color: "#1a237e" }}>Avancement</p>
+                      {/* Barre de progression */}
+                      <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden mb-2">
+                        <div className="h-full rounded-full transition-all" style={{ width: `${totalQ > 0 ? (answeredQ / totalQ) * 100 : 0}%`, backgroundColor: "#2e7d32" }} />
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-bold" style={{ color: "#2e7d32" }}>{answeredQ} répondues</span>
+                        <span className="text-[11px] text-gray-400">{totalQ - answeredQ} restantes</span>
+                      </div>
                     </div>
-                    <div className="flex flex-wrap gap-1">
-                      {examPreview.questions.map((q, idx) => {
-                        const isAns = !!(previewAnswers[q.id] && previewAnswers[q.id] !== "<p></p>");
-                        const qPage = Math.floor(idx / PREVIEW_PER_PAGE);
-                        const isCurrent = qPage === previewPage;
-                        return (
-                          <button
-                            key={q.id}
-                            onClick={() => setPreviewPage(qPage)}
-                            title={`Question ${idx + 1} — ${isAns ? "Répondue" : "Non répondue"}`}
-                            className="h-5 w-5 rounded text-[9px] font-black transition-all flex items-center justify-center"
-                            style={{
-                              backgroundColor: isAns ? "#2e7d32" : "#ffebee",
-                              color: isAns ? "white" : "#c62828",
-                              border: isCurrent ? "2px solid #1a237e" : isAns ? "none" : "1px solid #ef9a9a",
-                              outline: isCurrent ? "2px solid #c5cae9" : "none",
-                            }}
-                          >
-                            {idx + 1}
-                          </button>
-                        );
-                      })}
+
+                    {/* Grille de questions */}
+                    <div className="px-3 py-3 flex-1">
+                      <p className="text-[9px] font-bold uppercase tracking-widest text-gray-400 mb-2">Questions</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {examPreview.questions.map((q, idx) => {
+                          const isAns = !!(previewAnswers[q.id] && previewAnswers[q.id] !== "<p></p>");
+                          const qPage = Math.floor(idx / PREVIEW_PER_PAGE);
+                          const isCurrent = qPage === previewPage;
+                          return (
+                            <button
+                              key={q.id}
+                              onClick={() => setPreviewPage(qPage)}
+                              title={`Q${idx + 1} — ${isAns ? "Répondue" : "Non répondue"} — cliquer pour y aller`}
+                              className="h-7 w-7 rounded-lg text-[11px] font-black transition-all flex items-center justify-center"
+                              style={{
+                                backgroundColor: isAns ? "#2e7d32" : "#ffebee",
+                                color: isAns ? "white" : "#c62828",
+                                border: isCurrent ? "2px solid #1a237e" : isAns ? "none" : "1px solid #ef9a9a",
+                                boxShadow: isCurrent ? "0 0 0 3px #c5cae9" : "none",
+                              }}
+                            >
+                              {idx + 1}
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
-                    <div className="flex items-center gap-4 mt-1.5">
-                      <span className="flex items-center gap-1 text-[9px] text-gray-400">
-                        <span className="h-2.5 w-2.5 rounded-sm inline-block" style={{ backgroundColor: "#2e7d32" }} />Répondue
-                      </span>
-                      <span className="flex items-center gap-1 text-[9px] text-gray-400">
-                        <span className="h-2.5 w-2.5 rounded-sm inline-block border border-red-300" style={{ backgroundColor: "#ffebee" }} />Non répondue
-                      </span>
-                      <span className="flex items-center gap-1 text-[9px] text-gray-400">
-                        <span className="h-2.5 w-2.5 rounded-sm inline-block" style={{ border: "2px solid #1a237e", backgroundColor: "white" }} />Page actuelle
-                      </span>
+
+                    {/* Légende */}
+                    <div className="px-3 py-3 border-t space-y-1.5" style={{ borderColor: "#e8eaf6" }}>
+                      <div className="flex items-center gap-2">
+                        <span className="h-4 w-4 rounded shrink-0" style={{ backgroundColor: "#2e7d32" }} />
+                        <span className="text-[11px] text-gray-600 font-medium">Répondue</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="h-4 w-4 rounded shrink-0 border border-red-300" style={{ backgroundColor: "#ffebee" }} />
+                        <span className="text-[11px] text-gray-600 font-medium">Non répondue</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="h-4 w-4 rounded shrink-0" style={{ border: "2px solid #1a237e", boxShadow: "0 0 0 2px #c5cae9", backgroundColor: "white" }} />
+                        <span className="text-[11px] text-gray-600 font-medium">Page actuelle</span>
+                      </div>
                     </div>
                   </div>
-                </div>
-              );
-            })()}
+                );
+              })()}
 
-            {/* ── Contenu Google Forms style ── */}
-            <div className="flex-1 overflow-y-auto" style={{ backgroundColor: "#f4f6f9" }}>
+              {/* ── DROITE : Contenu Google Forms style ── */}
+              <div className="flex-1 overflow-y-auto" style={{ backgroundColor: "#f4f6f9" }}>
 
               {/* ── Formulaire dynamique ── */}
-              <div className="max-w-3xl mx-auto px-4 pt-6 pb-10 space-y-0">
+              <div className="max-w-2xl mx-auto px-4 pt-6 pb-10 space-y-0">
                 {examPreview.questions.length > 0 ? (() => {
                   const totalPreviewPages = Math.ceil(examPreview.questions.length / PREVIEW_PER_PAGE);
                   const pageStart = previewPage * PREVIEW_PER_PAGE;
@@ -991,7 +1008,8 @@ export default function ExamensPage() {
                   </>
                 )}
               </div>
-            </div>
+              </div>{/* fin DROITE */}
+            </div>{/* fin corps principal */}
           </div>
         )}
       </AnimatePresence>
