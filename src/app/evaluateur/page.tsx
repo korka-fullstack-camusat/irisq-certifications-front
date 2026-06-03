@@ -279,9 +279,9 @@ export default function EvaluatorPage() {
   const [currentPage, setCurrentPage]               = useState(1);
 
   const loadData = () => {
-    const sid = selectedSessionId || "all";
+    // Toujours charger TOUS les approuvés — la session est un contexte, pas un filtre
     setIsLoading(true);
-    fetchSessionResponses(sid)
+    fetchSessionResponses("all")
       .then(data => applyRows(data as any[]))
       .catch(() => {})
       .finally(() => setIsLoading(false));

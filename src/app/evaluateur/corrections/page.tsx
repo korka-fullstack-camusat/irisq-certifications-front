@@ -8,7 +8,7 @@ import {
     Edit3, Camera, FileText, AlertTriangle,
     ChevronLeft, ChevronRight, Lock, Clock, Maximize2,
 } from "lucide-react";
-import { fetchSessions, fetchSessionResponses, fetchExamBlockedResponses, unblockExam, API_URL } from "@/lib/api";
+import { fetchSessionResponses, fetchExamBlockedResponses, unblockExam, API_URL } from "@/lib/api";
 import { FilePreviewModal } from "@/components/FilePreviewModal";
 import { AnnotatedCopyModal } from "@/components/AnnotatedCopyModal";
 
@@ -57,18 +57,14 @@ export default function CorrectionsPage() {
     const [renderProgress, setRenderProgress] = useState(0);
     const [totalPdfPages, setTotalPdfPages]   = useState(0);
 
-    // ── Chargement des copies + candidats bloqués (sessions + hors-session) ──
+    // ── Chargement des copies + candidats bloqués (toutes formations, toutes sessions) ──
     useEffect(() => {
         const load = async () => {
             setIsLoading(true);
             try {
-                // 1. Réponses liées à des sessions (copies soumises + bloquées en session)
-                const sessions = await fetchSessions();
-                const chunks = await Promise.all(
-                    sessions.map((s: any) => fetchSessionResponses(s._id).catch(() => []))
-                );
-                const fromSessions: any[] = ([] as any[]).concat(...chunks);
-                const withExam = fromSessions.filter(
+                // 1. Tous les approuvés (session_id=all → aucun filtre session)
+                const allApproved: any[] = await fetchSessionResponses("all").catch(() => []);
+                const withExam = allApproved.filter(
                     (r: any) => r.status === "approved" &&
                         (r.exam_document || (r.exam_answers && r.exam_answers.length > 0) || r.exam_blocked)
                 );

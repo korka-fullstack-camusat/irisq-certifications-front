@@ -81,10 +81,9 @@ export default function EvaluateurDashboardPage() {
     // Charger les correcteurs pour détecter les signatures
     fetchCorrecteurs().then(setCorrecteurs).catch(() => {});
 
-    // Charger : session sélectionnée OU tous les approuvés si aucune session
-    const sid = cachedId || "all";
+    // Toujours charger TOUS les approuvés (toutes formations, toutes sessions)
     setIsLoading(true);
-    fetchSessionResponses(sid)
+    fetchSessionResponses("all")
       .then(data => applyRows(data as any[]))
       .catch(() => {})
       .finally(() => setIsLoading(false));
@@ -99,9 +98,9 @@ export default function EvaluateurDashboardPage() {
       localStorage.setItem(SESSION_ID_KEY, selectedSessionId);
       if (session) localStorage.setItem(SESSION_NAME_KEY, session.name);
     }
+    // Toujours tous les approuvés — la session n'est qu'un contexte d'affichage
     setIsLoading(true);
-    // "all" si aucune session → tous les approuvés
-    fetchSessionResponses(selectedSessionId || "all")
+    fetchSessionResponses("all")
       .then(data => applyRows(data as any[]))
       .catch(() => {})
       .finally(() => setIsLoading(false));
@@ -115,10 +114,10 @@ export default function EvaluateurDashboardPage() {
     );
   }
 
-  function loadData(sid?: string) {
-    const id = sid ?? selectedSessionId ?? "all";
+  function loadData(_sid?: string) {
+    // Toujours charger TOUS les approuvés — la session est un contexte, pas un filtre
     setIsLoading(true);
-    fetchSessionResponses(id || "all")
+    fetchSessionResponses("all")
       .then(data => applyRows(data as any[]))
       .catch(() => {})
       .finally(() => setIsLoading(false));
