@@ -7,7 +7,7 @@ import {
   CheckCircle2, Filter, ChevronLeft, ChevronRight,
   CalendarDays, FileText, ShieldCheck,
   Award, Calendar, ClipboardCheck, Mail,
-  AlertTriangle,
+  AlertTriangle, RefreshCw,
 } from "lucide-react";
 import {
   fetchSessionResponses, fetchCertifications,
@@ -278,15 +278,19 @@ export default function EvaluatorPage() {
   const [searchQuery, setSearchQuery]               = useState("");
   const [currentPage, setCurrentPage]               = useState(1);
 
-  useEffect(() => {
-    fetchCertifications().then(setCertifications).catch(() => {});
-    // Si aucune session sélectionnée → charger TOUS les approuvés
+  const loadData = () => {
     const sid = selectedSessionId || "all";
     setIsLoading(true);
     fetchSessionResponses(sid)
       .then(data => applyRows(data as any[]))
       .catch(() => {})
       .finally(() => setIsLoading(false));
+  };
+
+  useEffect(() => {
+    fetchCertifications().then(setCertifications).catch(() => {});
+    loadData();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   function applyRows(data: any[]) {
@@ -341,13 +345,25 @@ export default function EvaluatorPage() {
     >
 
       {/* ── En-tête ── */}
-      <div>
-        <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight" style={{ color: "#1a237e" }}>
-          Candidatures validées
-        </h1>
-        <p className="text-gray-400 text-sm mt-1">
-          Dossiers approuvés · en attente d&apos;attribution ou d&apos;évaluation
-        </p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight" style={{ color: "#1a237e" }}>
+            Candidatures validées
+          </h1>
+          <p className="text-gray-400 text-sm mt-1">
+            Dossiers approuvés · en attente d&apos;attribution ou d&apos;évaluation
+          </p>
+        </div>
+        <button
+          onClick={loadData}
+          disabled={isLoading}
+          className="shrink-0 flex items-center gap-2 px-4 py-2 rounded-xl border text-sm font-semibold transition-colors disabled:opacity-50"
+          style={{ borderColor: "#c5cae9", color: "#1a237e", backgroundColor: "white" }}
+          title="Rafraîchir la liste"
+        >
+          <RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
+          Rafraîchir
+        </button>
       </div>
 
       {/* ── Badge session ── */}

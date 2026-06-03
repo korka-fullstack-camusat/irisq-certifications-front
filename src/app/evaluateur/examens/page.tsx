@@ -1134,10 +1134,8 @@ export default function ExamensPage() {
                               className="accent-[#1a237e] h-4 w-4 shrink-0"
                             />
                             <div className="flex-1 min-w-0">
-                              <p className="text-sm font-bold text-gray-800 truncate">{c.name}</p>
-                              <p className="text-xs text-gray-400 truncate">{c.email}</p>
+                              <p className="text-sm font-bold text-gray-800 font-mono">{c.public_id}</p>
                             </div>
-                            <span className="text-[10px] font-mono text-gray-400 shrink-0">{c.public_id}</span>
                           </label>
                         );
                       })}
