@@ -993,9 +993,14 @@ export interface CandidateExam {
         section?: string;
         subsection?: string;
         text: string;
-        type: string;
+        type: string;          // "open" | "qcm" | "compound"
         options?: string[];
         has_justification?: boolean;
+        parts?: Array<{        // sous-questions pour type "compound"
+            id: string;
+            label: string;
+            type: string;      // "vraifaux" | "open"
+        }>;
     }>;
 }
 

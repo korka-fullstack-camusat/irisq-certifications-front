@@ -51,6 +51,7 @@ export default function ExamensPage() {
     id: string; text: string; type: string;
     options?: string[]; section?: string;
     subsection?: string; has_justification?: boolean;
+    parts?: Array<{ id: string; label: string; type: string }>;
   };
   const [examPreview, setExamPreview] = useState<{
     url: string; title: string; certification: string;
@@ -938,15 +939,42 @@ export default function ExamensPage() {
                           </div>
                         )}
 
+                        {/* ── Questions composées Vrai/Faux ── */}
+                        {q.type === "compound" && q.parts && q.parts.length > 0 && (
+                          <div className="px-6 pb-5 space-y-3">
+                            {q.parts.map((part) => (
+                              <div key={part.id} className="border rounded-xl overflow-hidden" style={{ borderColor: "#e8eaf6" }}>
+                                <div className="px-4 py-2 text-xs font-bold text-gray-700" style={{ backgroundColor: "#f4f6f9" }}>
+                                  {part.label}
+                                </div>
+                                {part.type === "vraifaux" ? (
+                                  <div className="px-4 py-3 flex gap-3">
+                                    {["Vrai", "Faux"].map(val => {
+                                      const key = `${q.id}_${part.id}`;
+                                      const sel = previewAnswers[key] === val;
+                                      return (
+                                        <button key={val} onClick={() => setPreviewAnswers(prev => ({ ...prev, [key]: val }))}
+                                          className="flex-1 py-2.5 rounded-xl text-sm font-black transition-all border"
+                                          style={{ backgroundColor: sel ? (val === "Vrai" ? "#2e7d32" : "#c62828") : "white", color: sel ? "white" : (val === "Vrai" ? "#2e7d32" : "#c62828"), borderColor: val === "Vrai" ? "#a5d6a7" : "#ef9a9a" }}>
+                                          {val === "Vrai" ? "✓ Vrai" : "✗ Faux"}
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                ) : (
+                                  <div className="px-4 pb-3 pt-2">
+                                    <RichTextEditor value={previewAnswers[`${q.id}_${part.id}`] || ""} onChange={html => setPreviewAnswers(prev => ({ ...prev, [`${q.id}_${part.id}`]: html }))} placeholder="Votre réponse…" minHeight="80px" />
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
                         {/* Réponse ouverte — éditeur Word complet */}
-                        {q.type !== "qcm" && (
+                        {q.type === "open" && (
                           <div className="px-6 pb-5">
-                            <RichTextEditor
-                              value={previewAnswers[answKey] || ""}
-                              onChange={html => setPreviewAnswers(prev => ({ ...prev, [answKey]: html }))}
-                              placeholder="Rédigez votre réponse (vous pouvez utiliser du texte, des tableaux, des listes…)"
-                              minHeight="150px"
-                            />
+                            <RichTextEditor value={previewAnswers[answKey] || ""} onChange={html => setPreviewAnswers(prev => ({ ...prev, [answKey]: html }))} placeholder="Rédigez votre réponse (vous pouvez utiliser du texte, des tableaux, des listes…)" minHeight="150px" />
                           </div>
                         )}
 

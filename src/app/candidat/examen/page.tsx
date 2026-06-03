@@ -1129,8 +1129,18 @@ export default function CandidatExamenPage() {
     const totalPages = questions.length > 0 ? Math.ceil(questions.length / QUESTIONS_PER_PAGE) : 1;
     const pageQuestions = questions.slice(currentPage * QUESTIONS_PER_PAGE, (currentPage + 1) * QUESTIONS_PER_PAGE);
     const isLastPage = currentPage === totalPages - 1;
+    // Compte les questions répondues (compound = au moins une sous-question répondue)
     const answeredCount = questions.length > 0
-        ? Object.values(answers).filter(v => v !== "" && v !== "<p></p>").length
+        ? questions.filter(q => {
+            if (q.type === "compound" && q.parts?.length) {
+                return q.parts.some(p => {
+                    const v = answers[`${q.id}_${p.id}`] || "";
+                    return v !== "" && v !== "<p></p>";
+                });
+            }
+            const v = answers[q.id] || "";
+            return v !== "" && v !== "<p></p>";
+          }).length
         : Array.from({ length: freeAnswerCount }, (_, i) => answers[`free_${i}`] || "")
             .filter(v => v !== "" && v !== "<p></p>").length;
     const totalQCount = questions.length > 0 ? questions.length : freeAnswerCount;
@@ -1493,12 +1503,49 @@ export default function CandidatExamenPage() {
                                                     ))}
                                                 </div>
                                             )}
-
-                                            {/* Champ "Justifiez votre choix" pour QCM qui le demandent */}
                                             {q.type === "qcm" && q.has_justification && (
                                                 <div className="px-3 pb-3 mt-1">
                                                     <p className="text-[11px] font-bold text-gray-500 mb-1.5 italic">Justifiez votre choix :</p>
                                                     <RichTextEditor value={answers[justifKey] || ""} onChange={html => setAnswers(prev => ({ ...prev, [justifKey]: html }))} placeholder="Justifiez votre réponse…" minHeight="80px" />
+                                                </div>
+                                            )}
+
+                                            {/* ── Questions composées Vrai/Faux (Lead Implementor) ── */}
+                                            {q.type === "compound" && q.parts && q.parts.length > 0 && (
+                                                <div className="px-3 pb-3 space-y-3 mt-1">
+                                                    {q.parts.map((part) => (
+                                                        <div key={part.id} className="border rounded-xl overflow-hidden" style={{ borderColor: "#e8eaf6" }}>
+                                                            <div className="px-3 py-2 text-xs font-bold text-gray-700" style={{ backgroundColor: "#f4f6f9" }}>
+                                                                {part.label}
+                                                            </div>
+                                                            {part.type === "vraifaux" ? (
+                                                                <div className="px-3 py-3 flex gap-3">
+                                                                    {["Vrai", "Faux"].map(val => {
+                                                                        const key = `${q.id}_${part.id}`;
+                                                                        const selected = answers[key] === val;
+                                                                        return (
+                                                                            <button
+                                                                                key={val}
+                                                                                onClick={() => setAnswers(prev => ({ ...prev, [key]: val }))}
+                                                                                className="flex-1 py-2.5 rounded-xl text-sm font-black transition-all border"
+                                                                                style={{
+                                                                                    backgroundColor: selected ? (val === "Vrai" ? "#2e7d32" : "#c62828") : "white",
+                                                                                    color: selected ? "white" : (val === "Vrai" ? "#2e7d32" : "#c62828"),
+                                                                                    borderColor: val === "Vrai" ? "#a5d6a7" : "#ef9a9a",
+                                                                                }}
+                                                                            >
+                                                                                {val === "Vrai" ? "✓ Vrai" : "✗ Faux"}
+                                                                            </button>
+                                                                        );
+                                                                    })}
+                                                                </div>
+                                                            ) : (
+                                                                <div className="px-3 pb-3 pt-2">
+                                                                    <RichTextEditor value={answers[`${q.id}_${part.id}`] || ""} onChange={html => setAnswers(prev => ({ ...prev, [`${q.id}_${part.id}`]: html }))} placeholder="Votre réponse…" minHeight="80px" />
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    ))}
                                                 </div>
                                             )}
 
