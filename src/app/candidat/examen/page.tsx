@@ -1277,7 +1277,17 @@ export default function CandidatExamenPage() {
                             <div className="flex flex-wrap gap-2">
                                 {(questions.length > 0 ? questions : Array.from({ length: freeAnswerCount }, (_, i) => ({ id: `free_${i}` }))).map((q, idx) => {
                                     const isAnswered = questions.length > 0
-                                        ? !!(answers[q.id] && answers[q.id] !== "<p></p>")
+                                        ? (() => {
+                                            // Questions composées (Vrai/Faux) : vérifier les sous-parties
+                                            if ((q as any).type === "compound" && (q as any).parts?.length) {
+                                                return (q as any).parts.some((p: any) => {
+                                                    const v = answers[`${q.id}_${p.id}`] || "";
+                                                    return v !== "" && v !== "<p></p>";
+                                                });
+                                            }
+                                            const v = answers[q.id] || "";
+                                            return v !== "" && v !== "<p></p>";
+                                          })()
                                         : !!(answers[`free_${idx}`] && answers[`free_${idx}`] !== "<p></p>");
                                     const qPage = Math.floor(idx / QUESTIONS_PER_PAGE);
                                     const isCurrent = qPage === currentPage && phase === "exam";
@@ -1319,9 +1329,16 @@ export default function CandidatExamenPage() {
                                 <div className="flex-1 overflow-y-auto p-3 space-y-2">
                                     {(questions.length > 0 ? questions : Array.from({ length: freeAnswerCount }, (_, i) => ({ id: `free_${i}`, text: `Question ${i + 1}`, type: "open", options: [], section: "", subsection: "", has_justification: false }))).map((q, idx) => {
                                         const isQFree = q.id.startsWith("free_");
+                                        const isCompound = (q as any).type === "compound" && (q as any).parts?.length > 0;
                                         const ans = answers[q.id] || "";
                                         const justif = answers[`${q.id}_justif`] || "";
-                                        const hasAns = ans && ans !== "<p></p>";
+                                        // Pour les questions composées : vérifier si au moins une sous-partie est répondue
+                                        const hasAns = isCompound
+                                            ? (q as any).parts.some((p: any) => {
+                                                const v = answers[`${q.id}_${p.id}`] || "";
+                                                return v !== "" && v !== "<p></p>";
+                                              })
+                                            : !!(ans && ans !== "<p></p>");
                                         const hasJustif = justif && justif !== "<p></p>";
                                         return (
                                             <div key={q.id} className={`rounded-xl overflow-hidden border bg-white shadow-sm ${hasAns ? "border-green-200" : "border-orange-200"}`}>
@@ -1331,6 +1348,26 @@ export default function CandidatExamenPage() {
                                                     <span className="ml-auto text-[10px] font-bold">{hasAns ? <span className="text-green-600 flex items-center gap-1"><CheckCircle2 className="h-3 w-3" />Répondu</span> : <span className="text-orange-500">Non répondu</span>}</span>
                                                 </div>
                                                 {!isQFree && <div className="px-3 py-2"><p className="text-xs text-gray-600 leading-relaxed whitespace-pre-wrap">{q.text}</p></div>}
+                                                {/* Résumé questions composées */}
+                                                {isCompound && (
+                                                    <div className="px-3 pb-2 space-y-1">
+                                                        {(q as any).parts.map((p: any) => {
+                                                            const pv = answers[`${q.id}_${p.id}`] || "";
+                                                            const pFilled = pv && pv !== "<p></p>";
+                                                            return (
+                                                                <div key={p.id} className="flex items-start gap-2 px-2 py-1.5 rounded-lg" style={{ backgroundColor: pFilled ? "#e8f5e9" : "#f8f8f8" }}>
+                                                                    <span className="text-[10px] font-bold text-gray-500 shrink-0">{p.label.split(".")[0]}.</span>
+                                                                    {pFilled
+                                                                        ? (p.type === "vraifaux"
+                                                                            ? <span className="text-xs font-bold" style={{ color: pv === "Vrai" ? "#2e7d32" : "#c62828" }}>{pv === "Vrai" ? "✓ Vrai" : "✗ Faux"}</span>
+                                                                            : <span className="text-xs text-gray-600 line-clamp-1" dangerouslySetInnerHTML={{ __html: pv }} />)
+                                                                        : <span className="text-xs text-gray-400 italic">Non répondu</span>
+                                                                    }
+                                                                </div>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                )}
                                                 {q.type === "qcm" && ans && (
                                                     <div className="px-3 pb-2">
                                                         <div className="flex items-center gap-2 px-3 py-2 rounded-lg" style={{ backgroundColor: "#e8f5e9", border: "1px solid #a5d6a7" }}>
@@ -1340,7 +1377,7 @@ export default function CandidatExamenPage() {
                                                         {hasJustif && <div className="mt-2 text-xs text-gray-600 bg-gray-50 rounded-lg px-3 py-2 border border-gray-100" dangerouslySetInnerHTML={{ __html: justif }} />}
                                                     </div>
                                                 )}
-                                                {q.type !== "qcm" && (
+                                                {q.type !== "qcm" && !isCompound && (
                                                     <div className="px-3 pb-2">
                                                         {hasAns ? <div className="text-xs text-gray-700 bg-gray-50 rounded-lg px-3 py-2 border border-gray-100" dangerouslySetInnerHTML={{ __html: ans }} /> : <p className="text-xs text-gray-400 italic">Aucune réponse saisie</p>}
                                                     </div>
