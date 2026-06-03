@@ -784,6 +784,60 @@ export default function ExamensPage() {
               </div>
             </div>
 
+            {/* ── Barre d'avancement ── */}
+            {examPreview.questions.length > 0 && (() => {
+              const totalQ = examPreview.questions.length;
+              const answeredQ = examPreview.questions.filter(q =>
+                previewAnswers[q.id] && previewAnswers[q.id] !== "<p></p>"
+              ).length;
+              return (
+                <div className="shrink-0 border-b px-5 py-2.5" style={{ backgroundColor: "#fff", borderColor: "#e0e0e0" }}>
+                  <div className="max-w-3xl mx-auto">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="text-[10px] font-black uppercase tracking-widest text-gray-500">Avancement</span>
+                      <span className="text-[10px] font-bold" style={{ color: "#1a237e" }}>
+                        {answeredQ}/{totalQ} répondues
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap gap-1">
+                      {examPreview.questions.map((q, idx) => {
+                        const isAns = !!(previewAnswers[q.id] && previewAnswers[q.id] !== "<p></p>");
+                        const qPage = Math.floor(idx / PREVIEW_PER_PAGE);
+                        const isCurrent = qPage === previewPage;
+                        return (
+                          <button
+                            key={q.id}
+                            onClick={() => setPreviewPage(qPage)}
+                            title={`Question ${idx + 1} — ${isAns ? "Répondue" : "Non répondue"}`}
+                            className="h-5 w-5 rounded text-[9px] font-black transition-all flex items-center justify-center"
+                            style={{
+                              backgroundColor: isAns ? "#2e7d32" : "#ffebee",
+                              color: isAns ? "white" : "#c62828",
+                              border: isCurrent ? "2px solid #1a237e" : isAns ? "none" : "1px solid #ef9a9a",
+                              outline: isCurrent ? "2px solid #c5cae9" : "none",
+                            }}
+                          >
+                            {idx + 1}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <div className="flex items-center gap-4 mt-1.5">
+                      <span className="flex items-center gap-1 text-[9px] text-gray-400">
+                        <span className="h-2.5 w-2.5 rounded-sm inline-block" style={{ backgroundColor: "#2e7d32" }} />Répondue
+                      </span>
+                      <span className="flex items-center gap-1 text-[9px] text-gray-400">
+                        <span className="h-2.5 w-2.5 rounded-sm inline-block border border-red-300" style={{ backgroundColor: "#ffebee" }} />Non répondue
+                      </span>
+                      <span className="flex items-center gap-1 text-[9px] text-gray-400">
+                        <span className="h-2.5 w-2.5 rounded-sm inline-block" style={{ border: "2px solid #1a237e", backgroundColor: "white" }} />Page actuelle
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+
             {/* ── Contenu Google Forms style ── */}
             <div className="flex-1 overflow-y-auto" style={{ backgroundColor: "#f4f6f9" }}>
 
@@ -896,9 +950,16 @@ export default function ExamensPage() {
                           </button>
                         )}
                         {isLastPreviewPage ? (
-                          <div className="inline-flex items-center gap-2 px-5 py-2 rounded-xl text-sm font-bold text-white opacity-40 cursor-not-allowed" style={{ backgroundColor: "#2e7d32" }}>
-                            <Send className="h-4 w-4" />Soumettre
-                          </div>
+                          <button
+                            onClick={() => {
+                              const totalQ = examPreview!.questions.length;
+                              const answeredQ = examPreview!.questions.filter(q => previewAnswers[q.id] && previewAnswers[q.id] !== "<p></p>").length;
+                              alert(`Aperçu uniquement — non interactif.\n\nDans l'examen réel :\n✅ ${answeredQ} question(s) répondues\n❌ ${totalQ - answeredQ} question(s) sans réponse\n\nLe candidat verra un modal de confirmation avant soumission.`);
+                            }}
+                            className="inline-flex items-center gap-2 px-5 py-2 rounded-xl text-sm font-bold text-white" style={{ backgroundColor: "#2e7d32" }}
+                          >
+                            <Send className="h-4 w-4" />Soumettre ma copie
+                          </button>
                         ) : (
                           <button onClick={() => setPreviewPage(p => p + 1)} className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold text-white" style={{ backgroundColor: "#1a237e" }}>
                             Suivant<ChevronRight className="h-4 w-4" />
