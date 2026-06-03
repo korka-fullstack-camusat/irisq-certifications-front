@@ -57,6 +57,8 @@ export default function ExamensPage() {
     duration?: number; questions: ExamQuestion[];
   } | null>(null);
   const [previewAnswers, setPreviewAnswers] = useState<Record<string, string>>({});
+  const [previewPage, setPreviewPage]       = useState(0);
+  const PREVIEW_PER_PAGE = 3;
 
   // ── Modal publication ──
   const [publishModal, setPublishModal] = useState<{ examId: string; certification: string } | null>(null);
@@ -458,6 +460,7 @@ export default function ExamensPage() {
                     type="button"
                     onClick={() => {
                       setPreviewAnswers({});
+                      setPreviewPage(0);
                       setExamPreview({
                         url: resolveDocUrl(exam.document_url),
                         title: exam.title,
@@ -817,21 +820,26 @@ export default function ExamensPage() {
                 </div>
               </div>
 
-              {/* ── Questions interactives ── */}
+              {/* ── Questions interactives paginées ── */}
               <div className="max-w-3xl mx-auto px-4 pb-10 space-y-0">
                 {examPreview.questions.length > 0 ? (() => {
-                  const nodes: React.ReactNode[] = [];
-                  let lastSection    = "";
-                  let lastSubsection = "";
-                  let qNum = 0;
+                  const totalPreviewPages = Math.ceil(examPreview.questions.length / PREVIEW_PER_PAGE);
+                  const pageStart = previewPage * PREVIEW_PER_PAGE;
+                  const pageQuestions = examPreview.questions.slice(pageStart, pageStart + PREVIEW_PER_PAGE);
+                  const isLastPreviewPage = pageStart + PREVIEW_PER_PAGE >= examPreview.questions.length;
 
-                  examPreview.questions.forEach((q, i) => {
+                  const nodes: React.ReactNode[] = [];
+                  let lastSection    = previewPage > 0 ? (examPreview.questions[pageStart - 1]?.section || "") : "";
+                  let lastSubsection = previewPage > 0 ? (examPreview.questions[pageStart - 1]?.subsection || "") : "";
+
+                  pageQuestions.forEach((q, localIdx) => {
+                    const i = pageStart + localIdx;
                     const section    = q.section    || "";
                     const subsection = q.subsection || "";
                     const answKey    = q.id;
                     const justKey    = `${q.id}_justif`;
                     const selected   = previewAnswers[answKey];
-                    qNum++;
+                    const qNum = i + 1;
 
                     // ── En-tête de section (bande verte) ──
                     if (section && section !== lastSection) {
@@ -860,7 +868,7 @@ export default function ExamensPage() {
                         {/* Texte de la question */}
                         <div className="px-6 pt-5 pb-3">
                           <p className="text-sm font-semibold text-gray-900 leading-relaxed whitespace-pre-wrap">
-                            {qNum}. {q.text}
+                            <span className="font-black" style={{ color: "#1a237e" }}>{qNum}.</span> {q.text}
                           </p>
                         </div>
 
@@ -910,12 +918,25 @@ export default function ExamensPage() {
                     );
                   });
 
-                  // Pied de page — bouton soumettre
+                  // Pied de page — navigation pagination
                   nodes.push(
-                    <div key="footer" className="bg-white border border-t-0 rounded-b-xl px-6 py-5 flex items-center justify-between" style={{ borderColor: "#c5cae9" }}>
-                      <span className="text-xs text-gray-400 italic">Aperçu évaluateur — {examPreview.duration ?? "—"} min</span>
-                      <div className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold text-white opacity-40 cursor-not-allowed" style={{ backgroundColor: "#2e7d32" }}>
-                        <Send className="h-4 w-4" /> Soumettre ma copie
+                    <div key="footer" className="bg-white border border-t-0 rounded-b-xl px-6 py-4 flex items-center justify-between gap-3" style={{ borderColor: "#c5cae9" }}>
+                      <span className="text-xs text-gray-400">Page <strong>{previewPage + 1}</strong> / {totalPreviewPages}</span>
+                      <div className="flex items-center gap-2">
+                        {previewPage > 0 && (
+                          <button onClick={() => setPreviewPage(p => p - 1)} className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold border" style={{ borderColor: "#c5cae9", color: "#1a237e" }}>
+                            <ChevronLeft className="h-4 w-4" />Précédent
+                          </button>
+                        )}
+                        {isLastPreviewPage ? (
+                          <div className="inline-flex items-center gap-2 px-5 py-2 rounded-xl text-sm font-bold text-white opacity-40 cursor-not-allowed" style={{ backgroundColor: "#2e7d32" }}>
+                            <Send className="h-4 w-4" />Soumettre
+                          </div>
+                        ) : (
+                          <button onClick={() => setPreviewPage(p => p + 1)} className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold text-white" style={{ backgroundColor: "#1a237e" }}>
+                            Suivant<ChevronRight className="h-4 w-4" />
+                          </button>
+                        )}
                       </div>
                     </div>
                   );
