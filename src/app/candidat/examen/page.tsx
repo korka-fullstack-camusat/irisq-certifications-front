@@ -1221,21 +1221,35 @@ export default function CandidatExamenPage() {
                     )}
                 </AnimatePresence>
 
-                {/* Top bar */}
-                <div className="bg-white border-b shadow-sm px-6 py-3 flex items-center justify-between shrink-0" style={{ borderColor: "#e0e0e0", zIndex: 10 }}>
-                    <div className="flex items-center gap-3">
-                        <Image src="/logo.png" alt="IRISQ" width={44} height={44} className="object-contain drop-shadow-md" priority />
-                        <div className="h-4 w-px bg-gray-200" />
-                        <p className="text-gray-700 font-bold text-sm hidden sm:block">{exam.title}</p>
+                {/* Top bar — 3 zones : logo+titre | caméra | timer */}
+                <div className="bg-white border-b shadow-sm px-4 py-2 grid shrink-0" style={{ borderColor: "#e0e0e0", zIndex: 10, gridTemplateColumns: "1fr auto 1fr" }}>
+                    {/* Gauche : logo + titre */}
+                    <div className="flex items-center gap-2 min-w-0">
+                        <Image src="/logo.png" alt="IRISQ" width={36} height={36} className="object-contain drop-shadow-md shrink-0" priority />
+                        <p className="text-gray-700 font-bold text-sm truncate hidden sm:block">{exam.title}</p>
                     </div>
-                    <div className="flex items-center gap-3">
+
+                    {/* Centre : caméra intégrée */}
+                    <div className="flex items-center justify-center">
+                        <div className={`relative rounded-lg overflow-hidden border-2 bg-black transition-all ${isCameraActive ? "opacity-100" : "opacity-0 pointer-events-none"}`}
+                            style={{ width: 120, height: 68, borderColor: "#374151" }}>
+                            <video ref={videoRefCallback} autoPlay playsInline muted className="w-full h-full object-cover transform -scale-x-100" />
+                            <div className="absolute top-1 left-1 flex items-center gap-1 bg-black/60 px-1 py-0.5 rounded text-[8px] font-bold text-white uppercase tracking-wider">
+                                <div className="w-1 h-1 rounded-full bg-rose-500 animate-pulse" />REC
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Droite : plein écran + timer */}
+                    <div className="flex items-center justify-end gap-2">
                         {!isFullscreen && (
-                            <button onClick={resumeFullscreen} className="text-rose-600 text-xs font-bold bg-rose-50 px-3 py-1.5 rounded-lg flex items-center gap-1.5 animate-pulse border border-rose-200">
-                                <Maximize className="h-3 w-3" />Plein Écran
+                            <button onClick={resumeFullscreen} className="text-rose-600 text-xs font-bold bg-rose-50 px-2 py-1.5 rounded-lg flex items-center gap-1 animate-pulse border border-rose-200 shrink-0">
+                                <Maximize className="h-3 w-3" />
+                                <span className="hidden sm:inline">Plein Écran</span>
                             </button>
                         )}
-                        <div className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold font-mono text-base shadow-sm ${timeLeft < 300 ? "bg-rose-50 text-rose-700 border border-rose-200" : "bg-gray-50 text-gray-800 border border-gray-200"}`}>
-                            <Clock className={`h-4 w-4 ${timeLeft < 300 ? "text-rose-600 animate-pulse" : "text-gray-500"}`} />
+                        <div className={`flex items-center gap-1.5 px-3 py-2 rounded-xl font-bold font-mono text-sm shadow-sm shrink-0 ${timeLeft < 300 ? "bg-rose-50 text-rose-700 border border-rose-200" : "bg-gray-50 text-gray-800 border border-gray-200"}`}>
+                            <Clock className={`h-3.5 w-3.5 ${timeLeft < 300 ? "text-rose-600 animate-pulse" : "text-gray-500"}`} />
                             {formatTime(timeLeft)}
                         </div>
                     </div>
@@ -1244,8 +1258,8 @@ export default function CandidatExamenPage() {
                 {/* Main content — sidebar gauche + formulaire droite (même layout que l'Aperçu) */}
                 <div className="flex-1 flex overflow-hidden">
 
-                    {/* ══ GAUCHE : Sidebar navigateur (identique à l'Aperçu) ══ */}
-                    <div className="shrink-0 border-r flex flex-col overflow-y-auto" style={{ width: "320px", minWidth: "320px", backgroundColor: "#fff", borderColor: "#e0e0e0" }}>
+                    {/* ══ GAUCHE : Sidebar navigateur responsive ══ */}
+                    <div className="shrink-0 border-r flex flex-col overflow-y-auto" style={{ width: "clamp(200px, 22vw, 320px)", backgroundColor: "#fff", borderColor: "#e0e0e0" }}>
                         {/* Stats */}
                         <div className="px-5 pt-5 pb-4 border-b" style={{ borderColor: "#e8eaf6" }}>
                             <p className="text-xs font-black uppercase tracking-widest mb-3" style={{ color: "#1a237e" }}>Avancement</p>
@@ -1270,7 +1284,7 @@ export default function CandidatExamenPage() {
                                     return (
                                         <button key={q.id} onClick={() => { setCurrentPage(qPage); if (phase === "review") setPhase("exam"); }}
                                             title={`Q${idx + 1} — ${isAnswered ? "Répondue" : "Non répondue"}`}
-                                            className="h-9 w-9 rounded-lg text-xs font-black transition-all flex items-center justify-center"
+                                            className="h-8 w-8 rounded-lg text-[11px] font-black transition-all flex items-center justify-center"
                                             style={{ backgroundColor: isAnswered ? "#2e7d32" : "#ffebee", color: isAnswered ? "white" : "#c62828", border: isCurrent ? "2px solid #1a237e" : isAnswered ? "none" : "1px solid #ef9a9a", boxShadow: isCurrent ? "0 0 0 3px #c5cae9" : "none" }}>
                                             {idx + 1}
                                         </button>
@@ -1541,13 +1555,6 @@ export default function CandidatExamenPage() {
                     </div>
                 </div>
 
-                {/* Webcam overlay */}
-                <div className={`fixed top-16 left-1/2 -translate-x-1/2 z-[210] rounded-xl overflow-hidden shadow-2xl border border-gray-600 w-40 h-28 bg-black transition-all ${isCameraActive ? "opacity-100" : "opacity-0 pointer-events-none"}`}>
-                    <video ref={videoRefCallback} autoPlay playsInline muted className="w-full h-full object-cover transform -scale-x-100" />
-                    <div className="absolute top-1.5 left-1.5 flex items-center gap-1 bg-black/60 px-1.5 py-0.5 rounded text-[9px] font-bold text-white uppercase tracking-wider">
-                        <div className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />REC
-                    </div>
-                </div>
                 <canvas ref={canvasRef} style={{ display: "none" }} />
             </div>
 
