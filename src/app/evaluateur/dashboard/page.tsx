@@ -81,25 +81,27 @@ export default function EvaluateurDashboardPage() {
     // Charger les correcteurs pour détecter les signatures
     fetchCorrecteurs().then(setCorrecteurs).catch(() => {});
 
-    if (cachedId) {
-      setIsLoading(true);
-      fetchSessionResponses(cachedId)
-        .then(data => applyRows(data as any[]))
-        .catch(() => {})
-        .finally(() => setIsLoading(false));
-    }
+    // Charger : session sélectionnée OU tous les approuvés si aucune session
+    const sid = cachedId || "all";
+    setIsLoading(true);
+    fetchSessionResponses(sid)
+      .then(data => applyRows(data as any[]))
+      .catch(() => {})
+      .finally(() => setIsLoading(false));
   }, []);
 
   const isFirstMount = useRef(true);
   useEffect(() => {
     if (isFirstMount.current) { isFirstMount.current = false; return; }
-    if (!selectedSessionId) { setApproved([]); return; }
     // Sauvegarder ID + nom pour les autres pages
     const session = sessions.find(s => s._id === selectedSessionId);
-    localStorage.setItem(SESSION_ID_KEY,   selectedSessionId);
-    if (session) localStorage.setItem(SESSION_NAME_KEY, session.name);
+    if (selectedSessionId) {
+      localStorage.setItem(SESSION_ID_KEY, selectedSessionId);
+      if (session) localStorage.setItem(SESSION_NAME_KEY, session.name);
+    }
     setIsLoading(true);
-    fetchSessionResponses(selectedSessionId)
+    // "all" si aucune session → tous les approuvés
+    fetchSessionResponses(selectedSessionId || "all")
       .then(data => applyRows(data as any[]))
       .catch(() => {})
       .finally(() => setIsLoading(false));

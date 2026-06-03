@@ -280,9 +280,10 @@ export default function EvaluatorPage() {
 
   useEffect(() => {
     fetchCertifications().then(setCertifications).catch(() => {});
-    if (!selectedSessionId) return;
+    // Si aucune session sélectionnée → charger TOUS les approuvés
+    const sid = selectedSessionId || "all";
     setIsLoading(true);
-    fetchSessionResponses(selectedSessionId)
+    fetchSessionResponses(sid)
       .then(data => applyRows(data as any[]))
       .catch(() => {})
       .finally(() => setIsLoading(false));
@@ -441,14 +442,6 @@ export default function EvaluatorPage() {
         <div className="flex flex-col items-center justify-center py-20 text-[#1a237e]">
           <Loader2 className="h-8 w-8 animate-spin mb-4" />
           <p className="text-sm font-bold animate-pulse">Chargement des dossiers...</p>
-        </div>
-      ) : !selectedSessionId ? (
-        <div className="bg-white rounded-2xl p-12 text-center border shadow-sm" style={{ borderColor: "#e0e0e0" }}>
-          <div className="w-16 h-16 bg-[#e8eaf6] rounded-2xl flex items-center justify-center mx-auto mb-4">
-            <CalendarDays className="h-8 w-8 text-[#1a237e]" />
-          </div>
-          <h3 className="text-lg font-bold text-gray-800 mb-2">Aucune session active</h3>
-          <p className="text-gray-500 text-sm max-w-sm mx-auto">Créez ou activez une session pour voir les candidatures.</p>
         </div>
       ) : filteredResponses.length === 0 ? (
         <div className="bg-white rounded-2xl p-12 text-center border shadow-sm" style={{ borderColor: "#e0e0e0" }}>
