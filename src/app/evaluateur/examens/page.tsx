@@ -794,10 +794,10 @@ export default function ExamensPage() {
                   previewAnswers[q.id] && previewAnswers[q.id] !== "<p></p>"
                 ).length;
                 return (
-                  <div className="w-72 shrink-0 border-r flex flex-col overflow-y-auto" style={{ backgroundColor: "#fff", borderColor: "#e0e0e0" }}>
+                  <div className="shrink-0 border-r flex flex-col overflow-y-auto" style={{ width: "320px", minWidth: "320px", backgroundColor: "#fff", borderColor: "#e0e0e0" }}>
                     {/* Titre + stats */}
-                    <div className="px-4 pt-5 pb-3 border-b" style={{ borderColor: "#e8eaf6" }}>
-                      <p className="text-[10px] font-black uppercase tracking-widest mb-2" style={{ color: "#1a237e" }}>Avancement</p>
+                    <div className="px-5 pt-5 pb-4 border-b" style={{ borderColor: "#e8eaf6" }}>
+                      <p className="text-xs font-black uppercase tracking-widest mb-3" style={{ color: "#1a237e" }}>Avancement</p>
                       {/* Barre de progression */}
                       <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden mb-2">
                         <div className="h-full rounded-full transition-all" style={{ width: `${totalQ > 0 ? (answeredQ / totalQ) * 100 : 0}%`, backgroundColor: "#2e7d32" }} />
@@ -809,9 +809,9 @@ export default function ExamensPage() {
                     </div>
 
                     {/* Grille de questions */}
-                    <div className="px-3 py-3 flex-1">
-                      <p className="text-[9px] font-bold uppercase tracking-widest text-gray-400 mb-2">Questions</p>
-                      <div className="flex flex-wrap gap-1.5">
+                    <div className="px-5 py-4 flex-1">
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-3">Questions</p>
+                      <div className="flex flex-wrap gap-2">
                         {examPreview.questions.map((q, idx) => {
                           const isAns = !!(previewAnswers[q.id] && previewAnswers[q.id] !== "<p></p>");
                           const qPage = Math.floor(idx / PREVIEW_PER_PAGE);
@@ -821,7 +821,7 @@ export default function ExamensPage() {
                               key={q.id}
                               onClick={() => setPreviewPage(qPage)}
                               title={`Q${idx + 1} — ${isAns ? "Répondue" : "Non répondue"} — cliquer pour y aller`}
-                              className="h-7 w-7 rounded-lg text-[11px] font-black transition-all flex items-center justify-center"
+                              className="h-9 w-9 rounded-lg text-xs font-black transition-all flex items-center justify-center"
                               style={{
                                 backgroundColor: isAns ? "#2e7d32" : "#ffebee",
                                 color: isAns ? "white" : "#c62828",
@@ -837,18 +837,18 @@ export default function ExamensPage() {
                     </div>
 
                     {/* Légende */}
-                    <div className="px-3 py-3 border-t space-y-1.5" style={{ borderColor: "#e8eaf6" }}>
-                      <div className="flex items-center gap-2">
-                        <span className="h-4 w-4 rounded shrink-0" style={{ backgroundColor: "#2e7d32" }} />
-                        <span className="text-[11px] text-gray-600 font-medium">Répondue</span>
+                    <div className="px-5 py-4 border-t space-y-2.5" style={{ borderColor: "#e8eaf6" }}>
+                      <div className="flex items-center gap-3">
+                        <span className="h-5 w-5 rounded-md shrink-0" style={{ backgroundColor: "#2e7d32" }} />
+                        <span className="text-xs text-gray-600 font-semibold">Répondue</span>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <span className="h-4 w-4 rounded shrink-0 border border-red-300" style={{ backgroundColor: "#ffebee" }} />
-                        <span className="text-[11px] text-gray-600 font-medium">Non répondue</span>
+                      <div className="flex items-center gap-3">
+                        <span className="h-5 w-5 rounded-md shrink-0 border border-red-300" style={{ backgroundColor: "#ffebee" }} />
+                        <span className="text-xs text-gray-600 font-semibold">Non répondue</span>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <span className="h-4 w-4 rounded shrink-0" style={{ border: "2px solid #1a237e", boxShadow: "0 0 0 2px #c5cae9", backgroundColor: "white" }} />
-                        <span className="text-[11px] text-gray-600 font-medium">Page actuelle</span>
+                      <div className="flex items-center gap-3">
+                        <span className="h-5 w-5 rounded-md shrink-0" style={{ border: "2px solid #1a237e", boxShadow: "0 0 0 2px #c5cae9", backgroundColor: "white" }} />
+                        <span className="text-xs text-gray-600 font-semibold">Page actuelle</span>
                       </div>
                     </div>
                   </div>
