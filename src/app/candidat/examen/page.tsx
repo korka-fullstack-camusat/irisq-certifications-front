@@ -1234,7 +1234,7 @@ export default function CandidatExamenPage() {
                 {/* Main content — split view */}
                 <div className="flex-1 flex overflow-hidden flex-col md:flex-row">
 
-                    {/* ══ GAUCHE : Sujet d'examen (scrollable) ══ */}
+                    {/* ══ GAUCHE : Sujet + navigateur de questions ══ */}
                     <div className="md:flex-[5] flex flex-col border-b md:border-b-0 md:border-r overflow-hidden" style={{ borderColor: "#c5cae9", minHeight: "40vh" }}>
                         {/* Header sujet */}
                         <div className="px-4 py-2.5 border-b flex items-center gap-2 shrink-0" style={{ backgroundColor: "#e8eaf6", borderColor: "#c5cae9" }}>
@@ -1250,34 +1250,71 @@ export default function CandidatExamenPage() {
                                     <span>Chargement du sujet…</span>
                                 </div>
                             ) : exam.document_url ? (() => {
-                                // Détecter le type de fichier pour choisir le mode d'affichage
                                 const rawName = decodeURIComponent((exam.document_url || "").split("?n=")[1] || exam.document_url || "").toLowerCase();
                                 const isDocx  = rawName.endsWith(".docx") || rawName.endsWith(".doc");
-                                // PDF → toujours iframe (préserve le format IRISQ exact, logo, tableaux, couleurs)
-                                // DOCX → HTML si disponible (mammoth), sinon iframe
                                 const useHtml = isDocx && hasVisibleContent(exam.exam_content_html);
                                 return useHtml ? (
-                                    <div
-                                        className="px-6 py-5 exam-subject"
-                                        style={{ fontSize: "0.875rem", lineHeight: "1.8" }}
-                                        dangerouslySetInnerHTML={{ __html: exam.exam_content_html! }}
-                                    />
+                                    <div className="px-6 py-5 exam-subject" style={{ fontSize: "0.875rem", lineHeight: "1.8" }} dangerouslySetInnerHTML={{ __html: exam.exam_content_html! }} />
                                 ) : (
-                                    <iframe
-                                        src={resolveDocUrl(exam.document_url)}
-                                        title="Sujet d'examen"
-                                        className="w-full border-0 block"
-                                        style={{ height: "100%", minHeight: "500px" }}
-                                    />
+                                    <iframe src={resolveDocUrl(exam.document_url)} title="Sujet d'examen" className="w-full border-0 block" style={{ height: "100%", minHeight: "500px" }} />
                                 );
                             })() : (
                                 <div className="flex flex-col items-center justify-center gap-3 h-full text-center px-6 py-10">
                                     <FileText className="h-10 w-10 text-gray-200" />
                                     <p className="text-sm font-semibold text-gray-500">Aucun sujet joint à cet examen.</p>
-                                    <p className="text-xs text-gray-400 max-w-xs">Contactez le responsable IRISQ.</p>
                                 </div>
                             )}
                         </div>
+
+                        {/* ── Navigateur de questions (état d'avancement) ── */}
+                        {totalQCount > 0 && (
+                            <div className="shrink-0 border-t px-3 py-3" style={{ borderColor: "#c5cae9", backgroundColor: "#f4f6f9" }}>
+                                <div className="flex items-center justify-between mb-2">
+                                    <span className="text-[10px] font-black uppercase tracking-widest text-gray-500">Avancement</span>
+                                    <span className="text-[10px] font-bold" style={{ color: "#1a237e" }}>
+                                        {answeredCount}/{totalQCount} répondues
+                                    </span>
+                                </div>
+                                {/* Grille de chips par question */}
+                                <div className="flex flex-wrap gap-1.5">
+                                    {(questions.length > 0 ? questions : Array.from({ length: freeAnswerCount }, (_, i) => ({ id: `free_${i}` }))).map((q, idx) => {
+                                        const isAnswered = questions.length > 0
+                                            ? !!(answers[q.id] && answers[q.id] !== "<p></p>")
+                                            : !!(answers[`free_${idx}`] && answers[`free_${idx}`] !== "<p></p>");
+                                        const qPage = Math.floor(idx / QUESTIONS_PER_PAGE);
+                                        const isCurrentPage = qPage === currentPage && phase === "exam";
+                                        return (
+                                            <button
+                                                key={q.id}
+                                                onClick={() => { setCurrentPage(qPage); if (phase === "review") setPhase("exam"); }}
+                                                title={isAnswered ? `Question ${idx + 1} — Répondue` : `Question ${idx + 1} — Non répondue, cliquez pour y aller`}
+                                                className={`h-6 w-6 rounded-md text-[10px] font-black transition-all flex items-center justify-center ${
+                                                    isCurrentPage
+                                                        ? "ring-2 ring-offset-1 ring-[#1a237e]"
+                                                        : ""
+                                                }`}
+                                                style={{
+                                                    backgroundColor: isAnswered ? "#2e7d32" : "#ffebee",
+                                                    color: isAnswered ? "white" : "#c62828",
+                                                    border: isAnswered ? "none" : "1px solid #ef9a9a",
+                                                }}
+                                            >
+                                                {idx + 1}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                                {/* Légende */}
+                                <div className="flex items-center gap-3 mt-2">
+                                    <span className="flex items-center gap-1 text-[9px] text-gray-500">
+                                        <span className="h-3 w-3 rounded-sm inline-block" style={{ backgroundColor: "#2e7d32" }} />Répondue
+                                    </span>
+                                    <span className="flex items-center gap-1 text-[9px] text-gray-500">
+                                        <span className="h-3 w-3 rounded-sm inline-block border border-red-300" style={{ backgroundColor: "#ffebee" }} />Non répondue
+                                    </span>
+                                </div>
+                            </div>
+                        )}
                     </div>
 
                     {/* ══ DROITE : Questions + réponses ══ */}
@@ -1556,15 +1593,42 @@ export default function CandidatExamenPage() {
                                     <X className="h-4 w-4" />
                                 </button>
                             </div>
-                            <div className="px-6 py-6 text-center">
-                                <div className="h-14 w-14 bg-amber-50 rounded-full flex items-center justify-center mx-auto mb-4">
-                                    <AlertTriangle className="h-7 w-7 text-amber-500" />
+                            <div className="px-6 pt-5 pb-6">
+                                {/* Récap réponses */}
+                                <div className="grid grid-cols-2 gap-3 mb-4">
+                                    <div className="rounded-xl p-3 text-center" style={{ backgroundColor: "#e8f5e9" }}>
+                                        <p className="text-2xl font-black" style={{ color: "#2e7d32" }}>{answeredCount}</p>
+                                        <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mt-0.5">Répondues</p>
+                                    </div>
+                                    <div className="rounded-xl p-3 text-center" style={{ backgroundColor: totalQCount - answeredCount > 0 ? "#ffebee" : "#e8f5e9" }}>
+                                        <p className="text-2xl font-black" style={{ color: totalQCount - answeredCount > 0 ? "#c62828" : "#2e7d32" }}>{totalQCount - answeredCount}</p>
+                                        <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mt-0.5">Non répondues</p>
+                                    </div>
                                 </div>
-                                <h3 className="font-black text-gray-800 mb-2">Soumettre votre copie ?</h3>
-                                <p className="text-sm text-gray-500 mb-1">
-                                    Vous avez répondu à <span className="font-bold text-[#1a237e]">{answeredCount}</span> question{answeredCount !== 1 ? "s" : ""} sur <span className="font-bold">{totalQCount}</span>.
-                                </p>
-                                <p className="text-xs text-gray-400 mb-6">Cette action est <strong>irréversible</strong>. Votre copie sera transmise immédiatement au correcteur.</p>
+
+                                {/* Avertissement si questions non répondues */}
+                                {totalQCount - answeredCount > 0 && (
+                                    <div className="rounded-xl p-3 mb-4 flex items-start gap-2" style={{ backgroundColor: "#fff8e1", border: "1px solid #ffe082" }}>
+                                        <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
+                                        <div>
+                                            <p className="text-xs font-bold text-amber-800">
+                                                {totalQCount - answeredCount} question{totalQCount - answeredCount > 1 ? "s" : ""} sans réponse
+                                            </p>
+                                            <p className="text-[11px] text-amber-700 mt-0.5">
+                                                Vous pouvez quand même soumettre — les questions sans réponse seront considérées comme non traitées.
+                                            </p>
+                                            <button
+                                                onClick={() => { setShowSubmitModal(false); setPhase("review"); }}
+                                                className="text-[11px] font-bold underline text-amber-800 mt-1"
+                                            >
+                                                Voir les questions non répondues →
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+
+                                <p className="text-xs text-gray-400 text-center mb-4">Cette action est <strong>irréversible</strong>. Votre copie sera transmise immédiatement au correcteur.</p>
+
                                 <div className="flex gap-3">
                                     <button
                                         onClick={() => setShowSubmitModal(false)}
@@ -1580,7 +1644,7 @@ export default function CandidatExamenPage() {
                                         className="flex-1 py-3 rounded-xl text-sm font-bold text-white transition-all hover:-translate-y-0.5 disabled:opacity-60 flex items-center justify-center gap-2"
                                         style={{ backgroundColor: "#2e7d32", boxShadow: "0 6px 16px rgba(46,125,50,0.25)" }}
                                     >
-                                        {isSubmitting ? <><Loader2 className="h-4 w-4 animate-spin" />Envoi…</> : <><CheckCircle2 className="h-4 w-4" />Confirmer</>}
+                                        {isSubmitting ? <><Loader2 className="h-4 w-4 animate-spin" />Envoi…</> : <><Send className="h-4 w-4" />Soumettre définitivement</>}
                                     </button>
                                 </div>
                             </div>
