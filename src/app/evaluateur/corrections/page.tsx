@@ -7,7 +7,7 @@ import {
     ShieldAlert, ShieldCheck, CheckCircle2, UserCheck,
     Edit3, Camera, FileText, AlertTriangle,
     ChevronLeft, ChevronRight, Lock, Clock, Maximize2,
-    CalendarDays, Filter,
+    CalendarDays,
 } from "lucide-react";
 import { fetchSessionResponses, fetchExamBlockedResponses, unblockExam, API_URL } from "@/lib/api";
 import { FilePreviewModal } from "@/components/FilePreviewModal";
@@ -232,11 +232,6 @@ export default function CorrectionsPage() {
                             style={{ borderColor: "#c5cae9" }}
                         />
                     </div>
-                    {hasDateFilter && (
-                        <button onClick={() => { setDateFrom(""); setDateTo(""); setCurrentPage(1); }} className="p-1 hover:bg-gray-100 rounded-full text-gray-400 transition-colors" title="Effacer le filtre de date">
-                            <X className="h-3.5 w-3.5" />
-                        </button>
-                    )}
                 </div>
             </div>
 
