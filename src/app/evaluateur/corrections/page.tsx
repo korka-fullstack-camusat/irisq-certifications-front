@@ -233,13 +233,9 @@ export default function CorrectionsPage() {
                         />
                     </div>
                     {hasDateFilter && (
-                        <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold" style={{ backgroundColor: "#e8eaf6", color: "#1a237e" }}>
-                            <Filter className="h-3 w-3" />
-                            {filtered.length}
-                            <button onClick={() => { setDateFrom(""); setDateTo(""); setCurrentPage(1); }} className="ml-0.5 hover:text-rose-500 transition-colors" title="Effacer">
-                                <X className="h-3 w-3" />
-                            </button>
-                        </div>
+                        <button onClick={() => { setDateFrom(""); setDateTo(""); setCurrentPage(1); }} className="p-1 hover:bg-gray-100 rounded-full text-gray-400 transition-colors" title="Effacer le filtre de date">
+                            <X className="h-3.5 w-3.5" />
+                        </button>
                     )}
                 </div>
             </div>
