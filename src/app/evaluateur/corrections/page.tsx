@@ -7,6 +7,7 @@ import {
     ShieldAlert, ShieldCheck, CheckCircle2, UserCheck,
     Edit3, Camera, FileText, AlertTriangle,
     ChevronLeft, ChevronRight, Lock, Clock, Maximize2,
+    CalendarDays, Filter,
 } from "lucide-react";
 import { fetchSessionResponses, fetchExamBlockedResponses, unblockExam, API_URL } from "@/lib/api";
 import { FilePreviewModal } from "@/components/FilePreviewModal";
@@ -43,6 +44,8 @@ export default function CorrectionsPage() {
     const [isLoading, setIsLoading]  = useState(true);
     const [searchQuery, setSearchQuery] = useState("");
     const [currentPage, setCurrentPage] = useState(1);
+    const [dateFrom, setDateFrom]       = useState("");
+    const [dateTo, setDateTo]           = useState("");
     const [selected, setSelected]    = useState<any>(null);
     const [previewFile, setPreviewFile] = useState<{ url: string; title?: string } | null>(null);
     const [showAnnotatedModal, setShowAnnotatedModal] = useState(false);
@@ -147,14 +150,31 @@ export default function CorrectionsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [pdfjsReady, selected?._id]);
 
-    // ── Filtrage ───────────────────────────────────────────────────────────
+    // ── Filtrage (texte + plage de dates) ────────────────────────────────
+    const hasDateFilter = dateFrom || dateTo;
     const filtered = responses.filter(r => {
+        // Filtre texte
         const q = searchQuery.toLowerCase();
-        return (
+        const matchText = !q || (
             generateId(r).toLowerCase().includes(q) ||
             (r.profile?.toLowerCase().includes(q) ?? false) ||
-            (r.assigned_examiner_email?.toLowerCase().includes(q) ?? false)
+            (r.assigned_examiner_email?.toLowerCase().includes(q) ?? false) ||
+            (r.answers?.["Certification souhaitée"]?.toLowerCase().includes(q) ?? false)
         );
+
+        // Filtre date (sur la date de soumission de l'examen ou de la candidature)
+        const submittedAt = r.exam_submitted_at || r.submitted_at;
+        let matchDate = true;
+        if (submittedAt) {
+            const d = new Date(submittedAt);
+            if (dateFrom) matchDate = matchDate && d >= new Date(dateFrom + "T00:00:00");
+            if (dateTo)   matchDate = matchDate && d <= new Date(dateTo   + "T23:59:59");
+        } else {
+            // Pas de date → exclure si filtre actif
+            if (hasDateFilter) matchDate = false;
+        }
+
+        return matchText && matchDate;
     });
     const totalPages  = Math.ceil(filtered.length / ITEMS_PER_PAGE);
     const paginated   = filtered.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
@@ -167,21 +187,72 @@ export default function CorrectionsPage() {
                 <p className="text-gray-400 text-sm mt-1">Consultez les copies soumises et leurs résultats de correction.</p>
             </div>
 
-            {/* ── Recherche ── */}
-            <div className="bg-white p-3.5 rounded-xl shadow-sm border flex items-center gap-3" style={{ borderColor: "#e8eaf6" }}>
-                <Search className="h-4 w-4 shrink-0" style={{ color: "#1a237e" }} />
-                <input
-                    type="text"
-                    placeholder="Rechercher par matricule, profil, correcteur…"
-                    className="flex-1 bg-transparent border-none focus:ring-0 text-sm text-gray-700 placeholder-gray-400"
-                    value={searchQuery}
-                    onChange={e => { setSearchQuery(e.target.value); setCurrentPage(1); }}
-                />
-                {searchQuery && (
-                    <button onClick={() => { setSearchQuery(""); setCurrentPage(1); }} className="p-1 hover:bg-gray-100 rounded-full text-gray-400">
-                        <X className="h-4 w-4" />
-                    </button>
-                )}
+            {/* ── Recherche + Filtres ── */}
+            <div className="space-y-3">
+                {/* Barre de recherche */}
+                <div className="bg-white p-3.5 rounded-xl shadow-sm border flex items-center gap-3" style={{ borderColor: "#e8eaf6" }}>
+                    <Search className="h-4 w-4 shrink-0" style={{ color: "#1a237e" }} />
+                    <input
+                        type="text"
+                        placeholder="Rechercher par matricule, certification, correcteur…"
+                        className="flex-1 bg-transparent border-none focus:ring-0 text-sm text-gray-700 placeholder-gray-400"
+                        value={searchQuery}
+                        onChange={e => { setSearchQuery(e.target.value); setCurrentPage(1); }}
+                    />
+                    {searchQuery && (
+                        <button onClick={() => { setSearchQuery(""); setCurrentPage(1); }} className="p-1 hover:bg-gray-100 rounded-full text-gray-400">
+                            <X className="h-4 w-4" />
+                        </button>
+                    )}
+                </div>
+
+                {/* Filtre par plage de dates */}
+                <div className="bg-white p-3.5 rounded-xl shadow-sm border flex flex-wrap items-center gap-3" style={{ borderColor: "#e8eaf6" }}>
+                    <div className="flex items-center gap-2 shrink-0">
+                        <CalendarDays className="h-4 w-4" style={{ color: "#1a237e" }} />
+                        <span className="text-xs font-bold uppercase tracking-wider" style={{ color: "#1a237e" }}>Période</span>
+                    </div>
+
+                    <div className="flex items-center gap-2 flex-1 min-w-0 flex-wrap">
+                        <div className="flex items-center gap-2">
+                            <label className="text-xs text-gray-500 font-medium shrink-0">Du</label>
+                            <input
+                                type="date"
+                                value={dateFrom}
+                                max={dateTo || undefined}
+                                onChange={e => { setDateFrom(e.target.value); setCurrentPage(1); }}
+                                className="text-sm border rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 bg-[#f4f6f9]"
+                                style={{ borderColor: "#c5cae9", "--tw-ring-color": "#1a237e40" } as React.CSSProperties}
+                            />
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <label className="text-xs text-gray-500 font-medium shrink-0">Au</label>
+                            <input
+                                type="date"
+                                value={dateTo}
+                                min={dateFrom || undefined}
+                                onChange={e => { setDateTo(e.target.value); setCurrentPage(1); }}
+                                className="text-sm border rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 bg-[#f4f6f9]"
+                                style={{ borderColor: "#c5cae9", "--tw-ring-color": "#1a237e40" } as React.CSSProperties}
+                            />
+                        </div>
+
+                        {/* Résumé du filtre actif */}
+                        {hasDateFilter && (
+                            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold" style={{ backgroundColor: "#e8eaf6", color: "#1a237e" }}>
+                                <Filter className="h-3 w-3" />
+                                {filtered.length} examen{filtered.length !== 1 ? "s" : ""} trouvé{filtered.length !== 1 ? "s" : ""}
+                                <button
+                                    onClick={() => { setDateFrom(""); setDateTo(""); setCurrentPage(1); }}
+                                    className="ml-1 hover:text-rose-600 transition-colors"
+                                    title="Effacer le filtre"
+                                >
+                                    <X className="h-3 w-3" />
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                </div>
             </div>
 
             {/* ── Contenu ── */}
