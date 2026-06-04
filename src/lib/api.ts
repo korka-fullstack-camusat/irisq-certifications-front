@@ -1053,6 +1053,12 @@ export async function candidateChangePassword(currentPassword: string, newPasswo
     return res.json();
 }
 
+export async function notifyExamStart(): Promise<void> {
+    try {
+        await candidateFetch(url("candidate/exam/start"), { method: "POST" });
+    } catch { /* silencieux — la notification est non-bloquante */ }
+}
+
 export async function candidateMe(): Promise<CandidateDossier> {
     const res = await candidateFetch(url("candidate/me"));
     if (!res.ok) {

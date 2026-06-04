@@ -10,7 +10,7 @@ import {
     ChevronRight, Send, X, Trophy,
 } from "lucide-react";
 import { useCandidate } from "@/lib/candidate-context";
-import { API_URL, fetchCandidateExam, fetchCandidateExams, ensureExamContent, uploadFiles, submitExamWithAntiCheat, type CandidateExam, type CandidateDossier } from "@/lib/api";
+import { API_URL, fetchCandidateExam, fetchCandidateExams, ensureExamContent, uploadFiles, submitExamWithAntiCheat, notifyExamStart, type CandidateExam, type CandidateDossier } from "@/lib/api";
 import RichTextEditor from "@/components/RichTextEditor";
 
 
@@ -407,6 +407,9 @@ export default function CandidatExamenPage() {
 
         // (blocage par rechargement désactivé — pas d'écriture sessionStorage)
         setPhase("exam");
+
+        // Notifier l'évaluateur que l'examen a démarré (non-bloquant)
+        notifyExamStart().catch(() => {});
 
         // Photo captures
         setTimeout(() => capturePhoto("debut"), 2000);
