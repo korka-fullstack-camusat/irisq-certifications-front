@@ -88,7 +88,7 @@ export default function EvaluatorLayout({ children }: { children: React.ReactNod
                                     >
                                         EV
                                     </div>
-                                    <p className="font-bold text-gray-800 mb-1">Comité Évaluateur</p>
+                                    <p className="font-bold text-gray-800 mb-1">OBED</p>
                                     <p className="text-gray-400 text-sm mb-6">
                                         Voulez-vous vraiment vous déconnecter ?
                                     </p>
@@ -224,7 +224,7 @@ export default function EvaluatorLayout({ children }: { children: React.ReactNod
                             EV
                         </div>
                         <div className="flex flex-col min-w-0">
-                            <span className="text-sm font-bold text-gray-800 truncate">Comité Évaluateur</span>
+                            <span className="text-sm font-bold text-gray-800 truncate">OBED</span>
                             <span className="text-xs text-gray-400">Jury & Validations</span>
                         </div>
                         <LogOut className="h-4 w-4 ml-auto opacity-0 group-hover:opacity-100 transition-opacity shrink-0" style={{ color: "#c62828" }} />
