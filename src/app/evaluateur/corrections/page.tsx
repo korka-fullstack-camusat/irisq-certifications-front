@@ -187,71 +187,60 @@ export default function CorrectionsPage() {
                 <p className="text-gray-400 text-sm mt-1">Consultez les copies soumises et leurs résultats de correction.</p>
             </div>
 
-            {/* ── Recherche + Filtres ── */}
-            <div className="space-y-3">
-                {/* Barre de recherche */}
-                <div className="bg-white p-3.5 rounded-xl shadow-sm border flex items-center gap-3" style={{ borderColor: "#e8eaf6" }}>
+            {/* ── Recherche + Filtre date sur la même ligne ── */}
+            <div className="bg-white rounded-xl shadow-sm border flex flex-wrap items-center gap-0 overflow-hidden" style={{ borderColor: "#e8eaf6" }}>
+
+                {/* Recherche — côté gauche */}
+                <div className="flex items-center gap-3 px-4 py-3 flex-1 min-w-[200px] border-r" style={{ borderColor: "#e8eaf6" }}>
                     <Search className="h-4 w-4 shrink-0" style={{ color: "#1a237e" }} />
                     <input
                         type="text"
-                        placeholder="Rechercher par matricule, certification, correcteur…"
-                        className="flex-1 bg-transparent border-none focus:ring-0 text-sm text-gray-700 placeholder-gray-400"
+                        placeholder="Matricule, certification, correcteur…"
+                        className="flex-1 bg-transparent border-none focus:ring-0 text-sm text-gray-700 placeholder-gray-400 min-w-0"
                         value={searchQuery}
                         onChange={e => { setSearchQuery(e.target.value); setCurrentPage(1); }}
                     />
                     {searchQuery && (
-                        <button onClick={() => { setSearchQuery(""); setCurrentPage(1); }} className="p-1 hover:bg-gray-100 rounded-full text-gray-400">
-                            <X className="h-4 w-4" />
+                        <button onClick={() => { setSearchQuery(""); setCurrentPage(1); }} className="p-1 hover:bg-gray-100 rounded-full text-gray-400 shrink-0">
+                            <X className="h-3.5 w-3.5" />
                         </button>
                     )}
                 </div>
 
-                {/* Filtre par plage de dates */}
-                <div className="bg-white p-3.5 rounded-xl shadow-sm border flex flex-wrap items-center gap-3" style={{ borderColor: "#e8eaf6" }}>
-                    <div className="flex items-center gap-2 shrink-0">
-                        <CalendarDays className="h-4 w-4" style={{ color: "#1a237e" }} />
-                        <span className="text-xs font-bold uppercase tracking-wider" style={{ color: "#1a237e" }}>Période</span>
+                {/* Filtre date — côté droit */}
+                <div className="flex items-center gap-3 px-4 py-3 flex-wrap">
+                    <CalendarDays className="h-4 w-4 shrink-0" style={{ color: "#1a237e" }} />
+                    <div className="flex items-center gap-2">
+                        <span className="text-xs font-medium text-gray-500 shrink-0">Du</span>
+                        <input
+                            type="date"
+                            value={dateFrom}
+                            max={dateTo || undefined}
+                            onChange={e => { setDateFrom(e.target.value); setCurrentPage(1); }}
+                            className="text-xs border rounded-lg px-2 py-1.5 focus:outline-none bg-[#f4f6f9] cursor-pointer"
+                            style={{ borderColor: "#c5cae9" }}
+                        />
                     </div>
-
-                    <div className="flex items-center gap-2 flex-1 min-w-0 flex-wrap">
-                        <div className="flex items-center gap-2">
-                            <label className="text-xs text-gray-500 font-medium shrink-0">Du</label>
-                            <input
-                                type="date"
-                                value={dateFrom}
-                                max={dateTo || undefined}
-                                onChange={e => { setDateFrom(e.target.value); setCurrentPage(1); }}
-                                className="text-sm border rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 bg-[#f4f6f9]"
-                                style={{ borderColor: "#c5cae9", "--tw-ring-color": "#1a237e40" } as React.CSSProperties}
-                            />
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <label className="text-xs text-gray-500 font-medium shrink-0">Au</label>
-                            <input
-                                type="date"
-                                value={dateTo}
-                                min={dateFrom || undefined}
-                                onChange={e => { setDateTo(e.target.value); setCurrentPage(1); }}
-                                className="text-sm border rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 bg-[#f4f6f9]"
-                                style={{ borderColor: "#c5cae9", "--tw-ring-color": "#1a237e40" } as React.CSSProperties}
-                            />
-                        </div>
-
-                        {/* Résumé du filtre actif */}
-                        {hasDateFilter && (
-                            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold" style={{ backgroundColor: "#e8eaf6", color: "#1a237e" }}>
-                                <Filter className="h-3 w-3" />
-                                {filtered.length} examen{filtered.length !== 1 ? "s" : ""} trouvé{filtered.length !== 1 ? "s" : ""}
-                                <button
-                                    onClick={() => { setDateFrom(""); setDateTo(""); setCurrentPage(1); }}
-                                    className="ml-1 hover:text-rose-600 transition-colors"
-                                    title="Effacer le filtre"
-                                >
-                                    <X className="h-3 w-3" />
-                                </button>
-                            </div>
-                        )}
+                    <div className="flex items-center gap-2">
+                        <span className="text-xs font-medium text-gray-500 shrink-0">Au</span>
+                        <input
+                            type="date"
+                            value={dateTo}
+                            min={dateFrom || undefined}
+                            onChange={e => { setDateTo(e.target.value); setCurrentPage(1); }}
+                            className="text-xs border rounded-lg px-2 py-1.5 focus:outline-none bg-[#f4f6f9] cursor-pointer"
+                            style={{ borderColor: "#c5cae9" }}
+                        />
                     </div>
+                    {hasDateFilter && (
+                        <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold" style={{ backgroundColor: "#e8eaf6", color: "#1a237e" }}>
+                            <Filter className="h-3 w-3" />
+                            {filtered.length}
+                            <button onClick={() => { setDateFrom(""); setDateTo(""); setCurrentPage(1); }} className="ml-0.5 hover:text-rose-500 transition-colors" title="Effacer">
+                                <X className="h-3 w-3" />
+                            </button>
+                        </div>
+                    )}
                 </div>
             </div>
 
