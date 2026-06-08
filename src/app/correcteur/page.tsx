@@ -69,7 +69,7 @@ export default function CorrecteurPage() {
     const [pending, setPending]           = useState<Pending | null>(null);
     const [pendingLabel, setPendingLabel] = useState("");
     const [pendingEarned, setPendingEarned] = useState("");
-    const [pendingMax, setPendingMax]     = useState("20");
+    const [pendingMax, setPendingMax]     = useState("");
     const [editingId, setEditingId]       = useState<string | null>(null);
     const pendingEarnedRef = useRef<HTMLInputElement>(null);
 
@@ -231,19 +231,23 @@ export default function CorrecteurPage() {
         const x = ((e.clientX - rect.left) / rect.width)  * 100;
         const y = ((e.clientY - rect.top)  / rect.height) * 100;
         setPendingLabel(`Q${annotations.length + 1}`);
-        setPendingEarned(""); setPendingMax("20");
+        setPendingEarned(""); setPendingMax("");
         setPending({ pageIndex: pageIdx, x, y, pxX: e.clientX - rect.left, pxY: e.clientY - rect.top });
         setTimeout(() => pendingEarnedRef.current?.focus(), 40);
     };
 
     const confirmPending = () => {
         if (!pending) return;
+        if (!pendingMax.trim()) {
+            alert("Veuillez indiquer le barème de cette question (le nombre de points indiqué dans l'énoncé, par ex. 4), pour que la note soit calculée sur ce total et non sur 20.");
+            return;
+        }
         setAnnotations(prev => [...prev, {
             id: uid(),
             pageIndex: pending.pageIndex,
             x: pending.x, y: pending.y,
             points_earned: pendingEarned,
-            max_points: pendingMax || "20",
+            max_points: pendingMax,
             label: pendingLabel || `Q${annotations.length + 1}`,
         }]);
         setPending(null);
@@ -598,7 +602,7 @@ export default function CorrecteurPage() {
                                                                                 <input type="text" inputMode="decimal" value={ann.max_points}
                                                                                     onChange={e => updateAnnotation(ann.id, "max_points", e.target.value)}
                                                                                     className="w-12 text-center text-sm font-bold border border-gray-200 rounded-xl py-1 focus:outline-none text-gray-500"
-                                                                                    placeholder="20" />
+                                                                                    placeholder="ex: 4" />
                                                                             </div>
                                                                             <div className="flex gap-1.5">
                                                                                 <button onClick={() => setEditingId(null)} className="flex-1 py-1.5 text-xs font-bold rounded-lg text-white" style={{ backgroundColor: "#2e7d32" }}>OK</button>
@@ -650,8 +654,9 @@ export default function CorrecteurPage() {
                                                                 <input type="text" inputMode="decimal" value={pendingMax}
                                                                     onChange={e => setPendingMax(e.target.value)}
                                                                     className="w-14 text-center text-base font-bold border border-gray-200 rounded-xl py-1 focus:outline-none text-gray-500"
-                                                                    placeholder="20" />
+                                                                    placeholder="ex: 4" />
                                                             </div>
+                                                            <p className="text-[9px] leading-tight text-gray-400">Barème de la question (lisez le nombre de points indiqué dans l&apos;énoncé, ex. « 4 points »).</p>
                                                             <div className="flex gap-1.5">
                                                                 <button onClick={confirmPending}
                                                                     className="flex-1 py-1.5 text-xs font-bold rounded-lg text-white flex items-center justify-center gap-1"
