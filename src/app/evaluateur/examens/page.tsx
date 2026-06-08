@@ -7,12 +7,12 @@ import {
   FileText, Send, X, Plus, Upload, Eye,
   Clock, CalendarDays, Filter, CheckCircle2,
   ChevronLeft, ChevronRight, AlertCircle, RefreshCw,
-  BookOpen,
+  BookOpen, Trash2,
 } from "lucide-react";
 import RichTextEditor from "@/components/RichTextEditor";
 import {
   API_URL, fetchExams, createExam, uploadFiles, publishExam,
-  reparseExam, fetchCertifications, fetchExamCandidates, type ExamCandidate,
+  reparseExam, deleteExam, fetchCertifications, fetchExamCandidates, type ExamCandidate,
 } from "@/lib/api";
 
 /** Résout un chemin relatif /api/files/... en URL absolue vers le backend. */
@@ -70,6 +70,7 @@ export default function ExamensPage() {
   const [publishLoadingCandidates, setPublishLoadingCandidates] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
   const [reparsingId, setReparsingId]         = useState<string | null>(null);
+  const [deletingId, setDeletingId]           = useState<string | null>(null);
   const [searchQuery, setSearchQuery]         = useState("");
   const [showModal, setShowModal]             = useState(false);
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
@@ -159,6 +160,19 @@ export default function ExamensPage() {
       alert(err?.message || "Erreur lors du re-parsing du document.");
     } finally {
       setReparsingId(null);
+    }
+  };
+
+  const handleDelete = async (id: string, title: string) => {
+    if (!confirm(`Supprimer définitivement l'examen « ${title} » ?\n\nCette action est irréversible.`)) return;
+    setDeletingId(id);
+    try {
+      await deleteExam(id);
+      await loadExams();
+    } catch (err: any) {
+      alert(err?.message || "Erreur lors de la suppression de l'examen.");
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -485,6 +499,21 @@ export default function ExamensPage() {
                       : <RefreshCw className="h-3.5 w-3.5" />
                     }
                     <span className="hidden sm:inline">Re-parser</span>
+                  </button>
+                  <button
+                    onClick={() => handleDelete(exam._id, exam.title)}
+                    disabled={deletingId === exam._id}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold transition-all disabled:opacity-50"
+                    style={{ borderColor: "#ffcdd2", color: "#c62828", backgroundColor: "#ffebee" }}
+                    onMouseEnter={e => (e.currentTarget.style.backgroundColor = "#ffcdd2")}
+                    onMouseLeave={e => (e.currentTarget.style.backgroundColor = "#ffebee")}
+                    title="Supprimer définitivement cet examen"
+                  >
+                    {deletingId === exam._id
+                      ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      : <Trash2 className="h-3.5 w-3.5" />
+                    }
+                    <span className="hidden sm:inline">Supprimer</span>
                   </button>
                 </div>
               </motion.div>
