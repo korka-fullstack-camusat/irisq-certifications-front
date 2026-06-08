@@ -490,13 +490,17 @@ export default function ExamensPage() {
                   <button
                     onClick={() => handleReparse(exam._id)}
                     disabled={reparsingId === exam._id}
-                    className="h-8 w-8 rounded-lg border border-gray-200 flex items-center justify-center text-amber-500 hover:bg-amber-50 hover:border-amber-200 disabled:opacity-50 transition-all"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold transition-all disabled:opacity-50"
+                    style={{ borderColor: "#ffe0b2", color: "#e65100", backgroundColor: "#fff8e1" }}
+                    onMouseEnter={e => (e.currentTarget.style.backgroundColor = "#fff3e0")}
+                    onMouseLeave={e => (e.currentTarget.style.backgroundColor = "#fff8e1")}
                     title="Re-parser le document (régénérer le contenu HTML)"
                   >
                     {reparsingId === exam._id
                       ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
                       : <RefreshCw className="h-3.5 w-3.5" />
                     }
+                    <span className="hidden sm:inline">Re-parser</span>
                   </button>
                   <button
                     onClick={() => handleDelete(exam._id)}
