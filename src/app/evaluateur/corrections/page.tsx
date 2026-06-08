@@ -59,6 +59,7 @@ export default function CorrectionsPage() {
     const [isRenderingPdf, setIsRenderingPdf] = useState(false);
     const [renderProgress, setRenderProgress] = useState(0);
     const [totalPdfPages, setTotalPdfPages]   = useState(0);
+    const [pdfRenderError, setPdfRenderError] = useState<string | null>(null);
 
     // ── Chargement des copies + candidats bloqués (toutes formations, toutes sessions) ──
     useEffect(() => {
@@ -113,11 +114,13 @@ export default function CorrectionsPage() {
         setRenderedPages([]);
         setRenderProgress(0);
         setTotalPdfPages(0);
+        setPdfRenderError(null);
 
         (async () => {
             try {
-                const res = await fetch(docUrl, { credentials: "include" });
-                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                // credentials: "omit" pour éviter les erreurs CORS (les fichiers sont publics)
+                const res = await fetch(docUrl, { credentials: "omit" });
+                if (!res.ok) throw new Error(`HTTP ${res.status} — document introuvable`);
                 const blob = await res.blob();
                 const arrayBuffer = await blob.arrayBuffer();
                 const pdfjsLib = (window as any).pdfjsLib;
@@ -139,8 +142,9 @@ export default function CorrectionsPage() {
                     setRenderedPages(prev => [...prev, { dataUrl, width: viewport.width, height: viewport.height }]);
                     setRenderProgress(i);
                 }
-            } catch (err) {
+            } catch (err: any) {
                 console.error("PDF render error:", err);
+                if (!cancelled) setPdfRenderError(err?.message || "Impossible d'afficher la copie en mode page par page.");
             } finally {
                 if (!cancelled) setIsRenderingPdf(false);
             }
@@ -553,7 +557,7 @@ export default function CorrectionsPage() {
                                                     {/* Pages PDF + annotations */}
                                                     <div className="flex-1 overflow-y-auto bg-gray-700" style={{ minHeight: 0 }}>
                                                         {/* Barre de progression */}
-                                                        {(isRenderingPdf || renderedPages.length === 0) && (
+                                                        {isRenderingPdf && (
                                                             <div className="sticky top-0 z-10 bg-gray-800/90 backdrop-blur-sm px-4 py-2 flex items-center gap-3">
                                                                 <Loader2 className="h-4 w-4 animate-spin text-white shrink-0" />
                                                                 <span className="text-white text-xs font-medium">
@@ -698,6 +702,29 @@ export default function CorrectionsPage() {
                                                                 </div>
                                                             ))}
                                                         </div>
+
+                                                        {/* Erreur de rendu — repli sur affichage iframe direct */}
+                                                        {!isRenderingPdf && pdfRenderError && renderedPages.length === 0 && (
+                                                            <div className="flex flex-col h-full">
+                                                                <div className="px-5 py-2 bg-amber-600/80 text-white text-xs font-semibold flex items-center gap-2 shrink-0">
+                                                                    ⚠️ {pdfRenderError} — Affichage alternatif du document :
+                                                                </div>
+                                                                <iframe
+                                                                    src={resolveUrl(selected.exam_document)}
+                                                                    title="Copie corrigée"
+                                                                    className="w-full border-0 bg-white"
+                                                                    style={{ height: "70vh" }}
+                                                                />
+                                                            </div>
+                                                        )}
+
+                                                        {/* Aucun document */}
+                                                        {!isRenderingPdf && !pdfRenderError && !selected.exam_document && renderedPages.length === 0 && (
+                                                            <div className="flex flex-col items-center justify-center gap-3 text-white/60 p-8 text-center" style={{ minHeight: "40vh" }}>
+                                                                <div className="text-4xl">📄</div>
+                                                                <p className="font-semibold">Aucune copie d&apos;examen disponible pour ce candidat.</p>
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 </div>
 
