@@ -655,11 +655,47 @@ export default function AntiCheatPortal() {
                                     <div key={q.id} className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
                                         <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3 pb-2 border-b border-gray-100">{q.part}</h3>
                                         <p className="text-gray-900 font-medium mb-4 whitespace-pre-wrap">{q.text}</p>
-                                        {/* Tableau à compléter (étude de cas type "Travail à faire") — fidèle au document source */}
-                                        {q.table_html && (
-                                            <div className="mb-4" dangerouslySetInnerHTML={{ __html: q.table_html }} />
+                                        {/* Légende Probabilité/Gravité + matrice de criticité (lecture seule) */}
+                                        {q.legend_html && (
+                                            <div className="mb-4" dangerouslySetInnerHTML={{ __html: q.legend_html }} />
                                         )}
-                                        {q.type === 'qcm' ? (
+                                        {/* Tableau d'activités à compléter — formulaire interactif, le candidat
+                                            écrit directement dans chaque cellule (étude de cas "Travail à faire") */}
+                                        {q.table_headers && q.table_activities && q.table_headers.length > 0 && (
+                                            <div className="mb-4 overflow-x-auto">
+                                                <table className="w-full border-collapse text-sm" style={{ borderColor: "#c7cbe0" }}>
+                                                    <thead><tr>
+                                                        {q.table_headers.map((h: string, hi: number) => (
+                                                            <th key={hi} className="border px-2 py-1.5 text-left text-[11px] font-bold" style={{ borderColor: "#c7cbe0", background: "#e8eaf6", color: "#1a237e" }}>{h}</th>
+                                                        ))}
+                                                    </tr></thead>
+                                                    <tbody>
+                                                        {q.table_activities.map((activity: string, ri: number) => (
+                                                            <tr key={ri}>
+                                                                <td className="border px-2 py-2 align-top font-semibold" style={{ borderColor: "#c7cbe0", background: "#fafbff", minWidth: "120px" }}>{activity}</td>
+                                                                {q.table_headers.slice(1).map((_: string, ciRaw: number) => {
+                                                                    const ci = ciRaw + 1;
+                                                                    const cellKey = `${q.id}__r${ri}_c${ci}`;
+                                                                    return (
+                                                                        <td key={ci} className="border p-1 align-top" style={{ borderColor: "#c7cbe0" }}>
+                                                                            <textarea
+                                                                                value={answers[cellKey] || ""}
+                                                                                onChange={e => setAnswers(prev => ({ ...prev, [cellKey]: e.target.value }))}
+                                                                                placeholder="…"
+                                                                                rows={2}
+                                                                                className="w-full resize-y text-xs px-1.5 py-1 rounded border-0 focus:ring-2 focus:outline-none"
+                                                                                style={{ minWidth: "64px", backgroundColor: "#fff" }}
+                                                                            />
+                                                                        </td>
+                                                                    );
+                                                                })}
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        )}
+                                        {q.table_headers && q.table_activities && q.table_headers.length > 0 ? null : q.type === 'qcm' ? (
                                             <div className="space-y-2">
                                                 {q.options?.map((opt: string, i: number) => (
                                                     <label key={i} className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${answers[q.id] === opt ? 'bg-[#e8eaf6] border-[#1a237e]' : 'bg-gray-50 border-transparent hover:bg-gray-100'}`}>
