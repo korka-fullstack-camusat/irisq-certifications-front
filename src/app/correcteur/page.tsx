@@ -61,6 +61,7 @@ export default function CorrecteurPage() {
     const [isRenderingPdf, setIsRenderingPdf] = useState(false);
     const [renderProgress, setRenderProgress] = useState(0);
     const [totalPdfPages, setTotalPdfPages]   = useState(0);
+    const [pdfRenderError, setPdfRenderError] = useState<string | null>(null);
 
     // Annotations
     const [annotations, setAnnotations]   = useState<Annotation[]>([]);
@@ -117,11 +118,12 @@ export default function CorrecteurPage() {
         setRenderedPages([]);
         setRenderProgress(0);
         setTotalPdfPages(0);
+        setPdfRenderError(null);
 
         (async () => {
             try {
                 const res = await fetch(docUrl, { credentials: "include" });
-                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                if (!res.ok) throw new Error(`HTTP ${res.status} — document introuvable`);
                 const blob = await res.blob();
                 const arrayBuffer = await blob.arrayBuffer();
                 const pdfjsLib = (window as any).pdfjsLib;
@@ -145,8 +147,9 @@ export default function CorrecteurPage() {
                     setRenderedPages(prev => [...prev, { dataUrl, width: viewport.width, height: viewport.height }]);
                     setRenderProgress(i);
                 }
-            } catch (err) {
+            } catch (err: any) {
                 console.error("PDF render error:", err);
+                if (!cancelled) setPdfRenderError(err?.message || "Impossible d'afficher la copie en mode page par page.");
             } finally {
                 if (!cancelled) setIsRenderingPdf(false);
             }
@@ -509,7 +512,7 @@ export default function CorrecteurPage() {
                                 <div className="flex-1 overflow-y-auto bg-gray-700 relative" style={{ scrollBehavior: "smooth" }}>
 
                                     {/* Loading state */}
-                                    {(isRenderingPdf || renderedPages.length === 0) && (
+                                    {isRenderingPdf && (
                                         <div className="sticky top-0 z-10 bg-gray-800/90 backdrop-blur-sm px-5 py-2 flex items-center gap-3">
                                             <Loader2 className="h-4 w-4 animate-spin text-white" />
                                             <span className="text-white text-xs font-medium">
@@ -522,6 +525,28 @@ export default function CorrecteurPage() {
                                                     <div className="h-full bg-white rounded-full transition-all" style={{ width: `${(renderProgress / totalPdfPages) * 100}%` }} />
                                                 </div>
                                             )}
+                                        </div>
+                                    )}
+
+                                    {/* Pas de document */}
+                                    {!isRenderingPdf && !pdfRenderError && !getExamDocUrl(selectedResponse) && (
+                                        <div className="flex flex-col items-center justify-center h-full gap-3 text-white/60 p-8 text-center">
+                                            <div className="text-4xl">📄</div>
+                                            <p className="font-semibold">Aucune copie d&apos;examen disponible pour ce candidat.</p>
+                                        </div>
+                                    )}
+
+                                    {/* Erreur de rendu → fallback iframe avec le document brut */}
+                                    {!isRenderingPdf && pdfRenderError && getExamDocUrl(selectedResponse) && (
+                                        <div className="flex flex-col h-full">
+                                            <div className="px-5 py-2 bg-amber-600/80 text-white text-xs font-semibold flex items-center gap-2 shrink-0">
+                                                ⚠️ {pdfRenderError} — Affichage alternatif du document :
+                                            </div>
+                                            <iframe
+                                                src={getExamDocUrl(selectedResponse) || ""}
+                                                title="Copie d'examen"
+                                                className="flex-1 w-full border-0 bg-white"
+                                            />
                                         </div>
                                     )}
 
