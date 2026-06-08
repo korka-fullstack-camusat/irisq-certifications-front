@@ -1489,6 +1489,11 @@ export default function CandidatExamenPage() {
                                                 </div>
                                             </div>
 
+                                            {/* Tableau à compléter (étude de cas type "Travail à faire") — fidèle au document source */}
+                                            {q.table_html && (
+                                                <div className="px-6 pb-3" dangerouslySetInnerHTML={{ __html: q.table_html }} />
+                                            )}
+
                                             {/* Options QCM */}
                                             {q.type === "qcm" && q.options && q.options.length > 0 && (
                                                 <div className="px-8 pb-3 space-y-2">
