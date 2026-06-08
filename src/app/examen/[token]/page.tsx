@@ -293,11 +293,19 @@ export default function AntiCheatPortal() {
             capturePhoto("debut");
         }, 2000);
 
-        // 2. Capture au Milieu de l'examen
-        const halfTimeMs = (timeLeft / 2) * 1000;
+        // 2. Capture au Tiers de l'examen
+        const thirdTimeMs = (timeLeft / 3) * 1000;
         setTimeout(() => {
-            capturePhoto("milieu");
-        }, halfTimeMs);
+            capturePhoto("premier_tiers");
+        }, thirdTimeMs);
+
+        // 3. Capture aux Deux-tiers de l'examen
+        const twoThirdsTimeMs = (timeLeft * 2 / 3) * 1000;
+        setTimeout(() => {
+            capturePhoto("deux_tiers");
+        }, twoThirdsTimeMs);
+
+        // (4ᵉ capture : à la fin de l'examen, juste avant la soumission — voir submitExam)
     };
 
     const submitExam = async () => {
