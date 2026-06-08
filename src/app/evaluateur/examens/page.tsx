@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  FilePlus, Trash2, Download, Search, Loader2,
+  FilePlus, Search, Loader2,
   FileText, Send, X, Plus, Upload, Eye,
   Clock, CalendarDays, Filter, CheckCircle2,
   ChevronLeft, ChevronRight, AlertCircle, RefreshCw,
@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import RichTextEditor from "@/components/RichTextEditor";
 import {
-  API_URL, fetchExams, createExam, deleteExam, uploadFiles, publishExam,
+  API_URL, fetchExams, createExam, uploadFiles, publishExam,
   reparseExam, fetchCertifications, fetchExamCandidates, type ExamCandidate,
 } from "@/lib/api";
 
@@ -140,16 +140,6 @@ export default function ExamensPage() {
       setUploadError(error?.message || "Erreur lors de la création de l'examen.");
     } finally {
       setIsSubmitting(false);
-    }
-  };
-
-  const handleDelete = async (id: string) => {
-    if (!confirm("Voulez-vous vraiment supprimer cet examen ?")) return;
-    try {
-      await deleteExam(id);
-      setExams(prev => prev.filter(e => e._id !== id));
-    } catch {
-      alert("Erreur lors de la suppression.");
     }
   };
 
@@ -479,14 +469,6 @@ export default function ExamensPage() {
                     <Eye className="h-3.5 w-3.5" />
                     <span className="hidden sm:inline">Aperçu</span>
                   </button>
-                  <a
-                    href={resolveDocUrl(exam.document_url)}
-                    download
-                    className="h-8 w-8 rounded-lg border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-emerald-50 hover:text-emerald-600 hover:border-emerald-200 transition-all"
-                    title="Télécharger"
-                  >
-                    <Download className="h-3.5 w-3.5" />
-                  </a>
                   <button
                     onClick={() => handleReparse(exam._id)}
                     disabled={reparsingId === exam._id}
@@ -501,12 +483,6 @@ export default function ExamensPage() {
                       : <RefreshCw className="h-3.5 w-3.5" />
                     }
                     <span className="hidden sm:inline">Re-parser</span>
-                  </button>
-                  <button
-                    onClick={() => handleDelete(exam._id)}
-                    className="h-8 w-8 rounded-lg border border-gray-200 flex items-center justify-center text-rose-400 hover:bg-rose-50 hover:border-rose-200 transition-all"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
                   </button>
                 </div>
               </motion.div>
