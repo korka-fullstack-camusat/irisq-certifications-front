@@ -166,13 +166,52 @@ export default function EvaluateurDashboardPage() {
     <div className="space-y-8 p-6 sm:p-8 bg-[#f4f6f9] min-h-screen">
 
       {/* ── En-tête ── */}
-      <div>
-        <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight" style={{ color: "#1a237e" }}>
-          Tableau de bord
-        </h1>
-        <p className="text-gray-400 text-sm mt-1">
-          Vue d&apos;ensemble des candidatures validées de la session en cours.
-        </p>
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight" style={{ color: "#1a237e" }}>
+            Tableau de bord
+          </h1>
+          <p className="text-gray-400 text-sm mt-1">
+            Vue d&apos;ensemble des candidatures validées de la session en cours.
+          </p>
+        </div>
+
+        {/* ── Sélecteur de session ── */}
+        <div className="bg-white rounded-2xl border shadow-sm px-4 py-2.5 flex items-center gap-3 flex-wrap shrink-0"
+          style={{ borderColor: "#e8eaf6" }}>
+          <CalendarDays className="h-4 w-4 shrink-0" style={{ color: "#1a237e" }} />
+          <span className="text-xs font-bold uppercase tracking-widest whitespace-nowrap" style={{ color: "#1a237e" }}>Session</span>
+
+          {isLoadingSessions ? (
+            <div className="flex items-center gap-2 text-gray-400 text-sm">
+              <Loader2 className="h-4 w-4 animate-spin" /> Chargement…
+            </div>
+          ) : sessions.length === 0 ? (
+            <span className="text-sm text-amber-600 font-semibold flex items-center gap-1 whitespace-nowrap">
+              <AlertCircle className="h-4 w-4" /> Aucune session active
+            </span>
+          ) : (
+            <select
+              value={selectedSessionId}
+              onChange={e => setSelectedSessionId(e.target.value)}
+              className="px-3 py-2 bg-[#f4f6f9] border border-gray-200 rounded-xl text-sm font-semibold focus:outline-none"
+              style={{ color: "#1a237e" }}
+            >
+              {sessions.map(s => (
+                <option key={s._id} value={s._id}>
+                  {s.name}{s.start_date ? ` — ${s.start_date}` : ""}
+                </option>
+              ))}
+            </select>
+          )}
+
+          {selectedSession && (selectedSession.start_date || selectedSession.end_date) && (
+            <span className="text-[11px] text-gray-400 font-semibold whitespace-nowrap">
+              {selectedSession.start_date && `Début : ${selectedSession.start_date}`}
+              {selectedSession.end_date   && ` · Fin : ${selectedSession.end_date}`}
+            </span>
+          )}
+        </div>
       </div>
 
       {/* ── Notifications : correcteurs ayant terminé leur correction ── */}
@@ -233,44 +272,6 @@ export default function EvaluateurDashboardPage() {
           ))}
         </div>
       )}
-
-      {/* ── Sélecteur de session (uniquement ici) ── */}
-      <div className="bg-white rounded-2xl border shadow-sm p-4" style={{ borderColor: "#e8eaf6" }}>
-        <div className="flex items-center gap-3 flex-wrap">
-          <CalendarDays className="h-4 w-4 shrink-0" style={{ color: "#1a237e" }} />
-          <span className="text-xs font-bold uppercase tracking-widest" style={{ color: "#1a237e" }}>Session</span>
-
-          {isLoadingSessions ? (
-            <div className="flex items-center gap-2 text-gray-400 text-sm">
-              <Loader2 className="h-4 w-4 animate-spin" /> Chargement…
-            </div>
-          ) : sessions.length === 0 ? (
-            <span className="text-sm text-amber-600 font-semibold flex items-center gap-1">
-              <AlertCircle className="h-4 w-4" /> Aucune session active
-            </span>
-          ) : (
-            <select
-              value={selectedSessionId}
-              onChange={e => setSelectedSessionId(e.target.value)}
-              className="flex-1 max-w-xs px-3 py-2 bg-[#f4f6f9] border border-gray-200 rounded-xl text-sm font-semibold focus:outline-none"
-              style={{ color: "#1a237e" }}
-            >
-              {sessions.map(s => (
-                <option key={s._id} value={s._id}>
-                  {s.name}{s.start_date ? ` — ${s.start_date}` : ""}
-                </option>
-              ))}
-            </select>
-          )}
-
-          {selectedSession && (
-            <span className="ml-auto text-[11px] text-gray-400 font-semibold">
-              {selectedSession.start_date && `Début : ${selectedSession.start_date}`}
-              {selectedSession.end_date   && ` · Fin : ${selectedSession.end_date}`}
-            </span>
-          )}
-        </div>
-      </div>
 
       {/* ── Stats ── */}
       {isLoading ? (
