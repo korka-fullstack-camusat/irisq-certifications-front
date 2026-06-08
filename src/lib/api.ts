@@ -996,6 +996,7 @@ export interface CandidateExam {
         type: string;          // "open" | "qcm" | "compound"
         options?: string[];
         has_justification?: boolean;
+        table_html?: string;   // tableau à compléter (étude de cas) — rendu fidèle au document source
         parts?: Array<{        // sous-questions pour type "compound"
             id: string;
             label: string;

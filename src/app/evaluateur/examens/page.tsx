@@ -51,6 +51,7 @@ export default function ExamensPage() {
     id: string; text: string; type: string;
     options?: string[]; section?: string;
     subsection?: string; has_justification?: boolean;
+    table_html?: string;
     parts?: Array<{ id: string; label: string; type: string }>;
   };
   const [examPreview, setExamPreview] = useState<{
