@@ -655,6 +655,10 @@ export default function AntiCheatPortal() {
                                     <div key={q.id} className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
                                         <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3 pb-2 border-b border-gray-100">{q.part}</h3>
                                         <p className="text-gray-900 font-medium mb-4 whitespace-pre-wrap">{q.text}</p>
+                                        {/* Tableau à compléter (étude de cas type "Travail à faire") — fidèle au document source */}
+                                        {q.table_html && (
+                                            <div className="mb-4" dangerouslySetInnerHTML={{ __html: q.table_html }} />
+                                        )}
                                         {q.type === 'qcm' ? (
                                             <div className="space-y-2">
                                                 {q.options?.map((opt: string, i: number) => (

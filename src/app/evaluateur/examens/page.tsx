@@ -889,6 +889,10 @@ export default function ExamensPage() {
                           <p className="text-sm font-semibold text-gray-900 leading-relaxed whitespace-pre-wrap">
                             <span className="font-black" style={{ color: "#1a237e" }}>{qNum}.</span> {q.text}
                           </p>
+                          {/* Tableau à compléter (étude de cas type "Travail à faire") — fidèle au document source */}
+                          {q.table_html && (
+                            <div dangerouslySetInnerHTML={{ __html: q.table_html }} />
+                          )}
                         </div>
 
                         {/* Options QCM — style document avec cases à cocher */}
