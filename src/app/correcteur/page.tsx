@@ -17,14 +17,6 @@ import {
 
 const ITEMS_PER_PAGE = 8;
 
-const APPRECIATIONS = [
-    { label: "Insuffisant",  value: "Insuffisant",  color: "#c62828", bg: "#ffebee", border: "#ef9a9a" },
-    { label: "Passable",     value: "Passable",     color: "#e65100", bg: "#fff3e0", border: "#ffcc80" },
-    { label: "Satisfaisant", value: "Satisfaisant", color: "#1565c0", bg: "#e3f2fd", border: "#90caf9" },
-    { label: "Bien",         value: "Bien",         color: "#2e7d32", bg: "#e8f5e9", border: "#a5d6a7" },
-    { label: "Très bien",    value: "Très bien",    color: "#4a148c", bg: "#f3e5f5", border: "#ce93d8" },
-];
-
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface RenderedPage { dataUrl: string; width: number; height: number; }
@@ -74,10 +66,7 @@ export default function CorrecteurPage() {
     const pendingEarnedRef = useRef<HTMLInputElement>(null);
 
     // Grade
-    const [appreciation, setAppreciation] = useState("");
     const [comments, setComments]         = useState("");
-    const [manualGrade, setManualGrade]   = useState("");
-    const [useManual, setUseManual]       = useState(false);
 
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isLocking, setIsLocking]       = useState(false);
@@ -194,11 +183,10 @@ export default function CorrecteurPage() {
     }), [annotations]);
 
     const effectiveGrade = useCallback(() => {
-        if (useManual && manualGrade.trim()) return manualGrade.trim();
         const { earned, max } = computedTotal();
         if (annotations.length === 0) return "";
         return `${earned}/${max}`;
-    }, [useManual, manualGrade, computedTotal, annotations]);
+    }, [computedTotal, annotations]);
 
     // ── Open modal ────────────────────────────────────────────────────────────
     const openModal = (r: any) => {
@@ -207,9 +195,6 @@ export default function CorrecteurPage() {
         setPending(null);
         setEditingId(null);
         setComments(r.exam_comments || "");
-        setAppreciation(r.exam_appreciation || "");
-        setUseManual(false);
-        setManualGrade(r.exam_grade || "");
         if (r.answer_grades?.length > 0) {
             setAnnotations(r.answer_grades.map((g: any) => ({
                 id: g.question_id || uid(),
@@ -263,14 +248,13 @@ export default function CorrecteurPage() {
         e.preventDefault();
         if (!selectedResponse) return;
         const grade = effectiveGrade();
-        if (!grade) { alert("Veuillez saisir au moins une annotation ou une note manuelle."); return; }
+        if (!grade) { alert("Veuillez poser au moins une annotation pour calculer la note."); return; }
         setIsSubmitting(true);
         try {
             const updated = await updateExamGrade(selectedResponse._id, {
                 exam_grade: grade,
                 exam_status: "graded",
                 exam_comments: comments || undefined,
-                exam_appreciation: appreciation || undefined,
                 answer_grades: annotations.length > 0 ? annotations.map(a => ({
                     question_id: a.id,
                     label: a.label,
@@ -326,8 +310,6 @@ export default function CorrecteurPage() {
 
     const isLocked   = !!selectedResponse?.is_correction_locked;
     const savedGrade = selectedResponse?.exam_grade;
-    const savedAppr  = selectedResponse?.exam_appreciation;
-    const stampAppr  = APPRECIATIONS.find(a => a.value === savedAppr);
     const { earned: totalEarned, max: totalMax } = computedTotal();
 
     return (
@@ -403,7 +385,6 @@ export default function CorrecteurPage() {
                                 const graded = !!response.exam_grade;
                                 const hasDoc = !!getExamDocUrl(response);
                                 const locked = !!response.is_correction_locked;
-                                const appr   = APPRECIATIONS.find(a => a.value === response.exam_appreciation);
                                 return (
                                     <motion.div key={response._id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: idx * 0.03 }}
                                         className="grid grid-cols-12 items-center px-6 py-4 hover:bg-gray-50/50 transition-colors group">
@@ -416,7 +397,6 @@ export default function CorrecteurPage() {
                                             {graded ? (
                                                 <div className="flex flex-col items-center gap-1">
                                                     <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold border" style={{ background: "#e8f5e9", color: "#2e7d32", borderColor: "#c8e6c9" }}><CheckCircle className="h-3 w-3" />{response.exam_grade}</span>
-                                                    {appr && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ color: appr.color, backgroundColor: appr.bg }}>{appr.label}</span>}
                                                 </div>
                                             ) : (
                                                 <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold border" style={{ background: "#fffbeb", color: "#b45309", borderColor: "#fde68a" }}><AlertTriangle className="h-3 w-3" />En attente</span>
@@ -696,13 +676,6 @@ export default function CorrecteurPage() {
                                                                     NOTE
                                                                 </span>
                                                             </div>
-                                                            {/* Appréciation */}
-                                                            {savedAppr && (
-                                                                <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full"
-                                                                    style={{ color: stampAppr?.color, backgroundColor: stampAppr?.bg }}>
-                                                                    {savedAppr}
-                                                                </span>
-                                                            )}
                                                         </div>
                                                     </div>
                                                 )}
@@ -769,44 +742,11 @@ export default function CorrecteurPage() {
                                             </div>
                                         )}
 
-                                        {/* Note manuelle */}
-                                        <div className="bg-white rounded-xl border border-gray-200 p-3 space-y-2">
-                                            <label className="flex items-center gap-2 cursor-pointer">
-                                                <input type="checkbox" disabled={isLocked} checked={useManual} onChange={e => setUseManual(e.target.checked)} className="rounded" />
-                                                <span className="text-[11px] font-bold text-gray-600">Note manuelle</span>
-                                            </label>
-                                            {useManual ? (
-                                                <input type="text" disabled={isLocked} value={manualGrade} onChange={e => setManualGrade(e.target.value)}
-                                                    placeholder="Ex: 15/20" className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm font-mono font-bold focus:outline-none disabled:opacity-50" style={{ color: "#1a237e" }} />
-                                            ) : (
-                                                <div className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm font-mono font-bold" style={{ color: "#1a237e" }}>
-                                                    {effectiveGrade() || <span className="text-gray-400 font-normal text-xs">Auto-calculée</span>}
-                                                </div>
-                                            )}
-                                            {savedGrade && (
-                                                <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-2 text-[11px] text-emerald-800 font-medium flex items-center gap-1.5">
-                                                    <CheckCircle className="h-3 w-3 shrink-0" /> Enregistrée : <span className="font-black">{savedGrade}</span>
-                                                </div>
-                                            )}
-                                        </div>
-
-                                        {/* Appréciation */}
-                                        <div>
-                                            <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">Appréciation</p>
-                                            <div className="flex flex-wrap gap-1.5">
-                                                {APPRECIATIONS.map(a => {
-                                                    const active = appreciation === a.value;
-                                                    return (
-                                                        <button key={a.value} type="button" disabled={isLocked}
-                                                            onClick={() => setAppreciation(active ? "" : a.value)}
-                                                            className="px-2 py-1 rounded-lg text-[10px] font-bold border-2 transition-all disabled:opacity-50"
-                                                            style={{ backgroundColor: active ? a.bg : "white", borderColor: active ? a.color : "#e8eaf6", color: active ? a.color : "#9ca3af" }}>
-                                                            {a.label}
-                                                        </button>
-                                                    );
-                                                })}
+                                        {savedGrade && (
+                                            <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-2 text-[11px] text-emerald-800 font-medium flex items-center gap-1.5">
+                                                <CheckCircle className="h-3 w-3 shrink-0" /> Note enregistrée : <span className="font-black">{savedGrade}</span>
                                             </div>
-                                        </div>
+                                        )}
 
                                         {/* Observations */}
                                         <div>
