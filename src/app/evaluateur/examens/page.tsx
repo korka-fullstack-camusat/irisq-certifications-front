@@ -51,7 +51,8 @@ export default function ExamensPage() {
     id: string; text: string; type: string;
     options?: string[]; section?: string;
     subsection?: string; has_justification?: boolean;
-    table_html?: string;
+    table_html?: string; legend_html?: string;
+    table_headers?: string[]; table_activities?: string[];
     parts?: Array<{ id: string; label: string; type: string }>;
   };
   const [examPreview, setExamPreview] = useState<{
@@ -890,7 +891,11 @@ export default function ExamensPage() {
                           <p className="text-sm font-semibold text-gray-900 leading-relaxed whitespace-pre-wrap">
                             <span className="font-black" style={{ color: "#1a237e" }}>{qNum}.</span> {q.text}
                           </p>
-                          {/* Tableau à compléter (étude de cas type "Travail à faire") — fidèle au document source */}
+                          {/* Légende Probabilité/Gravité + matrice de criticité (lecture seule) */}
+                          {q.legend_html && (
+                            <div dangerouslySetInnerHTML={{ __html: q.legend_html }} />
+                          )}
+                          {/* Tableau à compléter (étude de cas type "Travail à faire") — aperçu en lecture seule, fidèle au document source */}
                           {q.table_html && (
                             <div dangerouslySetInnerHTML={{ __html: q.table_html }} />
                           )}

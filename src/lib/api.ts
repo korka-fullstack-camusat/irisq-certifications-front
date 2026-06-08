@@ -996,7 +996,10 @@ export interface CandidateExam {
         type: string;          // "open" | "qcm" | "compound"
         options?: string[];
         has_justification?: boolean;
-        table_html?: string;   // tableau à compléter (étude de cas) — rendu fidèle au document source
+        table_html?: string;        // version statique en lecture seule (aperçu évaluateur)
+        legend_html?: string;       // légende Probabilité/Gravité + matrice de criticité (lecture seule)
+        table_headers?: string[];   // en-têtes du tableau d'activités à compléter
+        table_activities?: string[]; // noms d'activités (1ère colonne, pré-remplie) — le candidat complète les autres colonnes
         parts?: Array<{        // sous-questions pour type "compound"
             id: string;
             label: string;

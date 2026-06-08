@@ -1141,6 +1141,16 @@ export default function CandidatExamenPage() {
                     return v !== "" && v !== "<p></p>";
                 });
             }
+            // Tableau d'activités à compléter ("Travail à faire") : répondu si au moins
+            // une cellule a été remplie par le candidat
+            if (q.table_headers?.length && q.table_activities?.length) {
+                return q.table_activities.some((_, ri) =>
+                    q.table_headers!.slice(1).some((__, ciRaw) => {
+                        const v = answers[`${q.id}__r${ri}_c${ciRaw + 1}`] || "";
+                        return v.trim() !== "";
+                    })
+                );
+            }
             const v = answers[q.id] || "";
             return v !== "" && v !== "<p></p>";
           }).length
@@ -1335,12 +1345,19 @@ export default function CandidatExamenPage() {
                                         const isCompound = (q as any).type === "compound" && (q as any).parts?.length > 0;
                                         const ans = answers[q.id] || "";
                                         const justif = answers[`${q.id}_justif`] || "";
-                                        // Pour les questions composées : vérifier si au moins une sous-partie est répondue
+                                        const hasTable = !!((q as any).table_headers?.length && (q as any).table_activities?.length);
+                                        // Pour les questions composées / tableaux : vérifier si au moins une sous-partie/cellule est répondue
                                         const hasAns = isCompound
                                             ? (q as any).parts.some((p: any) => {
                                                 const v = answers[`${q.id}_${p.id}`] || "";
                                                 return v !== "" && v !== "<p></p>";
                                               })
+                                            : hasTable
+                                            ? (q as any).table_activities.some((_: any, ri: number) =>
+                                                (q as any).table_headers.slice(1).some((__: any, ciRaw: number) => {
+                                                    const v = answers[`${q.id}__r${ri}_c${ciRaw + 1}`] || "";
+                                                    return v.trim() !== "";
+                                                }))
                                             : !!(ans && ans !== "<p></p>");
                                         const hasJustif = justif && justif !== "<p></p>";
                                         return (
@@ -1446,7 +1463,14 @@ export default function CandidatExamenPage() {
                                     const idx = pageStart + localIdx;
                                     const section    = q.section    || q.part || "";
                                     const subsection = q.subsection || "";
-                                    const filled     = !!(answers[q.id] && answers[q.id] !== "<p></p>");
+                                    const hasTable   = !!(q.table_headers?.length && q.table_activities?.length);
+                                    const filled     = hasTable
+                                        ? q.table_activities!.some((_, ri) =>
+                                            q.table_headers!.slice(1).some((__, ciRaw) => {
+                                                const v = answers[`${q.id}__r${ri}_c${ciRaw + 1}`] || "";
+                                                return v.trim() !== "";
+                                            }))
+                                        : !!(answers[q.id] && answers[q.id] !== "<p></p>");
                                     const justifKey  = `${q.id}_justif`;
                                     const justifFilled = !!(answers[justifKey] && answers[justifKey] !== "<p></p>");
 
@@ -1489,9 +1513,49 @@ export default function CandidatExamenPage() {
                                                 </div>
                                             </div>
 
-                                            {/* Tableau à compléter (étude de cas type "Travail à faire") — fidèle au document source */}
-                                            {q.table_html && (
-                                                <div className="px-6 pb-3" dangerouslySetInnerHTML={{ __html: q.table_html }} />
+                                            {/* Légende Probabilité/Gravité + matrice de criticité — fidèle au document source (lecture seule) */}
+                                            {q.legend_html && (
+                                                <div className="px-6 pb-3" dangerouslySetInnerHTML={{ __html: q.legend_html }} />
+                                            )}
+
+                                            {/* Tableau d'activités à COMPLÉTER (étude de cas "Travail à faire") :
+                                                un champ de saisie par cellule vide, exactement comme demandé
+                                                dans le document — chaque cellule est une "question" à part entière. */}
+                                            {q.table_headers && q.table_activities && q.table_headers.length > 0 && (
+                                                <div className="px-6 pb-4 overflow-x-auto">
+                                                    <table className="w-full border-collapse text-sm" style={{ borderColor: "#c7cbe0" }}>
+                                                        <thead>
+                                                            <tr>
+                                                                {q.table_headers.map((h, hi) => (
+                                                                    <th key={hi} className="border px-2 py-1.5 text-left text-[11px] font-bold" style={{ borderColor: "#c7cbe0", background: "#e8eaf6", color: "#1a237e" }}>{h}</th>
+                                                                ))}
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody>
+                                                            {q.table_activities!.map((activity, ri) => (
+                                                                <tr key={ri}>
+                                                                    <td className="border px-2 py-2 align-top font-semibold" style={{ borderColor: "#c7cbe0", background: "#fafbff", minWidth: "120px" }}>{activity}</td>
+                                                                    {q.table_headers!.slice(1).map((_, ciRaw) => {
+                                                                        const ci = ciRaw + 1;
+                                                                        const cellKey = `${q.id}__r${ri}_c${ci}`;
+                                                                        return (
+                                                                            <td key={ci} className="border p-1 align-top" style={{ borderColor: "#c7cbe0" }}>
+                                                                                <textarea
+                                                                                    value={answers[cellKey] || ""}
+                                                                                    onChange={e => setAnswers(prev => ({ ...prev, [cellKey]: e.target.value }))}
+                                                                                    placeholder="…"
+                                                                                    rows={2}
+                                                                                    className="w-full resize-y text-xs px-1.5 py-1 rounded border-0 focus:ring-2 focus:outline-none"
+                                                                                    style={{ minWidth: "64px", backgroundColor: "#fff" }}
+                                                                                />
+                                                                            </td>
+                                                                        );
+                                                                    })}
+                                                                </tr>
+                                                            ))}
+                                                        </tbody>
+                                                    </table>
+                                                </div>
                                             )}
 
                                             {/* Options QCM */}
