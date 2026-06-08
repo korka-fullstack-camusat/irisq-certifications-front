@@ -122,7 +122,8 @@ export default function CorrecteurPage() {
 
         (async () => {
             try {
-                const res = await fetch(docUrl, { credentials: "include" });
+                // credentials: "omit" pour éviter les erreurs CORS (les fichiers sont publics)
+                const res = await fetch(docUrl, { credentials: "omit" });
                 if (!res.ok) throw new Error(`HTTP ${res.status} — document introuvable`);
                 const blob = await res.blob();
                 const arrayBuffer = await blob.arrayBuffer();
