@@ -447,6 +447,17 @@ export async function deleteExam(id: string) {
     return res.json();
 }
 
+export async function updateExam(id: string, data: { title?: string; duration_minutes?: number }) {
+    const res = await apiFetch(url(`exams/${id}`), {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+        redirect: "follow",
+    });
+    if (!res.ok) throw new Error("Failed to update exam");
+    return res.json();
+}
+
 export interface ExamCandidate {
     response_id: string;
     public_id:   string;

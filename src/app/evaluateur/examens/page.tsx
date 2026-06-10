@@ -7,12 +7,12 @@ import {
   FileText, Send, X, Plus, Upload, Eye,
   Clock, CalendarDays, Filter, CheckCircle2,
   ChevronLeft, ChevronRight, AlertCircle, RefreshCw,
-  BookOpen, Trash2,
+  BookOpen, Trash2, Pencil,
 } from "lucide-react";
 import RichTextEditor from "@/components/RichTextEditor";
 import {
   API_URL, fetchExams, createExam, uploadFiles, publishExam,
-  reparseExam, deleteExam, fetchCertifications, fetchExamCandidates, type ExamCandidate,
+  reparseExam, deleteExam, updateExam, fetchCertifications, fetchExamCandidates, type ExamCandidate,
 } from "@/lib/api";
 
 /** Résout un chemin relatif /api/files/... en URL absolue vers le backend. */
@@ -71,6 +71,10 @@ export default function ExamensPage() {
   const [isPublishing, setIsPublishing] = useState(false);
   const [reparsingId, setReparsingId]         = useState<string | null>(null);
   const [deletingId, setDeletingId]           = useState<string | null>(null);
+
+  // ── Modal modification (titre + durée) ──
+  const [editModal, setEditModal] = useState<{ id: string; title: string; duration_minutes: string | number } | null>(null);
+  const [isUpdating, setIsUpdating] = useState(false);
   const [searchQuery, setSearchQuery]         = useState("");
   const [showModal, setShowModal]             = useState(false);
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
@@ -173,6 +177,30 @@ export default function ExamensPage() {
       alert(err?.message || "Erreur lors de la suppression de l'examen.");
     } finally {
       setDeletingId(null);
+    }
+  };
+
+  const handleConfirmUpdate = async () => {
+    if (!editModal) return;
+    if (!editModal.title.trim()) {
+      alert("Le nom de l'examen ne peut pas être vide.");
+      return;
+    }
+    setIsUpdating(true);
+    try {
+      const payload: { title?: string; duration_minutes?: number } = {
+        title: editModal.title.trim(),
+      };
+      if (editModal.duration_minutes !== "") {
+        payload.duration_minutes = Number(editModal.duration_minutes);
+      }
+      await updateExam(editModal.id, payload);
+      await loadExams();
+      setEditModal(null);
+    } catch (err: any) {
+      alert(err?.message || "Erreur lors de la mise à jour de l'examen.");
+    } finally {
+      setIsUpdating(false);
     }
   };
 
@@ -501,6 +529,17 @@ export default function ExamensPage() {
                     <span className="hidden sm:inline">Re-parser</span>
                   </button>
                   <button
+                    onClick={() => setEditModal({ id: exam._id, title: exam.title, duration_minutes: exam.duration_minutes ?? "" })}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold transition-all"
+                    style={{ borderColor: "#c5cae9", color: "#1a237e", backgroundColor: "#e8eaf6" }}
+                    onMouseEnter={e => (e.currentTarget.style.backgroundColor = "#dde1f5")}
+                    onMouseLeave={e => (e.currentTarget.style.backgroundColor = "#e8eaf6")}
+                    title="Modifier le nom et la durée de l'examen"
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                    <span className="hidden sm:inline">Update</span>
+                  </button>
+                  <button
                     onClick={() => handleDelete(exam._id, exam.title)}
                     disabled={deletingId === exam._id}
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold transition-all disabled:opacity-50"
@@ -767,6 +806,90 @@ export default function ExamensPage() {
           onClose={() => setPreviewFile(null)}
         />
       )}
+
+      {/* ── Modal modification (titre + durée uniquement) ── */}
+      <AnimatePresence>
+        {editModal && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+            onClick={() => !isUpdating && setEditModal(null)}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 16 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 16 }}
+              transition={{ duration: 0.22 }}
+              onClick={e => e.stopPropagation()}
+              className="bg-white rounded-2xl w-full max-w-md overflow-hidden shadow-xl"
+              style={{ border: "1px solid #c5cae9" }}
+            >
+              {/* Header */}
+              <div className="px-6 py-4 flex items-center justify-between" style={{ backgroundColor: "#1a237e" }}>
+                <div className="flex items-center gap-3">
+                  <div className="h-7 w-7 rounded-lg flex items-center justify-center" style={{ backgroundColor: "rgba(255,255,255,0.15)" }}>
+                    <Pencil className="h-4 w-4 text-white" />
+                  </div>
+                  <h2 className="text-sm font-bold uppercase tracking-widest text-white">Modifier l&apos;examen</h2>
+                </div>
+                <button onClick={() => !isUpdating && setEditModal(null)} className="text-white/70 hover:text-white transition-colors">
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+
+              {/* Body */}
+              <div className="p-6 space-y-5">
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">
+                    Nom de l&apos;examen
+                  </label>
+                  <input
+                    type="text"
+                    value={editModal.title}
+                    onChange={e => setEditModal(prev => prev ? { ...prev, title: e.target.value } : prev)}
+                    className="w-full px-3 py-2 rounded-lg border text-sm focus:outline-none focus:ring-2"
+                    style={{ borderColor: "#c5cae9" }}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">
+                    Durée (minutes)
+                  </label>
+                  <div className="relative">
+                    <Clock className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                    <input
+                      type="number"
+                      min={1}
+                      value={editModal.duration_minutes}
+                      onChange={e => setEditModal(prev => prev ? { ...prev, duration_minutes: e.target.value } : prev)}
+                      className="w-full pl-9 pr-3 py-2 rounded-lg border text-sm focus:outline-none focus:ring-2"
+                      style={{ borderColor: "#c5cae9" }}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div className="px-6 py-4 flex items-center justify-end gap-3 border-t" style={{ borderColor: "#f0f1f7" }}>
+                <button
+                  onClick={() => setEditModal(null)}
+                  disabled={isUpdating}
+                  className="px-4 py-2 rounded-lg text-xs font-bold text-gray-500 hover:bg-gray-100 transition-colors disabled:opacity-50"
+                >
+                  Annuler
+                </button>
+                <button
+                  onClick={handleConfirmUpdate}
+                  disabled={isUpdating}
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold text-white transition-colors disabled:opacity-50"
+                  style={{ backgroundColor: "#1a237e" }}
+                >
+                  {isUpdating ? <><Loader2 className="h-4 w-4 animate-spin" /> Enregistrement…</> : "Enregistrer"}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* ── MODAL Aperçu rendu examen (vue candidat — mono-colonne) ── */}
       <AnimatePresence>
