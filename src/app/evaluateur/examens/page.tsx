@@ -73,7 +73,7 @@ export default function ExamensPage() {
   const [deletingId, setDeletingId]           = useState<string | null>(null);
 
   // ── Modal modification (titre + durée) ──
-  const [editModal, setEditModal] = useState<{ id: string; title: string; duration_minutes: string | number } | null>(null);
+  const [editModal, setEditModal] = useState<{ id: string; title: string; duration_minutes: string | number; deadline: string } | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
   const [searchQuery, setSearchQuery]         = useState("");
   const [showModal, setShowModal]             = useState(false);
@@ -188,8 +188,9 @@ export default function ExamensPage() {
     }
     setIsUpdating(true);
     try {
-      const payload: { title?: string; duration_minutes?: number } = {
+      const payload: { title?: string; duration_minutes?: number; deadline?: string | null } = {
         title: editModal.title.trim(),
+        deadline: editModal.deadline || null,
       };
       if (editModal.duration_minutes !== "") {
         payload.duration_minutes = Number(editModal.duration_minutes);
@@ -529,7 +530,7 @@ export default function ExamensPage() {
                     <span className="hidden sm:inline">Re-parser</span>
                   </button>
                   <button
-                    onClick={() => setEditModal({ id: exam._id, title: exam.title, duration_minutes: exam.duration_minutes ?? "" })}
+                    onClick={() => setEditModal({ id: exam._id, title: exam.title, duration_minutes: exam.duration_minutes ?? "", deadline: exam.deadline ? String(exam.deadline).slice(0, 10) : "" })}
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold transition-all"
                     style={{ borderColor: "#c5cae9", color: "#1a237e", backgroundColor: "#e8eaf6" }}
                     onMouseEnter={e => (e.currentTarget.style.backgroundColor = "#dde1f5")}
@@ -861,6 +862,24 @@ export default function ExamensPage() {
                       min={1}
                       value={editModal.duration_minutes}
                       onChange={e => setEditModal(prev => prev ? { ...prev, duration_minutes: e.target.value } : prev)}
+                      className="w-full pl-9 pr-3 py-2 rounded-lg border text-sm focus:outline-none focus:ring-2"
+                      style={{ borderColor: "#c5cae9" }}
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">
+                    Date limite de soumission
+                  </label>
+                  <p className="text-xs text-gray-400 mb-2">
+                    Le candidat peut passer l&apos;examen jusqu&apos;à cette date. Laisser vide pour supprimer la date limite.
+                  </p>
+                  <div className="relative">
+                    <CalendarDays className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                    <input
+                      type="date"
+                      value={editModal.deadline}
+                      onChange={e => setEditModal(prev => prev ? { ...prev, deadline: e.target.value } : prev)}
                       className="w-full pl-9 pr-3 py-2 rounded-lg border text-sm focus:outline-none focus:ring-2"
                       style={{ borderColor: "#c5cae9" }}
                     />

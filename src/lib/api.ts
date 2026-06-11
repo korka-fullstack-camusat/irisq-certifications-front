@@ -447,7 +447,7 @@ export async function deleteExam(id: string) {
     return res.json();
 }
 
-export async function updateExam(id: string, data: { title?: string; duration_minutes?: number }) {
+export async function updateExam(id: string, data: { title?: string; duration_minutes?: number; deadline?: string | null }) {
     const res = await apiFetch(url(`exams/${id}`), {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
