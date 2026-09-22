@@ -22,6 +22,7 @@ import {
   fetchSessions,
   fetchSessionResponses,
   downloadSessionDossiersZip,
+  fetchFormations,
   type Session,
 } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
@@ -41,17 +42,6 @@ interface CandidatureRow {
 
 const FORMATION_FIELD = "Certification souhaitée";
 const UNCATEGORIZED = "Sans formation renseignée";
-
-const PREDEFINED_FORMATIONS = [
-  "Implementor ISO/IEC17025:2017",
-  "Lead Implementor ISO/IEC17025:2017",
-  "Junior Implementor ISO 9001:2015",
-  "Implementor ISO 9001:2015",
-  "Lead Implementor ISO 9001:2015",
-  "Junior Implementor ISO 14001:2015",
-  "Implementor ISO 14001:2015",
-  "Lead Implementor ISO 14001:2015",
-];
 
 function isPending(r: CandidatureRow): boolean {
   return !r.status || r.status === "pending";
@@ -82,6 +72,7 @@ export default function DashboardOverviewPage() {
     typeof window !== "undefined" ? localStorage.getItem(SELECTED_SESSION_KEY) || "" : ""
   );
   const [rows, setRows] = useState<CandidatureRow[]>([]);
+  const [formationNames, setFormationNames] = useState<string[]>([]);
   const [loadingSessions, setLoadingSessions] = useState(true);
   const [loadingRows, setLoadingRows] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -89,6 +80,11 @@ export default function DashboardOverviewPage() {
 
   useEffect(() => {
     const cachedId = typeof window !== "undefined" ? localStorage.getItem(SELECTED_SESSION_KEY) || "" : "";
+
+    // Fetch formations list (active only) for the dashboard grouping
+    fetchFormations(true)
+      .then(data => { if (data.length > 0) setFormationNames(data.map(f => f.title)); })
+      .catch(() => {});
 
     // Fetch sessions + responses for cached session in parallel
     const sessionsPromise = fetchSessions().then(list => {
@@ -146,7 +142,7 @@ export default function DashboardOverviewPage() {
 
   const formations = useMemo(() => {
     const map = new Map<string, CandidatureRow[]>();
-    for (const name of PREDEFINED_FORMATIONS) map.set(name, []);
+    for (const name of formationNames) map.set(name, []);
     for (const r of rows) {
       const raw = r.answers?.[FORMATION_FIELD];
       const name = (typeof raw === "string" && raw.trim()) ? raw.trim() : UNCATEGORIZED;
@@ -154,7 +150,7 @@ export default function DashboardOverviewPage() {
       map.get(name)!.push(r);
     }
     return Array.from(map.entries()).map(([name, items]) => ({ name, items }));
-  }, [rows]);
+  }, [rows, formationNames]);
 
   async function handleExport() {
     if (!selectedId || exporting) return;
