@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import {
     ArrowRight, Award, CheckCircle2, Info, Loader2,
@@ -8,9 +8,9 @@ import {
 } from "lucide-react";
 
 import { useCandidate } from "@/lib/candidate-context";
+import { fetchFormations } from "@/lib/api";
 
-// ── Certifications disponibles (même liste que le form public) ────────────────
-const CERTIFICATIONS = [
+const CERTIFICATIONS_FALLBACK = [
     "Junior Implementor ISO/IEC17025:2017",
     "Implementor ISO/IEC17025:2017",
     "Lead Implementor ISO/IEC17025:2017",
@@ -27,6 +27,13 @@ const CERTIFICATIONS = [
 
 export default function NouvelleDemandePage() {
     const { dossier, dossiers, loading } = useCandidate();
+    const [allCertifications, setAllCertifications] = useState<string[]>(CERTIFICATIONS_FALLBACK);
+
+    useEffect(() => {
+        fetchFormations(true)
+            .then(data => { if (data.length > 0) setAllCertifications(data.map(f => f.title)); })
+            .catch(() => {});
+    }, []);
 
     if (loading || !dossier) {
         return (
@@ -43,7 +50,7 @@ export default function NouvelleDemandePage() {
         .filter(Boolean) as string[];
 
     // Certifications non encore demandées
-    const available = CERTIFICATIONS.filter(c => !existingCerts.includes(c));
+    const available = allCertifications.filter(c => !existingCerts.includes(c));
 
     return (
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">

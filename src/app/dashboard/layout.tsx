@@ -13,6 +13,7 @@ import {
     History,
     XCircle,
     FolderOpen,
+    GraduationCap,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import Image from "next/image";
@@ -31,6 +32,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
         { name: "Candidatures validées",   href: "/dashboard/candidatures-validees",  icon: ShieldCheck,     mode: null as string | null },
         { name: "Candidats certifiés",     href: "/dashboard/candidats-certifies",    icon: Trophy,          mode: null as string | null },
         { name: "Candidats non certifiés", href: "/dashboard/candidats-non-certifies",icon: XCircle,         mode: null as string | null },
+        { name: "Formations",              href: "/dashboard/formations",             icon: GraduationCap,   mode: null as string | null },
         { name: "Documents",               href: "/dashboard/documents",              icon: FolderOpen,      mode: null as string | null },
         { name: "Historiques",             href: "/dashboard/historique",             icon: History,         mode: null as string | null },
     ];

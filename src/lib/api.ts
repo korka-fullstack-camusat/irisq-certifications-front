@@ -1,5 +1,13 @@
 export const API_URL = (process.env.NEXT_PUBLIC_API_URL || "https://irisq-certifications-api.onrender.com/api")
 
+export type Formation = {
+    id: string;
+    title: string;
+    description?: string;
+    is_active: boolean;
+    created_at?: string;
+};
+
 // ─── Shared cache helpers ────────────────────────────────────────────────────
 const CERT_FORM_ID_KEY = "irisq_form_id";
 const AUDIT_ACTION_TYPES_KEY = "irisq_audit_action_types";
@@ -421,6 +429,46 @@ export async function fetchCertifications(): Promise<string[]> {
     if (!res.ok) throw new Error("Failed to fetch certifications");
     const data = await res.json();
     return data.certifications as string[];
+}
+
+// ─── Formations ──────────────────────────────────────────────────────────────
+
+export async function fetchFormations(activeOnly = false): Promise<Formation[]> {
+    const endpoint = activeOnly ? url("formations?active_only=true") : url("formations");
+    const res = await fetch(endpoint, { redirect: "follow" });
+    if (!res.ok) throw new Error("Failed to fetch formations");
+    return res.json();
+}
+
+export async function createFormation(data: { title: string; description?: string; is_active?: boolean }): Promise<Formation> {
+    const res = await apiFetch(url("formations"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+    });
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || "Failed to create formation");
+    }
+    return res.json();
+}
+
+export async function updateFormation(id: string, data: Partial<Formation>): Promise<Formation> {
+    const res = await apiFetch(url(`formations/${id}`), {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+    });
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || "Failed to update formation");
+    }
+    return res.json();
+}
+
+export async function deleteFormation(id: string): Promise<void> {
+    const res = await apiFetch(url(`formations/${id}`), { method: "DELETE" });
+    if (!res.ok) throw new Error("Failed to delete formation");
 }
 
 export async function createExam(data: {

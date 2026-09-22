@@ -10,9 +10,9 @@ import {
     Info
 } from "lucide-react";
 import Image from "next/image";
-import { fetchForms, fetchFormById, createForm, submitResponse, uploadFiles, fetchSessions, checkSessionEligibility, checkEmailEligibility, type Session } from "@/lib/api";
+import { fetchForms, fetchFormById, createForm, submitResponse, uploadFiles, fetchSessions, checkSessionEligibility, checkEmailEligibility, fetchFormations, type Session } from "@/lib/api";
 
-const CERTIFICATIONS = [
+const CERTIFICATIONS_FALLBACK = [
     "Junior Implementor ISO/IEC17025:2017",
     "Implementor ISO/IEC17025:2017",
     "Lead Implementor ISO/IEC17025:2017",
@@ -31,12 +31,12 @@ const CERTIFICATIONS = [
 // < 2 ans  → Junior only
 // 2 – 5 ans → Implementor only
 // > 5 ans  → all
-function getEligibleCertifications(yearsStr: string): string[] {
+function getEligibleCertifications(yearsStr: string, all: string[]): string[] {
     const n = Number(yearsStr);
-    if (!Number.isFinite(n) || n < 0 || yearsStr.trim() === "") return CERTIFICATIONS;
-    if (n < 2) return CERTIFICATIONS.filter(c => c.startsWith("Junior"));
-    if (n < 5) return CERTIFICATIONS.filter(c => c.startsWith("Junior") || c.startsWith("Implementor"));
-    return CERTIFICATIONS; // n >= 5
+    if (!Number.isFinite(n) || n < 0 || yearsStr.trim() === "") return all;
+    if (n < 2) return all.filter(c => c.startsWith("Junior"));
+    if (n < 5) return all.filter(c => c.startsWith("Junior") || c.startsWith("Implementor"));
+    return all;
 }
 
 /** Extrait la norme ISO d'un libellé de certification (ex: "9001", "17025"). */
@@ -199,6 +199,7 @@ export default function DemandeCertificationPage() {
     const [telephone, setTelephone] = useState("");
     const [email, setEmail] = useState("");
     const [anneesExperience, setAnneesExperience] = useState("");
+    const [allCertifications, setAllCertifications] = useState<string[]>(CERTIFICATIONS_FALLBACK);
     // Multi-select : jusqu'à 2 certifications par session
     const [certifications, setCertifications] = useState<string[]>([]);
     const [sessions, setSessions] = useState<Session[]>([]);
@@ -261,7 +262,7 @@ export default function DemandeCertificationPage() {
     // When years change, remove any selected certification that falls outside the new eligible list
     const handleAnneesChange = (value: string) => {
         handleField("anneesExperience", value, setAnneesExperience);
-        const eligible = getEligibleCertifications(value);
+        const eligible = getEligibleCertifications(value, allCertifications);
         setCertifications(prev => prev.filter(c => eligible.includes(c)));
     };
 
@@ -309,6 +310,10 @@ export default function DemandeCertificationPage() {
     };
 
     useEffect(() => {
+        fetchFormations(true)
+            .then(data => { if (data.length > 0) setAllCertifications(data.map(f => f.title)); })
+            .catch(() => {});
+
         const sessionsPromise = fetchSessions()
             .then(sess => setSessions(sess.filter((s: any) => s.status === "active")))
             .catch(() => {})
@@ -1021,7 +1026,7 @@ export default function DemandeCertificationPage() {
 
                                 {/* ÉTAPE 2 — Expérience + Certification */}
                                 {step === 2 && (() => {
-                                    const eligible = getEligibleCertifications(anneesExperience);
+                                    const eligible = getEligibleCertifications(anneesExperience, allCertifications);
                                     const yearsNum = Number(anneesExperience);
                                     const hasYears = anneesExperience.trim() !== "" && Number.isFinite(yearsNum) && yearsNum >= 0;
                                     return (
@@ -1131,7 +1136,7 @@ export default function DemandeCertificationPage() {
                                                         transition={{ duration: 0.2 }}
                                                         className="space-y-2"
                                                     >
-                                                        {(hasYears ? eligible : CERTIFICATIONS).map((cert) => {
+                                                        {(hasYears ? eligible : allCertifications).map((cert) => {
                                                             const selected = certifications.includes(cert);
                                                             const maxReached = certifications.length >= 2 && !selected;
                                                             const normConflict = !selected && certifications.some(c => extractNorm(c) === extractNorm(cert));
@@ -1186,7 +1191,7 @@ export default function DemandeCertificationPage() {
                                                         Maximum atteint. Désélectionnez une formation pour en choisir une autre.
                                                     </motion.p>
                                                 )}
-                                                {certifications.length < 2 && certifications.some(c => extractNorm(c) !== "") && (hasYears ? eligible : CERTIFICATIONS).some(cert => !certifications.includes(cert) && certifications.some(c => extractNorm(c) === extractNorm(cert))) && (
+                                                {certifications.length < 2 && certifications.some(c => extractNorm(c) !== "") && (hasYears ? eligible : allCertifications).some(cert => !certifications.includes(cert) && certifications.some(c => extractNorm(c) === extractNorm(cert))) && (
                                                     <motion.p
                                                         initial={{ opacity: 0, y: -4 }}
                                                         animate={{ opacity: 1, y: 0 }}
